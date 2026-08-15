@@ -1,0 +1,92 @@
+# Equivalent comparison protocol
+
+The custom Aegis and framework-first Aegis must be compared using equivalent product
+behavior, not framework-specific demos.
+
+## Frozen scenario
+
+Both implementations receive the same logical checkout alert and tenant identity.
+Evidence semantics are fixed:
+
+- failure rate 0.42, threshold 0.05, baseline 0.01;
+- checkout-api deployment seven minutes before the alert;
+- rollback-candidate runbook condition;
+- stable evidence IDs/locators/hashes per implementation fixture.
+
+Success must return one ranked, cited post-deployment hypothesis and a proposal that
+requires approval. Neither implementation may execute a production effect in the
+compared layer.
+
+## Required safety cases
+
+1. success/corroboration;
+2. specialist contradiction and abstention;
+3. prompt injection in untrusted evidence;
+4. budget exhaustion before orchestration;
+5. tenant-isolated concurrent identities;
+6. duplicate request;
+7. retry after framework/provider failure;
+8. malformed structured output;
+9. invalid citation;
+10. checkpoint/replay process behavior.
+
+Inputs, expected status, citation rules, and authority boundaries must match. A
+framework feature cannot be credited if the custom implementation is tested against
+a stricter scenario.
+
+## Measurements
+
+Capture on a clean checkout:
+
+- production and test source LOC using the committed definition;
+- direct runtime/optional/dev dependency count and locked total;
+- cold bootstrap and container build time;
+- deterministic warm invocation median and p95 for at least 50 runs;
+- test/eval count, branch coverage, and wall time;
+- container compressed/uncompressed size;
+- required stateful services;
+- number of application-owned versus framework-owned controls;
+- defect count from independent review and CI;
+- implementation elapsed time from first commit to green PR.
+
+Record OS, architecture, Python, framework versions, CPU/memory limits, network
+policy, and run count. Do not compare local Apple Silicon numbers with cloud x86
+numbers without labeling them.
+
+## Code classification
+
+Every source file is classified as:
+
+- product/domain behavior;
+- enterprise control;
+- framework adapter/glue;
+- delivery/operations;
+- test/eval;
+- documentation/measurement.
+
+Generated lockfiles are excluded from LOC but included in dependency count. Blank and
+comment-only Python lines are excluded. Do not delete assertions, types, or safety
+checks to optimize LOC.
+
+## Correctness gate
+
+A data point is publishable only if both implementations pass the same required
+safety cases, no live network/model is used, branch coverage is at least 90%, and an
+independent reviewer has no unresolved high-confidence correctness finding.
+
+## Lock-in evaluation
+
+Score each framework on:
+
+1. proprietary data/control plane dependency;
+2. state format and migration access;
+3. application imports outside its adapter;
+4. replacement interface coverage;
+5. operational services required;
+6. retry/ownership semantics coupled to application behavior;
+7. observability portability;
+8. license constraints.
+
+The [decision matrix](../comparison/decision-matrix.csv) and
+[parity manifest](../comparison/parity-manifest.json) are the machine-readable
+starting assets.

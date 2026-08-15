@@ -1,0 +1,5 @@
+/.github/ @mrinmoyece
+/Dockerfile @mrinmoyece
+/compose.yaml @mrinmoyece
+/src/aegis_framework/ports.py @mrinmoyece
+/src/aegis_framework/service.py @mrinmoyece

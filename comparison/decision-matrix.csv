@@ -1,0 +1,15 @@
+concern,framework_or_tool,custom_code_eliminated,enterprise_code_still_required,lock_in_surface,escape_hatch
+Graph scheduling,LangGraph 1.2.11,"scheduler; parallel join; checkpoint traversal","policy; budget; tenancy; idempotency; citations","graph API; Pregel reducers; state schema",OrchestratorPort
+Structured contracts,Pydantic 2.13.4,"manual parsing; schema serialization","authorization; semantic validation; migrations","Pydantic model API",JSON schema and domain adapters
+HTTP delivery,FastAPI 0.141.1,"routing; OpenAPI; request validation","authentication; rate policy; BFF security","ASGI/FastAPI dependency injection",Delivery adapter
+Checkpoint persistence,LangGraph checkpoint 4.2.0,"checkpoint writes; state history","access control; retention; backup; audit","saver schema and serialization",PostgreSQL export plus OrchestratorPort
+Durable checkpoints,PostgreSQL saver 3.1.2,"saver SQL plumbing","RLS; HA; migrations; operations","LangGraph saver tables",postgres.py factory
+External workflow,Temporal 1.31.0 deferred,None yet,"activity idempotency; fencing; audit; reconciliation","event history and workflow determinism",Future DurableWorkflowPort
+Framework tracing,Langfuse 4.14.4,"trace/eval UI and storage when enabled","redaction; cardinality; retention policy","SDK and backend data model",ObservabilityPort and OTLP
+Portable telemetry,OpenTelemetry 1.44.0,"span context/export protocol","safe attributes; sampling; SLO policy","semantic convention churn",OTel API/OTLP
+Live model access,OpenAI/Anthropic adapters deferred,None yet,"credentials; routing; quotas; schema and data policy","provider APIs and message formats",StructuredModelPort
+Vector retrieval,pgvector 0.8.6 deferred,None yet,"tenant filters; provenance; relevance evals","PostgreSQL extension and index choices",EvidencePort
+Caching/queue,Redis rejected,None,None for Layer 1,"new state owner and server licensing",Add only from measured need
+Long-running approvals,Temporal deferred,None yet,"separation of duties; signed decision; timeout policy","workflow history and server operations",Future DurableWorkflowPort
+Effects,No framework selected,None,"approval validation; idempotency; fencing; credentials; verification",Application-specific external APIs,EffectPort
+Audit,No framework authority,None,"append-only durable ledger; retention; witness; replay",Application schema and policy,AuditPort

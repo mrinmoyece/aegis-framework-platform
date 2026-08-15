@@ -1,0 +1,179 @@
+"""Replaceable application contracts around framework and enterprise authority."""
+
+from __future__ import annotations
+
+from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager
+from datetime import datetime
+from enum import StrEnum
+from typing import Protocol
+
+from pydantic import Field
+
+from aegis_framework.domain import (
+    ApprovalGrant,
+    ApprovalRequest,
+    EffectReceipt,
+    Evidence,
+    IdentityContext,
+    InvestigationRequest,
+    InvestigationResult,
+    RemediationProposal,
+    SpecialistFinding,
+    SpecialistTask,
+    StrictModel,
+)
+
+
+class Action(StrEnum):
+    INVESTIGATION_RUN = "investigation:run"
+    INVESTIGATION_READ = "investigation:read"
+    EFFECT_EXECUTE = "effect:execute"
+
+
+class PolicyDecision(StrictModel):
+    allowed: bool
+    policy_id: str
+    reason: str
+
+
+class BudgetDecision(StrictModel):
+    allowed: bool
+    reservation_id: str
+    requested_units: int = Field(gt=0)
+    remaining_units: int = Field(ge=0)
+    reason: str
+
+
+class RunClaimStatus(StrEnum):
+    STARTED = "started"
+    COMPLETED = "completed"
+    RETRY = "retry"
+    IN_PROGRESS = "in_progress"
+
+
+class RunClaim(StrictModel):
+    status: RunClaimStatus
+    attempt: int = Field(ge=1)
+    result: InvestigationResult | None = None
+
+
+class PolicyPort(Protocol):
+    def authorize(
+        self,
+        identity: IdentityContext,
+        action: Action,
+        *,
+        resource_tenant_id: str,
+    ) -> PolicyDecision: ...
+
+
+class BudgetPort(Protocol):
+    def reserve(
+        self,
+        identity: IdentityContext,
+        *,
+        reservation_id: str,
+        units: int,
+    ) -> BudgetDecision: ...
+
+
+class EvidencePort(Protocol):
+    def collect(
+        self,
+        identity: IdentityContext,
+        request: InvestigationRequest,
+    ) -> Sequence[Evidence]: ...
+
+
+class StructuredModelPort(Protocol):
+    def analyze(self, task: SpecialistTask) -> object: ...
+
+
+class OrchestratorPort(Protocol):
+    def run(
+        self,
+        *,
+        tenant_id: str,
+        request: InvestigationRequest,
+        request_id: str,
+        thread_ref: str,
+        evidence: Sequence[Evidence],
+    ) -> InvestigationResult: ...
+
+    def checkpoint_count(self, thread_ref: str) -> int: ...
+
+
+class ApprovalPort(Protocol):
+    def open_request(
+        self,
+        identity: IdentityContext,
+        proposal: RemediationProposal,
+    ) -> ApprovalRequest: ...
+
+
+class EffectPort(Protocol):
+    def execute(
+        self,
+        identity: IdentityContext,
+        proposal: RemediationProposal,
+        approval: ApprovalGrant,
+    ) -> EffectReceipt: ...
+
+
+class AuditPort(Protocol):
+    def append(
+        self,
+        *,
+        identity: IdentityContext,
+        event_type: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> None: ...
+
+
+class IdempotencyPort(Protocol):
+    def acquire(
+        self,
+        *,
+        tenant_id: str,
+        request_id: str,
+        fingerprint: str,
+    ) -> RunClaim: ...
+
+    def complete(
+        self,
+        *,
+        tenant_id: str,
+        request_id: str,
+        result: InvestigationResult,
+    ) -> None: ...
+
+    def fail(self, *, tenant_id: str, request_id: str, code: str) -> None: ...
+
+
+class Observation(Protocol):
+    def finish(
+        self,
+        *,
+        status: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> None: ...
+
+
+class ObservabilityPort(Protocol):
+    def investigation(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+
+class ClockPort(Protocol):
+    def now(self) -> datetime: ...
+
+
+class FindingValidatorPort(Protocol):
+    def validate(
+        self, finding: SpecialistFinding, evidence: Sequence[Evidence]
+    ) -> bool: ...
