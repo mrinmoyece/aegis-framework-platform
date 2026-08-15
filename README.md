@@ -8,10 +8,10 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
-**Layer 3 investigates and persists lifecycle truth. It still cannot approve, execute,
+**Layer 4 investigates through a governed model gateway. It still cannot approve, execute,
 or verify a production effect.**
 
-## Delivered Layer 3
+## Delivered Layer 4
 
 - additive strict application events with aggregate sequence, commit-order tenant
   cursor, expected-version concurrency, aggregate/tenant hash chains, legacy upcast,
@@ -31,6 +31,16 @@ or verify a production effect.**
   non-`BYPASSRLS` runtime role;
 - digest-pinned optional Temporal Server 1.29.1 Compose profile and replay integration;
 - OpenTelemetry/optional Langfuse counts/status telemetry without payload export.
+- immutable neutral model messages/content/tools/schemas/safety/usage/pricing/errors with
+  tenant/run/purpose binding, strict bounds, and canonical digests;
+- tenant model policy/catalog, exact capability/context/region/classification/price
+  declarations, deterministic routes, worst-case token/cost reservation, immutable call
+  intent/settlement, explicit billing ambiguity, and rebuildable usage/health views;
+- bounded structured repair, fallback, circuit, rate/concurrency controls, cancellation
+  and policy-revocation stale-result rejection, with SDK and graph retries disabled;
+- deterministic fake plus official OpenAI 3.1.0 and Anthropic 0.122.0 adapters; all tests
+  use fake clients and no network/credentials;
+- authorized redacted catalog, usage, and derived-health APIs under forced PostgreSQL RLS.
 
 ## Ownership
 
@@ -39,6 +49,7 @@ or verify a production effect.**
 | PostgreSQL application ledger | Events, idempotency, inbox/outbox, run/timeline/audit facts | Framework scheduling/checkpoints |
 | Temporal | Cross-process schedule, Activities, timers, signals, replay/recovery | Tenant grants, policy, audit, API status, effects |
 | LangGraph | Cognitive nodes, fan-out/join, reducers, graph checkpoints | Workflow lifecycle, authorization, audit, effects |
+| Official provider SDKs | OpenAI/Anthropic wire protocol and decoding | Model policy, routing, budget, pricing, usage, safety, retry truth |
 
 A framework history, checkpoint, trace, prompt, completion, message, or tool result is
 never an authorization, tenant grant, quota receipt, approval, audit record, fencing
@@ -107,7 +118,7 @@ make integration
 AEGIS_TEST_TEMPORAL_ADDRESS=127.0.0.1:57233 make temporal-integration
 ```
 
-The four PostgreSQL tests prove forced RLS/pool reset, immutable audit/events, quota
+The five PostgreSQL tests prove forced RLS/pool reset, immutable audit/events, quota/model
 races, checkpoint isolation, ledger/outbox atomicity, projection rebuild, and tenant
 isolation. The Temporal test proves no-worker recovery, Activity retry, duplicate
 signal, cancellation signal, timer timeout, completion, and deterministic replay.
@@ -131,13 +142,15 @@ never the repository or workflow history.
 | Graph saver | `langgraph-checkpoint-postgres` 3.1.2 | Tenant owner/RLS overlay |
 | Telemetry | OpenTelemetry 1.44.0 | Fixed names/allowlisted attributes |
 | Optional model trace/eval | Langfuse 4.14.4 | Counts/status only |
+| Provider adapters | OpenAI 3.1.0 + Anthropic 0.122.0 | `ModelProviderAdapter`; retries disabled |
 
 ## Qualification status
 
-- 138 deterministic tests pass at 91.61% meaningful branch coverage;
-- 13 deterministic evals cover cognitive safety plus durable recovery, duplicates,
-  cancellation, revocation during wait, and framework outage;
-- four PostgreSQL and two Temporal integration tests pass locally;
+- 163 deterministic tests pass at greater than 90% meaningful branch coverage;
+- 21 deterministic evals cover cognitive and model gateway safety, durable recovery,
+  routing, budgets, malformed output, fallback/circuit, timeout/cancellation, duplicate
+  and ambiguous billing, revocation, and tenant isolation;
+- five PostgreSQL and two Temporal integration tests pass locally;
 - one Keycloak compatibility test remains environment-gated;
 - tests/evals use no live credentials, real models, or cloud services.
 
@@ -146,28 +159,31 @@ these as production evidence.
 
 ## Framework comparison
 
-`comparison/layer3-metrics.json` pins custom Aegis Layer 3 at `87cefe5` and Layer 4 at
-`171fa48`. Temporal removes custom scheduler, poller, timer, signal history,
-heartbeat/retry, and worker recovery code. Enterprise event envelopes, RLS,
-idempotency, inbox/outbox, policy checks, projections, redaction, and audit remain
-custom. The tradeoff is a second operational service and replay/upgrade discipline.
+`comparison/layer4-metrics.json` pins custom Aegis Layer 5 at `7c22d38`. Framework Layer 4
+has 12,136 production LOC versus custom Layer 5's 11,079: frameworks did not reduce the
+enterprise control code and increase production LOC by 1,057. Total source is 17,599
+versus 16,558. An equivalent 50-run in-process fake gateway benchmark measured 0.348 ms
+median/0.510 ms p95 here versus 0.166/0.206 ms custom;
+it excludes databases, worker systems, networks, and process boundaries. Official SDKs
+remove provider wire code only; policy, budget, ledger, resilience, safety, and evals
+remain application-owned.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
 | `make lint` / `make type` / `make test` | Strict deterministic gates |
-| `make eval` | Thirteen deterministic evals |
+| `make eval` | Twenty-one deterministic evals |
 | `make integration` | Configured PostgreSQL/Keycloak tests |
 | `make temporal-integration` | Configured Temporal workflow/replay test |
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 3 comparison metrics |
+| `make measure` | Refresh Layer 4 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
-[ADR 007](docs/adr/007-temporal-durable-workflow.md),
+[ADR 007](docs/adr/007-temporal-durable-workflow.md), [ADR 009](docs/adr/009-provider-neutral-model-gateway.md),
 [runbook](docs/runbook.md), [threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).
 

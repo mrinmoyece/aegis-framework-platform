@@ -60,6 +60,20 @@ from aegis_framework.errors import (
 )
 from aegis_framework.fixtures import DemoBundle, DemoScenario, build_demo_bundle
 from aegis_framework.identity import UnavailableAuthenticator
+from aegis_framework.model_gateway import (
+    CredentialReference,
+    DataClassification,
+    InMemoryModelControlStore,
+    ModelCapability,
+    ModelCatalogEntry,
+    ModelControlStore,
+    ModelPrice,
+    ModelProvider,
+    ModelRoute,
+    ModelUsageView,
+    ProviderHealthView,
+    TenantModelPolicy,
+)
 from aegis_framework.ports import Action, PolicyDecision, PolicyPort
 from aegis_framework.references import TenantReferenceCodec
 from aegis_framework.service import InvestigationService
@@ -125,6 +139,19 @@ class MeResponse(StrictModel):
     purposes: tuple[Identifier, ...]
     grant_version: int = Field(ge=1)
     expires_at: str
+
+
+class ModelCatalogView(StrictModel):
+    provider: ModelProvider
+    model: Identifier
+    region: Identifier
+    capabilities: tuple[str, ...]
+    context_tokens: int
+    maximum_output_tokens: int
+    tokenizer: Identifier | None
+    tokenizer_limitations: str
+    usage_limitations: str
+    pricing_version: Identifier
 
 
 class BodySizeLimitMiddleware:
@@ -199,6 +226,7 @@ class ApiRuntime:
     policy: PolicyPort
     service_for: Callable[[DemoScenario], InvestigationService]
     durable: DurableInvestigationService | None = None
+    model_control: ModelControlStore | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -260,8 +288,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.3.0",
-        description="Authenticated durable Layer 3 investigation API.",
+        version="0.4.0",
+        description="Authenticated durable Layer 4 model investigation API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -412,6 +440,55 @@ def create_app(
         return tuple(
             selected_runtime.governance.list_audit(identity=identity, limit=limit)
         )
+
+    @app.get("/v1/models/catalog", response_model=tuple[ModelCatalogView, ...])
+    def model_catalog(
+        identity: IdentityContext = Depends(authenticated),
+    ) -> tuple[ModelCatalogView, ...]:
+        control = _require_model_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.MODEL_CATALOG_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        return tuple(
+            _catalog_view(entry)
+            for entry in control.catalog(tenant_id=identity.tenant_id)
+        )
+
+    @app.get(
+        "/v1/models/usage/{run_id}",
+        response_model=ModelUsageView,
+    )
+    def model_usage(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> ModelUsageView:
+        control = _require_model_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.MODEL_USAGE_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        return control.usage(tenant_id=identity.tenant_id, run_id=run_id)
+
+    @app.get(
+        "/v1/models/health",
+        response_model=tuple[ProviderHealthView, ...],
+    )
+    def model_health(
+        identity: IdentityContext = Depends(authenticated),
+    ) -> tuple[ProviderHealthView, ...]:
+        control = _require_model_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.MODEL_HEALTH_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        return tuple(control.health(tenant_id=identity.tenant_id))
 
     @app.post(
         "/v1/investigations",
@@ -609,6 +686,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
     from aegis_framework.fixtures import DEMO_TIME
 
     durable_store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
+    model_control = _demo_model_control()
     return ApiRuntime(
         authenticator=primary.authenticator,
         governance=primary.governance,
@@ -622,6 +700,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
             store=durable_store,
             cursor_codec=CursorCodec(b"aegis-demo-cursor-key-is-test-only-0001"),
         ),
+        model_control=model_control,
     )
 
 
@@ -658,6 +737,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
         IssuerConfiguration,
         JwtAuthenticator,
     )
+    from aegis_framework.model_postgres import PostgresModelControlStore
     from aegis_framework.postgres import PostgresRepository, open_runtime_pool
 
     clock = SystemClock()
@@ -713,7 +793,97 @@ def _production_runtime_from_environment() -> ApiRuntime:
             ),
             cursor_codec=cursor_codec,
         ),
+        model_control=PostgresModelControlStore(pool=pool),
     )
+
+
+def _demo_model_control() -> InMemoryModelControlStore:
+    entries = tuple(
+        ModelCatalogEntry(
+            tenant_id=tenant_id,
+            provider=ModelProvider.FAKE,
+            model="deterministic-v1",
+            region="local",
+            capabilities=frozenset({ModelCapability.JSON_SCHEMA}),
+            context_tokens=32_768,
+            maximum_output_tokens=4_096,
+            tokenizer=None,
+            tokenizer_limitations="Portable conservative byte estimate only.",
+            usage_limitations=(
+                "Deterministic fake usage is synthetic, never provider billing."
+            ),
+            price=ModelPrice(
+                version="fake-2026-08-15",
+                currency="USD",
+                input_microunits_per_million_tokens=1_000,
+                output_microunits_per_million_tokens=2_000,
+            ),
+            credential=CredentialReference(
+                reference=f"secret:fake-model-{tenant_id}",
+                version=1,
+            ),
+        )
+        for tenant_id in ("tenant-acme", "tenant-beta")
+    )
+    policies = tuple(
+        TenantModelPolicy(
+            tenant_id=entry.tenant_id,
+            policy_id=f"model-policy-{entry.tenant_id}",
+            revision=1,
+            allowed_providers=frozenset({ModelProvider.FAKE}),
+            allowed_models=frozenset({entry.model}),
+            allowed_regions=frozenset({entry.region}),
+            allowed_data_classifications=frozenset({DataClassification.INTERNAL}),
+            allowed_purposes=frozenset({"incident-response"}),
+            required_capabilities=frozenset({ModelCapability.JSON_SCHEMA}),
+            risk_ceiling=RiskLevel.MEDIUM,
+            routes=(
+                ModelRoute(
+                    provider=entry.provider,
+                    model=entry.model,
+                    region=entry.region,
+                    priority=1,
+                ),
+            ),
+            maximum_input_tokens=16_384,
+            maximum_output_tokens=4_096,
+            maximum_cost_microunits=10_000,
+            maximum_calls_per_run=8,
+        )
+        for entry in entries
+    )
+    return InMemoryModelControlStore(
+        policies=policies,
+        catalog=entries,
+        tenant_cost_limits={
+            "tenant-acme": 1_000_000,
+            "tenant-beta": 1_000_000,
+        },
+    )
+
+
+def _catalog_view(entry: ModelCatalogEntry) -> ModelCatalogView:
+    return ModelCatalogView(
+        provider=entry.provider,
+        model=entry.model,
+        region=entry.region,
+        capabilities=tuple(sorted(item.value for item in entry.capabilities)),
+        context_tokens=entry.context_tokens,
+        maximum_output_tokens=entry.maximum_output_tokens,
+        tokenizer=entry.tokenizer,
+        tokenizer_limitations=entry.tokenizer_limitations,
+        usage_limitations=entry.usage_limitations,
+        pricing_version=entry.price.version,
+    )
+
+
+def _require_model_control(runtime: ApiRuntime) -> ModelControlStore:
+    if runtime.model_control is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="model operations are unavailable",
+        )
+    return runtime.model_control
 
 
 def _authorize_resource(

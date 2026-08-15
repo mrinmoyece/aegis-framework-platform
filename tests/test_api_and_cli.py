@@ -96,6 +96,32 @@ def test_authenticated_identity_and_governance_routes_are_scoped() -> None:
     assert "tenant_id" not in audit.text
 
 
+def test_model_operations_routes_are_authorized_and_redacted() -> None:
+    client = TestClient(create_app(mode=AppMode.DEMO))
+    headers = _headers(request_id="api-model-operations")
+    catalog = client.get("/v1/models/catalog", headers=headers)
+    assert catalog.status_code == 200
+    assert catalog.json()[0]["provider"] == "fake"
+    assert catalog.json()[0]["pricing_version"] == "fake-2026-08-15"
+    assert "credential" not in catalog.text
+    assert "tenant_id" not in catalog.text
+
+    usage = client.get("/v1/models/usage/run:opaque", headers=headers)
+    assert usage.status_code == 200
+    assert usage.json() == {
+        "run_id": "run:opaque",
+        "reserved_cost_microunits": 0,
+        "reconciled_cost_microunits": 0,
+        "ambiguous_cost_microunits": 0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "call_count": 0,
+    }
+    health = client.get("/v1/models/health", headers=headers)
+    assert health.status_code == 200
+    assert health.json()[0]["status"] == "unknown"
+
+
 def test_production_identity_and_readiness_fail_closed() -> None:
     client = TestClient(create_app(mode=AppMode.PRODUCTION))
     health = client.get("/healthz")

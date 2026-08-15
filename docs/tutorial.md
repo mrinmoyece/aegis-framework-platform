@@ -1,4 +1,4 @@
-# Tutorial: trace one durable investigation without trusting framework state
+# Tutorial: trace one durable model-backed investigation without trusting frameworks
 
 ## 1. Run the deterministic delivery adapter
 
@@ -153,7 +153,45 @@ counts/status. The optional Temporal tracing interceptor is configured through t
 and does not export application payload contents. Temporal input contains only opaque
 references. Langfuse remains model/graph telemetry; automatic graph capture is blocked.
 
-## 10. Run all release gates
+## 10. Inspect model operations without exposing credentials
+
+```bash
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-model-catalog-001' \
+  http://127.0.0.1:8000/v1/models/catalog
+
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-model-usage-001' \
+  http://127.0.0.1:8000/v1/models/usage/RUN_ID
+
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-model-health-001' \
+  http://127.0.0.1:8000/v1/models/health
+```
+
+Catalog output omits credential and tenant references. Usage comes from application call
+facts, and health is derived. The demo catalog uses only the deterministic fake; official
+SDK adapters are never activated implicitly.
+
+A model-backed node follows this order:
+
+```text
+current model policy/catalog
+  -> worst-case token/cost reservation
+  -> immutable requested attempt
+  -> one SDK call (SDK retries disabled)
+  -> current policy/cancellation recheck
+  -> strict Pydantic output/citation validation
+  -> immutable billed/not-billed/ambiguous settlement
+```
+
+Malformed output receives only the policy repair bound. Timeout/crash ambiguity blocks
+silent duplicate calls. No model output can create identity, policy, approval, or effect.
+
+## 11. Run all release gates
 
 ```bash
 make ci

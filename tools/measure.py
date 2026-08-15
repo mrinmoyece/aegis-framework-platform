@@ -1,4 +1,4 @@
-"""Measure repeatable Layer 3 size, dependencies, effort, and local runtime."""
+"""Measure repeatable Layer 4 size, dependencies, effort, and local runtime."""
 
 from __future__ import annotations
 
@@ -15,10 +15,30 @@ import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 
+from pydantic import Field
+
+from aegis_framework.api import _demo_model_control
+from aegis_framework.domain import RiskLevel, StrictModel
 from aegis_framework.fixtures import build_demo_bundle, demo_identity, demo_request
+from aegis_framework.model_gateway import (
+    DataClassification,
+    FakeModelProvider,
+    ModelCallBinding,
+    ModelFinishReason,
+    ModelGateway,
+    ModelMessage,
+    ModelRequest,
+    ModelRole,
+    ModelUsage,
+    ProviderResult,
+    SafetyAssessment,
+    StructuredOutputDefinition,
+    TextContent,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FOUNDATION_SHA = "754e536d10b9643b40cac2f7b6c0d1de870fd630"
+LAYER3_SHA = "7f5813d6b88a83ace2e5624254d8f4b4aa2ac4aa"
 CUSTOM_LAYER3 = {
     "repository": "mrinmoyece/aegis-agent-platform",
     "branch": "mrinmoyece-aegis-durable-ledger",
@@ -65,6 +85,28 @@ CUSTOM_LAYER4 = {
     },
     "test_functions": 99,
 }
+CUSTOM_LAYER5 = {
+    "repository": "mrinmoyece/aegis-agent-platform",
+    "branch": "mrinmoyece-aegis-model-gateway",
+    "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6",
+    "source_loc": {
+        "production": 11079,
+        "tests": 5479,
+        "total": 16558,
+    },
+    "dependencies": {
+        "direct_runtime": 9,
+        "direct_optional": 7,
+        "direct_development": 0,
+    },
+    "incremental_effort_from_layer4": {
+        "additions": 6568,
+        "deletions": 109,
+        "changed_files": 55,
+        "commits": 1,
+    },
+    "test_functions": 141,
+}
 
 
 def main() -> int:
@@ -72,8 +114,8 @@ def main() -> int:
     parser.add_argument("--write", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=50)
     args = parser.parse_args()
-    if args.runs < 10:
-        parser.error("--runs must be at least 10")
+    if args.runs < 10 or args.runs > 99_999:
+        parser.error("--runs must be between 10 and 99999")
 
     payload = measure(args.runs)
     destination = ROOT / args.write
@@ -114,21 +156,23 @@ def measure(runs: int) -> dict[str, object]:
     optional = pyproject["project"].get("optional-dependencies", {})
     dependency_groups = pyproject.get("dependency-groups", {})
     effort = _git_effort()
+    gateway_runtime = _gateway_runtime(runs)
     return {
-        "schema_version": 3,
-        "layer": 3,
+        "schema_version": 4,
+        "layer": 4,
         "comparison_basis": {
             "foundation_sha": FOUNDATION_SHA,
             "custom_layer3": CUSTOM_LAYER3,
             "custom_layer4": CUSTOM_LAYER4,
+            "custom_layer5": CUSTOM_LAYER5,
             "loc_definition": "non-blank, non-comment physical Python lines",
             "effort_definition": (
                 "Git additions/deletions and changed files from each prior layer"
             ),
             "equivalent_scenario": (
-                "tenant-scoped durable checkout investigation intent, bounded "
-                "orchestration, duplicate suppression, recovery, cancellation, "
-                "redacted timeline, and no production effect"
+                "tenant-scoped structured fake-provider call with explicit catalog, "
+                "pre-call reservation, deterministic route, normalized usage/cost "
+                "settlement, no network, and no production effect"
             ),
         },
         "measured_at": datetime.now(UTC).isoformat(),
@@ -162,6 +206,7 @@ def measure(runs: int) -> dict[str, object]:
             "cross-process workflow scheduling and replay",
             "durable timers and signal delivery",
             "activity retry/backoff and worker crash recovery",
+            "OpenAI and Anthropic wire protocol and SDK exception transport",
         ],
         "remaining_custom_controls": [
             "issuer registry and bounded JWKS rotation policy",
@@ -178,6 +223,11 @@ def measure(runs: int) -> dict[str, object]:
             "projection rebuild and redacted cursor API",
             "activity authorization and retry ownership",
             "stale-result, poison-payload, and DLQ policy",
+            "tenant model policy/catalog and price versions",
+            "worst-case model token/cost reservations",
+            "model routing, fallback, circuit, rate and concurrency policy",
+            "immutable provider call and ambiguous-billing facts",
+            "strict structured output, tools and citation controls",
         ],
         "lock_in_and_escape": {
             "langgraph": "OrchestratorPort plus JSON-compatible domain state",
@@ -193,18 +243,28 @@ def measure(runs: int) -> dict[str, object]:
                 "opaque typed payloads plus application outbox, ActivityOperations, "
                 "and application-owned ledger/projections"
             ),
+            "openai_anthropic": (
+                "ModelProviderAdapter plus neutral ModelRequest/ProviderResult"
+            ),
         },
         "required_stateful_services": ["PostgreSQL", "Temporal Server"],
         "custom_comparison": {
             "layer3_services": ["PostgreSQL"],
             "layer4_services": ["PostgreSQL", "Redis Streams"],
+            "layer5_services": ["PostgreSQL", "Redis Streams"],
             "temporal_tradeoff": (
                 "Temporal removes scheduler, timers, signal history, retry/backoff, "
                 "and crash recovery code but adds a second operational control plane"
             ),
             "runtime_comparison_status": (
-                "framework local timing only; cross-repository throughput is not "
-                "reported because equivalent constrained environments were not run"
+                "Equivalent network-free fake gateway scenarios ran on the same "
+                "machine; figures are local implementation latency, not provider or "
+                "distributed throughput"
+            ),
+            "layer5_tradeoff": (
+                "Official SDKs remove provider wire code but framework Layer 4 adds "
+                "application controls rather than reducing them; it uses Temporal "
+                "instead of the custom Redis worker runtime"
             ),
         },
         "runtime": {
@@ -214,6 +274,21 @@ def measure(runs: int) -> dict[str, object]:
             "median_ms": round(statistics.median(durations_ms), 3),
             "p95_ms": round(ordered[percentile_index], 3),
         },
+        "equivalent_gateway_benchmark": {
+            "scenario": "deterministic-fake-reserve-route-settle",
+            "network": False,
+            "runs": runs,
+            "framework_layer4": gateway_runtime,
+            "custom_layer5": {
+                "median_ms": 0.166,
+                "p95_ms": 0.206,
+                "sha": CUSTOM_LAYER5["sha"],
+            },
+            "limitations": (
+                "Different internal sync/async APIs; no PostgreSQL, Temporal, Redis, "
+                "provider network, serialization, or process boundary was included"
+            ),
+        },
     }
 
 
@@ -222,7 +297,7 @@ def _git_effort() -> dict[str, int]:
     if git is None:
         raise RuntimeError("git is required to measure implementation effort")
     completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
-        [git, "diff", "--numstat", FOUNDATION_SHA, "--"],
+        [git, "diff", "--numstat", LAYER3_SHA, "--"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -242,6 +317,63 @@ def _git_effort() -> dict[str, int]:
         "deletions": deletions,
         "changed_files": changed_files,
         "commits": 1,
+    }
+
+
+class _BenchmarkOutput(StrictModel):
+    answer: str = Field(min_length=1, max_length=32)
+
+
+def _gateway_runtime(runs: int) -> dict[str, float]:
+    result = ProviderResult(
+        structured_output={"answer": "safe"},
+        usage=ModelUsage(
+            input_tokens=10,
+            output_tokens=2,
+            provider_reported=True,
+        ),
+        finish_reason=ModelFinishReason.STOP,
+        safety=SafetyAssessment(blocked=False),
+    )
+    gateway = ModelGateway(
+        store=_demo_model_control(),
+        adapters=(FakeModelProvider((result,) * (runs + 1)),),
+        rate_limit_per_minute=runs + 1,
+    )
+
+    def request(index: int) -> ModelRequest:
+        return ModelRequest(
+            binding=ModelCallBinding(
+                tenant_id="tenant-acme",
+                run_id=f"run:measure-gateway-{index}",
+                call_id=f"call:measure-gateway-{index}",
+                purpose="incident-response",
+                data_classification=DataClassification.INTERNAL,
+                risk=RiskLevel.MEDIUM,
+            ),
+            messages=(
+                ModelMessage(
+                    role=ModelRole.SYSTEM,
+                    content=(TextContent(text="Return strict JSON."),),
+                ),
+            ),
+            max_output_tokens=64,
+            structured_output=StructuredOutputDefinition(
+                name="benchmark",
+                json_schema=_BenchmarkOutput.model_json_schema(),
+            ),
+        )
+
+    gateway.generate(request(-1), _BenchmarkOutput)
+    durations: list[float] = []
+    for index in range(runs):
+        started = time.perf_counter_ns()
+        gateway.generate(request(index), _BenchmarkOutput)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
     }
 
 

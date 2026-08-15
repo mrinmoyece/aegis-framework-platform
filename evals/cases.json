@@ -78,5 +78,45 @@
     "case_id": "durable-framework-outage",
     "kind": "framework-outage",
     "expected_reason": "bounded_retry_same_intent"
+  },
+  {
+    "case_id": "model-routing",
+    "kind": "model-routing",
+    "expected_reason": "deterministic_policy_route"
+  },
+  {
+    "case_id": "model-malformed",
+    "kind": "model-malformed",
+    "expected_reason": "bounded_structured_repair"
+  },
+  {
+    "case_id": "model-budget",
+    "kind": "model-budget",
+    "expected_reason": "reserve_before_provider"
+  },
+  {
+    "case_id": "model-fallback-circuit",
+    "kind": "model-fallback-circuit",
+    "expected_reason": "bounded_fallback_and_circuit"
+  },
+  {
+    "case_id": "model-timeout-cancel",
+    "kind": "model-timeout-cancel",
+    "expected_reason": "ambiguous_timeout_and_cancel"
+  },
+  {
+    "case_id": "model-duplicate-ambiguous",
+    "kind": "model-duplicate-ambiguous",
+    "expected_reason": "stable_call_id_no_exactly_once_claim"
+  },
+  {
+    "case_id": "model-policy-revocation",
+    "kind": "model-policy-revocation",
+    "expected_reason": "stale_result_rejected"
+  },
+  {
+    "case_id": "model-tenant-isolation",
+    "kind": "model-tenant-isolation",
+    "expected_reason": "tenant_model_policy_isolation"
   }
 ]

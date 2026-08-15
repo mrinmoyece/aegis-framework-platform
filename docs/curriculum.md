@@ -1,4 +1,4 @@
-# Layer 3 curriculum
+# Layer 4 curriculum
 
 ## Learning outcomes
 
@@ -21,6 +21,12 @@ After this layer, an engineer should be able to:
 15. assign retry ownership without overlapping workflow, graph and provider retries;
 16. reauthorize commands/signals/Activities against current policy;
 17. recover worker/history/checkpoint failures without fabricating application outcome.
+18. design neutral model message/tool/schema/usage/pricing/error contracts;
+19. enforce tenant model policy, catalog capabilities, pricing and secret references;
+20. reserve worst-case token/cost budget before provider intent and reconcile ambiguity;
+21. assign SDK, gateway and Temporal retry ownership without multiplication;
+22. contain malformed/hostile output with schema, tool and citation allowlists;
+23. distinguish immutable usage facts from derived provider health and framework traces.
 
 ## Suggested sequence
 
@@ -39,6 +45,10 @@ After this layer, an engineer should be able to:
 | Temporal lifecycle | ADR 007, `temporal.py` | Run no-worker recovery, retry, timer and replay | What may workflow code do deterministically? |
 | Activity authority | `activity_runtime.py` | Revoke a signaller during wait | Why is a signal payload never authority? |
 | Projection API | durable API/timeline tests | Rebuild and tamper with a cursor | Why can Temporal query not serve product status? |
+| Model contracts | ADR 009, `model_gateway.py` | Attempt vendor-shape/tool/policy injection | Which fields may a model create? |
+| Routing and resilience | `ModelGateway` | Trigger fallback, circuit, timeout and cancellation | Why is ambiguous billing not retried by default? |
+| Provider adapters | `provider_adapters.py` | Verify both SDKs use zero retries and fake clients | What remains vendor-specific? |
+| Model ledger | migration 0003, `model_postgres.py` | Race reservations and rebuild projections | Which fact owns usage/cost? |
 
 ## Practical exercises
 
@@ -58,6 +68,10 @@ After this layer, an engineer should be able to:
    deputy path.
 10. Propose a Temporal-to-alternative migration using only outbox messages and
     application events.
+11. Add a model route with an unknown price and prove the provider adapter is not called.
+12. Crash after model call intent, prove the cost is reported ambiguous, and reconcile it.
+13. Revoke model policy during a fake provider call and prove the billed output is stale.
+14. Replace the fake provider adapter without changing graph/domain/ledger contracts.
 
 ## Assessment rubric
 

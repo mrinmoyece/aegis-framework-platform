@@ -1,0 +1,192 @@
+{
+  "comparison_basis": {
+    "custom_layer3": {
+      "branch": "mrinmoyece-aegis-durable-ledger",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 4,
+        "locked_total": null
+      },
+      "implementation_effort_proxy": {
+        "additions": 3901,
+        "changed_files": 42,
+        "commits": 1,
+        "deletions": 176
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "87cefe58adbf62e6a419d38e57e0928581b7003c",
+      "source_loc": {
+        "production": 3765,
+        "tests": 2239,
+        "total": 6004
+      },
+      "test_functions": 77
+    },
+    "custom_layer4": {
+      "branch": "mrinmoyece-aegis-worker-runtime",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 6,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer3": {
+        "additions": 6301,
+        "changed_files": 47,
+        "commits": 1,
+        "deletions": 198
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "171fa485819334a892684544c0a993a6e2fc4ace",
+      "source_loc": {
+        "production": 7452,
+        "tests": 3687,
+        "total": 11139
+      },
+      "test_functions": 99
+    },
+    "custom_layer5": {
+      "branch": "mrinmoyece-aegis-model-gateway",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 9
+      },
+      "incremental_effort_from_layer4": {
+        "additions": 6568,
+        "changed_files": 55,
+        "commits": 1,
+        "deletions": 109
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6",
+      "source_loc": {
+        "production": 11079,
+        "tests": 5479,
+        "total": 16558
+      },
+      "test_functions": 141
+    },
+    "effort_definition": "Git additions/deletions and changed files from each prior layer",
+    "equivalent_scenario": "tenant-scoped structured fake-provider call with explicit catalog, pre-call reservation, deterministic route, normalized usage/cost settlement, no network, and no production effect",
+    "foundation_sha": "754e536d10b9643b40cac2f7b6c0d1de870fd630",
+    "loc_definition": "non-blank, non-comment physical Python lines"
+  },
+  "custom_comparison": {
+    "layer3_services": [
+      "PostgreSQL"
+    ],
+    "layer4_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer5_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer5_tradeoff": "Official SDKs remove provider wire code but framework Layer 4 adds application controls rather than reducing them; it uses Temporal instead of the custom Redis worker runtime",
+    "runtime_comparison_status": "Equivalent network-free fake gateway scenarios ran on the same machine; figures are local implementation latency, not provider or distributed throughput",
+    "temporal_tradeoff": "Temporal removes scheduler, timers, signal history, retry/backoff, and crash recovery code but adds a second operational control plane"
+  },
+  "dependencies": {
+    "direct_development": 8,
+    "direct_optional": 6,
+    "direct_runtime": 10,
+    "locked_total": 116
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "Darwin",
+    "python": "3.14.7"
+  },
+  "equivalent_gateway_benchmark": {
+    "custom_layer5": {
+      "median_ms": 0.166,
+      "p95_ms": 0.206,
+      "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6"
+    },
+    "framework_layer4": {
+      "median_ms": 0.348,
+      "p95_ms": 0.51
+    },
+    "limitations": "Different internal sync/async APIs; no PostgreSQL, Temporal, Redis, provider network, serialization, or process boundary was included",
+    "network": false,
+    "runs": 50,
+    "scenario": "deterministic-fake-reserve-route-settle"
+  },
+  "framework_code_removed": [
+    "custom graph scheduler",
+    "parallel fan-out and deterministic join engine",
+    "checkpoint serialization and state-history plumbing",
+    "HTTP routing and OpenAPI generation",
+    "JWT signature and registered-claim cryptography",
+    "PostgreSQL connection-pool lifecycle",
+    "cross-process workflow scheduling and replay",
+    "durable timers and signal delivery",
+    "activity retry/backoff and worker crash recovery",
+    "OpenAI and Anthropic wire protocol and SDK exception transport"
+  ],
+  "implementation_effort_proxy": {
+    "additions": 6422,
+    "changed_files": 48,
+    "commits": 1,
+    "deletions": 107
+  },
+  "layer": 4,
+  "lock_in_and_escape": {
+    "fastapi": "typed request/response models at the delivery adapter",
+    "langfuse": "ObservabilityPort plus OpenTelemetry",
+    "langgraph": "OrchestratorPort plus JSON-compatible domain state",
+    "openai_anthropic": "ModelProviderAdapter plus neutral ModelRequest/ProviderResult",
+    "psycopg_postgresql": "repository ports plus application-owned SQL migrations",
+    "pyjwt": "AuthenticatorPort plus standard OIDC/JWT claims and JWK documents",
+    "temporal": "opaque typed payloads plus application outbox, ActivityOperations, and application-owned ledger/projections"
+  },
+  "measured_at": "2026-08-15T22:26:49.159640+00:00",
+  "qualification_counts": {
+    "deterministic_evals_passed": 21,
+    "deterministic_tests_passed": 163,
+    "keycloak_integration_environment_gated": 1,
+    "postgres_integration_passed": 5,
+    "temporal_integration_passed": 2
+  },
+  "remaining_custom_controls": [
+    "issuer registry and bounded JWKS rotation policy",
+    "authoritative principal and tenant resolution",
+    "immutable RBAC, purpose, risk, and policy evaluation",
+    "quota reservation and retry ownership",
+    "forced RLS schema and transaction tenant context",
+    "tenant-scoped checkpoint ownership",
+    "secret-reference boundary",
+    "redacted hash-chained durable audit",
+    "API anti-enumeration and readiness failure policy",
+    "event envelope and dual integrity chains",
+    "transactional inbox/outbox and idempotency",
+    "projection rebuild and redacted cursor API",
+    "activity authorization and retry ownership",
+    "stale-result, poison-payload, and DLQ policy",
+    "tenant model policy/catalog and price versions",
+    "worst-case model token/cost reservations",
+    "model routing, fallback, circuit, rate and concurrency policy",
+    "immutable provider call and ambiguous-billing facts",
+    "strict structured output, tools and citation controls"
+  ],
+  "required_stateful_services": [
+    "PostgreSQL",
+    "Temporal Server"
+  ],
+  "runtime": {
+    "median_ms": 2.597,
+    "network": false,
+    "p95_ms": 3.327,
+    "runs": 50,
+    "scenario": "deterministic-success"
+  },
+  "schema_version": 4,
+  "source_loc": {
+    "production": 12136,
+    "tests": 5463,
+    "total": 17599
+  }
+}

@@ -181,6 +181,23 @@ class DurableActivityRuntime(ActivityOperations):
 
     def _run_graph_blocking(self, value: TemporalActivityInput) -> ActivityOutcome:
         tenant_id, _ = self._authorized(value)
+        existing_result = self._store.activity_artifact(
+            tenant_id=tenant_id,
+            run_id=value.run_id,
+            event_type="investigation.graph_completed",
+        )
+        if existing_result is not None:
+            try:
+                InvestigationResult.model_validate(existing_result["result"])
+                result_ref = existing_result["result_ref"]
+            except (KeyError, ValidationError) as exc:
+                raise IntegrityFailure("graph result is malformed") from exc
+            if not isinstance(result_ref, str):
+                raise IntegrityFailure("graph result reference is malformed")
+            return ActivityOutcome(
+                outcome="graph_complete",
+                result_ref=result_ref,
+            )
         request = self._store.run_request(tenant_id=tenant_id, run_id=value.run_id)
         artifact = self._store.activity_artifact(
             tenant_id=tenant_id,

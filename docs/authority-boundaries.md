@@ -1,4 +1,4 @@
-# Layer 3 authority and retry ownership
+# Layer 4 authority and retry ownership
 
 ## Ownership matrix
 
@@ -14,6 +14,10 @@
 | Cross-process schedule/timer/signal | Temporal history | Yes | Temporal |
 | Activity result fact | Application event after Activity | Temporal return reference only | Event ledger |
 | Cognitive node progress | LangGraph checkpoint | Yes | LangGraph saver |
+| Model policy/catalog/pricing | Application PostgreSQL policy/catalog | Route/model name may enter adapter | Current model policy/catalog |
+| Model token/cost reservation | Application model reservation | Reservation/call reference only | Application database |
+| Provider call/usage outcome | Immutable model call facts | SDK response is untrusted input | Application settlement/reconciliation |
+| Provider health | Derived application projection | Framework health is advisory only | Model call fact rebuild |
 | Hypothesis/proposal | Domain result with citations | Yes, non-authoritative candidate | Application result event |
 | API status/timeline | Rebuildable application projection | Temporal query is convenience only | Event replay |
 | Audit | Application PostgreSQL audit/ledger | No | Application database |
@@ -29,6 +33,8 @@
 | Activity | Temporal | Three attempts, timeout/heartbeat, stable operation ID |
 | Evidence connector call | Activity only | Connector SDK retries disabled or counted inside Activity limit |
 | LangGraph run | One Activity attempt | No Temporal per-node retry and no graph retry loop |
+| Provider SDK | None | `max_retries=0`; one network intent per durable attempt ID |
+| Structured repair/fallback | Application gateway | Policy bound; no ambiguous-billing fallback by default |
 | Signal | Temporal may redeliver | Workflow command-reference set + application inbox |
 | Projection | Application replay | Cursor/hash checkpoint; deterministic reducer |
 
@@ -42,6 +48,10 @@
 6. Reserve budget before evidence or graph work; retry reuses the run reservation.
 7. Persist Activity intent before I/O and result/failure afterward.
 8. Serve status/timeline only from authorized application projections.
+9. Before a provider call, recheck model policy/catalog, reserve worst-case cost, and
+   append call intent.
+10. Settle billed/not-billed/ambiguous outcome, reject stale policy/cancellation results,
+    and serve only RLS-filtered redacted usage/catalog/health projections.
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.

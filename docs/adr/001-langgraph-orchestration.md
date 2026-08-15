@@ -14,7 +14,9 @@ need model-selected topology or an unbounded conversational agent.
 Use LangGraph 1.2.11 with a statically declared graph and JSON-compatible state.
 Use `InMemorySaver` only for network-free demo/tests and provide a PostgreSQL saver
 adapter. Keep policy, tenant authority, budget, evidence access, idempotency,
-approval, audit, and effects outside LangGraph behind application protocols.
+approval, audit, and effects outside LangGraph behind application protocols. Layer 4
+structured nodes use `GatewayStructuredModel`; model policy, catalog, reservation,
+routing, usage, and provider adapters remain outside graph state.
 
 ## Consequences
 

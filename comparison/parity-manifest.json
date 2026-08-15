@@ -2,7 +2,7 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 3,
+  "layer": 4,
   "generated_on": "2026-08-15",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
@@ -46,10 +46,10 @@
     {
       "id": "05-provider-neutral-model-gateway",
       "name": "Provider-neutral model gateway",
-      "status": "partial",
-      "evidence": ["src/aegis_framework/ports.py", "src/aegis_framework/model.py"],
-      "framework_owned": ["structured graph node invocation"],
-      "enterprise_owned": ["provider policy", "tenant quotas", "credentials", "routing", "schema policy"]
+      "status": "delivered",
+      "evidence": ["src/aegis_framework/model_gateway.py", "src/aegis_framework/provider_adapters.py", "src/aegis_framework/model_postgres.py", "migrations/0003_layer4.sql", "tests/test_model_gateway.py"],
+      "framework_owned": ["official provider HTTP protocol and response decoding", "structured LangGraph node invocation"],
+      "enterprise_owned": ["tenant model policy/catalog", "capability and price declarations", "token/cost reservation", "routing and resilience", "immutable usage facts", "structured safety"]
     },
     {
       "id": "06-evidence-connectors-correlation",
@@ -95,25 +95,25 @@
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_temporal_integration.py"],
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_temporal_integration.py"],
       "framework_owned": ["Temporal replay", "optional Langfuse evaluator observation"],
-      "enterprise_owned": ["thirteen safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
+      "enterprise_owned": ["twenty-one hermetic safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
     },
     {
       "id": "12-observability-replay",
       "name": "Observability and replay",
       "status": "partial",
-      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py"],
+      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py"],
       "framework_owned": ["OTel spans", "Temporal replay", "LangGraph checkpoints"],
-      "enterprise_owned": ["redaction", "cardinality", "event replay", "projection rebuild", "retention"]
+      "enterprise_owned": ["redaction", "cardinality", "event and model usage replay", "projection rebuild", "retention"]
     },
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
       "status": "partial",
-      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py"],
+      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py"],
       "framework_owned": ["FastAPI delivery"],
-      "enterprise_owned": ["authorized redacted status/timeline", "opaque cursor", "session security", "review UX"]
+      "enterprise_owned": ["authorized redacted status/timeline/model operations", "opaque cursor", "session security", "review UX"]
     },
     {
       "id": "14-mcp-a2a-interoperability",

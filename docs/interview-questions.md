@@ -233,3 +233,44 @@
     Consume the same application outbox, emit the same event transitions, implement
     `ActivityOperations`, and pass retry/timer/signal/recovery/replay equivalence. No
     application fact must be extracted from Temporal first.
+
+## Layer 4 model gateway
+
+51. **Why use official SDKs rather than LiteLLM or Instructor?**
+    The official SDKs remove provider wire-protocol code and allow retries to be disabled.
+    LiteLLM and Instructor currently conflict with OpenAI 3.x and add routing/repair/retry
+    axes while leaving Aegis policy, budget, ledger and safety controls intact.
+
+52. **What is authoritative for model usage and cost?**
+    Immutable application reservation and call-settlement facts under tenant RLS. SDK
+    usage is untrusted provider input until validated and settled. Langfuse, provider
+    dashboards, traces, and health projections are not application ledger truth.
+
+53. **Why reserve the worst case before network intent?**
+    Fallbacks and structured repairs can each incur cost. Reserving only the first route
+    lets failures exceed policy. The reservation covers the bounded route/repair envelope
+    and is reused by stable call identity.
+
+54. **What happens after a timeout or crash?**
+    The provider may have billed. Aegis records or derives billing ambiguity, blocks a
+    silent duplicate provider call, and requires reconciliation. It does not claim
+    exactly-once billing.
+
+55. **Why recheck policy after the provider returns?**
+    Authority may be revoked while I/O is in flight. Usage can still require settlement,
+    but stale output cannot enter graph state.
+
+56. **Why is provider health not truth?**
+    It is a replaceable projection from a bounded sample of application outcomes. It may
+    guide availability routing but cannot grant model access, prove an SLA, or establish
+    cost.
+
+57. **How are tools and structured output constrained?**
+    Tools must exactly match an application allowlist. JSON Schema and Pydantic reject
+    undeclared fields and bounds; citations are checked against known evidence triples.
+    No output schema contains identity, role, policy, approval, credential, or effect
+    authority.
+
+58. **How can the provider stack be replaced?**
+    Implement `ModelProviderAdapter` for the neutral request/result contracts. Routing,
+    policy, budget, immutable facts, APIs, graph integration and evals remain unchanged.

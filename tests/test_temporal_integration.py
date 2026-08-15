@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from datetime import timedelta
+from uuid import uuid4
 
 import pytest
 from temporalio.client import Client
@@ -244,7 +245,7 @@ def test_temporal_end_to_end_application_outbox_and_projection() -> None:
     async def execute() -> None:
         client, environment = await _client()
         bundle = build_demo_bundle()
-        identity = demo_identity(request_id="temporal-e2e")
+        identity = demo_identity(request_id=f"temporal-e2e-{uuid4().hex}")
         store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
         run = store.accept_run(
             identity=identity,
