@@ -1,221 +1,177 @@
-# Layer 2 architecture
+# Layer 3 durable investigation architecture
 
 ## Product boundary
 
-The product still investigates checkout incidents and opens a pending approval. It
-does not approve, execute, or verify a production change. Layer 2 makes identity,
-tenancy, authorization, quota, secrets references, checkpoints, and audit
-production-shaped without expanding the effect boundary.
+Layer 3 accepts a tenant-authorized investigation command, records immutable
+application intent, schedules a crash-resilient lifecycle, runs the existing bounded
+LangGraph investigation, optionally waits for a signal, and publishes application-owned
+status and timeline projections.
 
-The journey remains:
+It still cannot approve, execute, or verify a production change. Live evidence
+connectors and model providers, controlled effects/approvals, sandboxing, memory/RAG,
+UI/BFF, MCP/A2A, and production deployment remain deferred.
 
-1. authenticate a human or workload access token at delivery;
-2. resolve the authoritative principal and tenant from application storage;
-3. evaluate a current purpose-bound grant and tenant policy;
-4. reserve tenant quota before evidence or graph work;
-5. investigate with the bounded LangGraph graph;
-6. open a pending approval outside the graph;
-7. append redacted application audit.
+## Three durable owners
 
-Steps for approval decisions, effects, fencing, verification, and reconciliation
-remain absent.
+| Owner | Owns | Never authoritative for |
+|---|---|---|
+| PostgreSQL application ledger | Tenant/aggregate event order, command idempotency, inbox/outbox, run projection, audit facts | Framework scheduling or graph checkpoints |
+| Temporal 1.29.1 server + Python SDK 1.31.0 | Cross-process scheduling, Activity retry/backoff, durable timers, signals, cancellation delivery, workflow replay | Tenant grants, policy, quota, audit, API status, external-effect truth |
+| LangGraph 1.2.11 | Bounded cognitive fan-out/fan-in, reducers, specialist/critic state, graph checkpoints | Workflow lifecycle, authorization, audit, idempotency, approval, effects |
 
-## Components and authority
+Framework histories and checkpoints can be deleted and reconstructed operationally
+without changing application facts. Losing the application ledger is data loss.
 
 ```mermaid
-flowchart TB
-  subgraph Delivery
-    API[FastAPI bearer-token API]
-    CLI[Explicit deterministic demo CLI]
-  end
-  subgraph Identity["Application identity and governance"]
-    JWT[PyJWT verifier]
-    JWKS[Bounded JWKS cache]
-    IDR[Identity repository]
-    RBAC[RBAC + purpose + risk policy]
-    QUOTA[Atomic quota repository]
-    SECRET[Secret-reference boundary]
-    AUDIT[Immutable audit repository]
-  end
-  subgraph Database["PostgreSQL application authority"]
-    RLS[Forced tenant RLS]
-    TEN[(tenants/principals/grants)]
-    POL[(policies/quotas/secrets)]
-    AUD[(audit heads/events)]
-    OWNER[(checkpoint thread owners)]
-  end
-  subgraph Framework["Framework mechanics only"]
-    LG[LangGraph]
-    CP[(LangGraph saver tables)]
-    LF[Manual Langfuse adapter]
-  end
-
-  API --> JWT --> JWKS
-  JWT --> IDR --> TEN
-  API --> RBAC --> POL
-  API --> QUOTA --> POL
-  API --> LG --> CP
-  LG -. no authority .-> RBAC
-  OWNER --> CP
-  API --> AUDIT --> AUD
-  SECRET --> POL
-  RLS --> TEN
-  RLS --> POL
-  RLS --> AUD
-  RLS --> OWNER
-  RLS --> CP
-  LG --> LF
+flowchart LR
+  C[Authenticated command] --> P[Current policy]
+  P --> L[(PostgreSQL ledger)]
+  L --> O[Transactional outbox]
+  O --> T[Temporal workflow]
+  T --> A[Reauthorizing Activities]
+  A --> E[Evidence adapter]
+  A --> G[LangGraph]
+  G --> CPG[(LangGraph checkpoints)]
+  A --> L
+  L --> R[Run/timeline projection API]
+  T -. operational query only .-> OPS[Operator diagnostics]
 ```
 
-`ports.py` and `access.py` are provider-neutral boundaries. `identity.py` owns JOSE
-and JWKS mechanics. `authorization.py` owns immutable role definitions and current
-policy evaluation. `postgres.py` is the PostgreSQL/Psycopg/LangGraph-saver adapter.
-LangGraph and Langfuse never approve or grant access.
+## Command and execution order
 
-## Authentication sequence
+1. FastAPI establishes `IdentityContext`; no body, signal, workflow payload, graph
+   state, or evidence value establishes a tenant.
+2. Current policy authorizes the exact tenant/action/purpose/risk.
+3. One application transaction claims `(tenant_id, request_id, fingerprint)`, appends
+   `investigation.requested`, advances the commit-order tenant cursor, builds the
+   run projection, and inserts the Temporal start outbox message.
+4. A race-safe dispatcher claims outbox rows with a bounded lease. Delivery retries use
+   the same message/workflow ID. Five failed claims become an explicit dead-letter row.
+5. Temporal starts one opaque workflow ID. Workflow history contains only bounded
+   tenant/actor/request/run references, never raw evidence, credentials, prompts, or
+   identity grants. No tenant ID is placed in search attributes; no custom search
+   attribute is required.
+6. Before every Activity, application code resolves opaque references to current
+   application authority and reevaluates policy. The initial authorization Activity
+   reserves budget once by run ID before evidence or LangGraph work.
+7. Evidence collection persists a content-hashed application artifact. The next
+   Activity reloads it, validates tenancy/integrity, and invokes one bounded LangGraph
+   run. Temporal does not retry individual graph nodes.
+8. Graph output is persisted as an application result event. Optional wait/resume,
+   cancellation intent, timeout, completion, and failure are separate events.
+9. The API reads application projections under current authorization. Temporal queries
+   are operational convenience and are never returned as product truth.
 
-```mermaid
-sequenceDiagram
-  actor C as Caller
-  participant A as FastAPI
-  participant J as JWT verifier
-  participant K as Bounded JWKS cache
-  participant D as Identity repository
-  participant P as Policy repository
-  participant S as Investigation service
-  participant G as LangGraph
-  participant U as Durable audit
+## Immutable event envelope
 
-  C->>A: Authorization: Bearer + request ID
-  A->>J: bounded token
-  J->>K: configured issuer + required kid + allowed alg
-  K-->>J: current verification key
-  J->>J: signature, iss, aud, exp, iat, nbf, lifetime
-  J->>D: tenant claim scope + exact issuer/subject
-  D-->>J: active principal + grant version + current grants
-  J-->>A: immutable IdentityContext
-  A->>P: action + tenant + purpose + risk
-  P-->>A: current allow/deny decision
-  A->>S: typed identity + alert
-  S->>G: tenant-derived thread + evidence
-  G-->>S: cited result/proposal
-  S->>U: redacted application event
-  S-->>C: investigation result
+`ApplicationEvent` is additive and strict:
+
+- tenant, aggregate type/ID and aggregate sequence;
+- commit-order tenant cursor;
+- event ID/type, occurrence time, schema version;
+- opaque actor/correlation/causation references;
+- bounded JSON payload;
+- aggregate previous hash, tenant previous hash, and record hash.
+
+Append locks the aggregate head and tenant cursor, checks `expected_version`, computes
+both chains, writes events/outbox/idempotency/projections, and advances heads in one
+transaction. Rollback leaves no cursor gap or orphaned message. Event IDs are unique
+per tenant. Runtime privileges plus a trigger reject event/idempotency/inbox mutation.
+
+Version-zero legacy events are upcast explicitly into version-one envelopes; replay
+never guesses a schema. Projection rebuild folds events in tenant cursor order and
+stores a checkpoint containing cursor, hash, and rebuild version. Read models are
+derived and replaceable.
+
+## Inbox, outbox, and stale work
+
+- Inbox message IDs suppress duplicate external commands. Payload hashes and typed
+  command records remain tenant-scoped facts.
+- Outbox claims use `FOR UPDATE SKIP LOCKED` in PostgreSQL and compare
+  claim-token/attempt on completion. Expired claims can be reclaimed.
+- Intent is committed before delivery or an Activity with I/O. Result/failure is
+  committed after it. No code claims exactly-once external behavior.
+- Aggregate state transitions reject a graph result after cancellation/terminal state.
+- Activity operation IDs make duplicate Activity delivery idempotent.
+- Poison payloads fail strict Pydantic and 64 KiB codec bounds; permanent failures are
+  non-retryable and cannot repeatedly crash a worker fleet.
+
+## Temporal workflow
+
+`AegisInvestigationWorkflow` is sandboxed and deterministic. It performs no database,
+network, filesystem, random, or wall-clock I/O. It uses only Temporal Activities,
+`workflow.wait_condition`, and workflow history. The lifecycle is:
+
+```text
+authorize/reserve -> collect evidence -> run LangGraph
+  -> [record wait -> authorize resume | cancel intent | timeout]
+  -> complete | fail
 ```
 
-Unverified token content may select only an exact preconfigured issuer and an RLS
-scope. It cannot establish a tenant: the resolved `(issuer, subject)` principal must
-exist in that tenant and its application `grant_version` must match the token.
-Application grants—not token roles—produce immutable role/purpose/permission/risk
-bindings. Human and workload identities use the same contract with an explicit
-`principal_kind`.
+Activities have five-minute attempt, fifteen-minute schedule-to-close, thirty-second
+heartbeat timeout with ten-second periodic heartbeats, and three-attempt exponential
+retry bounds. Blocking application adapters run outside the worker event loop.
+Validation, authorization,
+idempotency, integrity, and framework-defect errors are non-retryable. Declared
+transient application failures are retryable. LangGraph/provider retries must remain
+disabled or independently bounded so they do not overlap Temporal retry ownership.
 
-The verifier:
+The initial code path records `workflow.patched("aegis-investigation-lifecycle-v1")`.
+Future incompatible changes use patch/deprecate/remove or Worker Versioning and must
+replay committed representative histories before release. Continue-as-new is not used:
+the workflow has one bounded investigation, at most 32 accepted resume commands, one
+idempotent cancellation command, and a two-day execution cap. Add it only if measured
+histories approach server limits.
 
-- accepts only configured `RS256`, `PS256`, or `ES256`;
-- requires a bounded `kid` and rejects `crit` and unexpected token types;
-- verifies signature, exact issuer, configured audience, and required claims;
-- applies an explicit maximum clock skew and token lifetime;
-- validates `exp`, `iat`, and optional `nbf` against the injected clock;
-- limits token and JWKS response size, key count, key use, operations, and algorithms;
-- refreshes on expiry or an unfamiliar key after a cooldown;
-- never uses stale keys after a refresh failure.
+## Cancellation, timeout, and recovery
 
-## Authorization and anti-enumeration
+Application cancellation intent is persisted before a Temporal cancel signal. The
+workflow checks cancellation between Activities and records terminal `cancelled`
+through the authoritative inbox command. A stale Activity result cannot move
+`cancel_requested` back to running/completed. Abrupt worker
+loss leaves the Temporal workflow scheduled; another worker replays history and resumes
+the pending Activity. Activity heartbeat timeout detects a lost attempt. Workflow
+timeout produces an application `timed_out` event.
 
-Every service run and checkpoint read uses `PolicyPort`. Delivery routes use the same
-policy for tenant, policy, quota, and audit reads. A decision requires all of:
+If Temporal history is unavailable but the application ledger remains intact, the
+reconciler reissues pending outbox intent under the same workflow ID or marks an
+explicit platform failure. If LangGraph checkpoints are unavailable, a bounded graph
+Activity may rerun under the same application operation and budget reservation. Neither
+case fabricates completion.
 
-- resource tenant equals identity tenant;
-- identity and grant have not expired;
-- current tenant policy exists and permits the action/purpose/risk;
-- one immutable current grant permits that exact action for that purpose and risk.
+## Tenancy, privacy, and observability
 
-Missing and forbidden tenant resources both return `404`; investigation denial is a
-generic `403`; authentication failures are generic `401`. Responses never explain
-whether another tenant's object exists.
+Every Layer 3 table forces RLS under the non-superuser, non-`BYPASSRLS`
+`aegis_runtime` role. Worker claims are tenant-scoped. Temporal payloads use encrypted,
+authenticated tenant references plus hash-derived actor/request references and bounded
+Pydantic conversion. Tenant-RLS actor bindings map an actor reference back to the
+current application principal; current grants are reloaded rather than copied to
+history. Signals carry only a command reference; the Activity loads the authoritative
+inbox command and current signaller.
 
-| Route | Authentication | Required permission |
-|---|---|---|
-| `GET /healthz` | none; liveness only | none |
-| `GET /readyz` | none | production identity and governance configured |
-| `GET /v1/me` | bearer token | current authenticated principal |
-| `GET /v1/tenants/{tenant_id}` | bearer token | `tenant:read` |
-| `GET /v1/policies/current` | bearer token | `policy:read` |
-| `GET /v1/quotas/investigations` | bearer token | `quota:read` |
-| `GET /v1/audit` | bearer token | `audit:read` |
-| `POST /v1/investigations` | bearer token | `investigation:run` |
+Temporal's OpenTelemetry interceptor is optional and exports framework operation
+spans, not payload contents. Application spans keep fixed names and allowlisted
+low-cardinality count/status attributes. Tenant IDs, actor IDs, request IDs, evidence
+locators, prompts, completions, credentials, and payload bodies are not exported.
+Langfuse remains model/graph telemetry only; automatic LangGraph/LangChain capture is
+disabled.
 
-The deterministic static bearer identities exist only when `AEGIS_MODE=demo` or an
-explicit test runtime is injected. The default is production mode. Missing OIDC or
-PostgreSQL settings leave readiness and authenticated routes closed.
+## API truth
 
-## PostgreSQL transaction and RLS boundary
+`POST /v1/durable-investigations` returns `202` after durable application intent, not
+workflow completion. Authorized routes expose a redacted run view and opaque
+HMAC-protected cursor timeline. Timeline entries contain only cursor, event type,
+timestamp, status, and bounded failure code. Payloads and tenant IDs are not returned.
 
-`migrations/0001_layer2.sql` creates tenant-first keys/indexes for tenants,
-principals, grants, policies, quotas/reservations, secret references, audit, and
-checkpoint owners. Every tenant table enables and forces RLS using:
+## Replaceability
 
-```sql
-tenant_id = aegis.current_tenant_id()
-```
+- `ActivityOperations` and the application outbox isolate the Temporal SDK/server.
+- `OrchestratorPort` isolates LangGraph.
+- PostgreSQL data is application-schema SQL with canonical JSON export and deterministic
+  rebuild.
+- `PolicyPort`, `BudgetPort`, `EvidencePort`, and current-authority resolution remain
+  provider-neutral.
 
-The runtime login must be a member of `aegis_runtime`. Pool configuration executes
-`SET ROLE aegis_runtime`, enables row security, verifies the role is neither
-superuser nor `BYPASSRLS`, and applies statement/lock/idle-transaction timeouts.
-Every repository call uses `set_config(..., true)` inside one transaction. Both the
-transaction helper and pool reset hook reject leaked tenant state.
-
-Policy and quota updates use version predicates. Quota reservation serializes the
-tenant/reservation key, locks the quota row, stores allow and deny decisions, and
-returns the stored result on retry.
-
-Audit uses one locked head per tenant. The application stores only a derived actor
-reference and allowlisted attributes, then hashes canonical event content with the
-previous tenant hash. Runtime privileges deny update/delete, and a trigger rejects
-mutation even by a more privileged writer. PostgreSQL durability is audit truth;
-LangGraph checkpoints and traces are not.
-
-## Tenant-bound LangGraph persistence
-
-Administrative setup runs `PostgresSaver.setup()` and then forces RLS on
-`checkpoints`, `checkpoint_blobs`, and `checkpoint_writes`. Their policies join
-`thread_id` to `aegis.checkpoint_threads` under the current tenant. Runtime setup is
-not permitted.
-
-`TenantPostgresOrchestrator` registers an opaque tenant-derived thread and performs
-all saver work in the same tenant transaction. A conflicting cross-tenant thread
-hits the global uniqueness constraint but remains invisible through RLS. The memory
-saver also records thread ownership for deterministic tests.
-
-Checkpoint content can resume graph mechanics. It remains non-authoritative for
-identity, grants, policy, quota, approval, audit, idempotency, secrets, fencing, or
-effects.
-
-## Framework versus custom responsibilities
-
-| Concern | Proven library/framework | Explicit application responsibility |
-|---|---|---|
-| JWT/JWS | PyJWT + cryptography | issuer registry, allowed algorithms, cache bounds, lifetime/skew, principal/grant resolution |
-| HTTP | FastAPI/Pydantic | bearer boundary, body/token bounds, anti-enumeration, readiness behavior |
-| Graph | LangGraph | policy before execution, tenant thread ownership, citation/risk/approval boundaries |
-| Pool/SQL | Psycopg/PostgreSQL | forced RLS, role attributes, tenant transaction, schema and audit semantics |
-| Checkpoints | LangGraph PostgreSQL saver | RLS overlay, owner registry, access authorization |
-| Trace/eval | OpenTelemetry/Langfuse | allowlists, buckets, exporter redaction, no automatic graph capture |
-| Policy | none selected | immutable RBAC, purposes, risk, current policy and revocation |
-
-No second agent framework or orchestration owner is introduced.
-
-## Replaceability and unproven evidence
-
-- Replace PyJWT through `AuthenticatorPort`.
-- Replace an IdP through configured issuer/JWKS and `(issuer, subject)` mapping.
-- Replace PostgreSQL repositories through the access/governance/audit/budget ports.
-- Replace LangGraph through `OrchestratorPort`.
-- Replace Langfuse through `ObservabilityPort` and OpenTelemetry.
-
-Deterministic key rotation and a local environment-gated Keycloak test exist. Live
-IdP rotation under production traffic is unproven. Production deployment, TLS,
-network policy, database HA/backups/restore, retention/erasure execution, KMS-backed
-secret resolution, external evidence/model adapters, and all production effects are
-also unproven.
+Removing Temporal requires a replacement that passes the worker loss, timer, retry,
+signal, cancellation, duplicate delivery, and replay suite. Removing LangGraph does not
+change the workflow or ledger contracts.

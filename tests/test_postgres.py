@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -10,6 +11,7 @@ from psycopg import Connection, Error
 from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 
+from aegis_framework.activity_runtime import DurableActivityRuntime
 from aegis_framework.adapters import FixedClock
 from aegis_framework.errors import OrchestrationFailure, RepositoryUnavailable
 from aegis_framework.fixtures import DEMO_TIME, demo_identity, demo_request
@@ -23,8 +25,11 @@ from aegis_framework.postgres import (
     setup_postgres,
     tenant_transaction,
 )
+from aegis_framework.references import TenantReferenceCodec
+from aegis_framework.temporal import TemporalActivityInput
 
 _MIGRATION = Path("migrations/0001_layer2.sql")
+_LAYER3_MIGRATION = Path("migrations/0002_layer3.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -52,6 +57,25 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "grants_tenant_principal_active_idx" in migration
     assert "audit_events_tenant_recorded_idx" in migration
     assert "PASSWORD" not in migration
+    layer3 = _LAYER3_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "ledger_aggregate_heads",
+        "ledger_tenant_cursors",
+        "application_events",
+        "durable_idempotency",
+        "durable_actor_bindings",
+        "inbox_messages",
+        "outbox_messages",
+        "projection_checkpoints",
+        "investigation_runs",
+        "investigation_timeline",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer3
+    assert "application_events_immutable" in layer3
+    assert "inbox_messages_immutable" in layer3
+    assert "FORCE ROW LEVEL SECURITY" in layer3
+    assert "FOR UPDATE SKIP LOCKED" not in layer3
+    assert "PASSWORD" not in layer3
 
 
 def _integration_dsns() -> tuple[str, str]:
@@ -103,6 +127,41 @@ def _prepare_database(admin_dsn: str) -> None:
                     max_risk = 'medium'
                 """,
                 (tenant_id,),
+            )
+            subject_id = (
+                "responder-alpha" if tenant_id == _TENANT_ALPHA else "responder-beta"
+            )
+            connection.execute(
+                """
+                INSERT INTO aegis.principals (
+                    tenant_id, issuer, subject_id, principal_kind,
+                    status, grant_version, version
+                )
+                VALUES (
+                    %s, 'https://demo.aegis.invalid', %s, 'human',
+                    'active', 1, 1
+                )
+                ON CONFLICT (tenant_id, issuer, subject_id) DO UPDATE
+                SET status = 'active', grant_version = 1
+                """,
+                (tenant_id, subject_id),
+            )
+            connection.execute(
+                """
+                INSERT INTO aegis.grants (
+                    tenant_id, grant_id, issuer, subject_id, role, purpose,
+                    risk_ceiling, status, expires_at, version
+                )
+                VALUES (
+                    %s, 'grant-integration', 'https://demo.aegis.invalid', %s,
+                    'incident-responder', 'incident-response', 'medium',
+                    'active', %s, 1
+                )
+                ON CONFLICT (tenant_id, grant_id) DO UPDATE
+                SET status = 'active', expires_at = EXCLUDED.expires_at,
+                    revoked_at = NULL
+                """,
+                (tenant_id, subject_id, DEMO_TIME.replace(year=2027)),
             )
             connection.execute(
                 """
@@ -337,6 +396,227 @@ def test_live_checkpoint_rls_prevents_cross_tenant_reads_and_rebinding() -> None
                 request_id="postgres-cross-tenant",
                 thread_ref=thread_ref,
                 evidence=(),
+            )
+    finally:
+        pool.close()
+
+
+@pytest.mark.postgres
+def test_live_ledger_outbox_projection_rls_and_immutability() -> None:
+    admin_dsn, pool, repository = _repository_context()
+    tenant_references = TenantReferenceCodec(b"postgres-reference-key-test-00001")
+    durability = PostgresDurability(
+        pool=pool,
+        clock=FixedClock(DEMO_TIME),
+        tenant_references=tenant_references,
+    )
+    suffix = uuid4().hex
+    run_id = f"run:{suffix}"
+    event_id = f"event:{suffix}"
+    outbox_id = f"outbox:{suffix}"
+    request_id = f"request:{suffix}"
+    try:
+        appended = durability.append(
+            tenant_id=_TENANT_ALPHA,
+            aggregate_type="investigation",
+            aggregate_id=run_id,
+            expected_version=0,
+            drafts=(
+                EventDraft(
+                    event_id=event_id,
+                    event_type="investigation.requested",
+                    occurred_at=DEMO_TIME,
+                    actor_ref="actor:integration",
+                    correlation_ref=request_id,
+                    payload={
+                        "incident_id": "incident:integration",
+                        "request": demo_request(
+                            incident_id="incident:integration"
+                        ).model_dump(mode="json"),
+                        "request_ref": request_id,
+                        "run_id": run_id,
+                        "tenant_ref": "tenant:opaque",
+                        "wait_for_signal": False,
+                        "workflow_id": f"workflow:{suffix}",
+                    },
+                ),
+            ),
+            outbox=(
+                OutboxDraft(
+                    message_id=outbox_id,
+                    destination="temporal",
+                    message_type="investigation.start",
+                    available_at=DEMO_TIME,
+                    payload={"run_id": run_id},
+                ),
+            ),
+            idempotency=IdempotencyDraft(
+                request_id=request_id,
+                fingerprint="a" * 64,
+            ),
+        )
+        assert appended[0].aggregate_sequence == 1
+        assert durability.verify_integrity(tenant_id=_TENANT_ALPHA)
+        assert (
+            durability.rebuild_run(
+                tenant_id=_TENANT_ALPHA,
+                run_id=run_id,
+            ).status.value
+            == "queued"
+        )
+        with pytest.raises(ConcurrencyConflict):
+            durability.append(
+                tenant_id=_TENANT_ALPHA,
+                aggregate_type="investigation",
+                aggregate_id=run_id,
+                expected_version=0,
+                drafts=(
+                    EventDraft(
+                        event_id=f"event:stale:{suffix}",
+                        event_type="investigation.started",
+                        occurred_at=DEMO_TIME,
+                        actor_ref="actor:integration",
+                        correlation_ref=request_id,
+                    ),
+                ),
+            )
+
+        claims = durability.claim_outbox(
+            tenant_id=_TENANT_ALPHA,
+            worker_ref="worker:integration",
+            now=DEMO_TIME,
+            claim_until=DEMO_TIME.replace(year=2027),
+            limit=10,
+        )
+        assert len(claims) == 1
+        durability.complete_outbox(claims[0], now=DEMO_TIME)
+
+        identity = demo_identity(
+            tenant_id=_TENANT_ALPHA,
+            subject_id="responder-alpha",
+            request_id=f"durable:{suffix}",
+        )
+        durable_run = durability.accept_run(
+            identity=identity,
+            request=demo_request(incident_id=f"incident:{suffix}"),
+            wait_for_signal=True,
+        )
+        replay = durability.accept_run(
+            identity=identity,
+            request=demo_request(incident_id=f"incident:{suffix}"),
+            wait_for_signal=True,
+        )
+        assert replay.replayed
+        assert replay.run_id == durable_run.run_id
+        signal = durability.accept_signal(
+            identity=identity,
+            command=SignalCommand(
+                command_id=f"resume:{suffix}",
+                run_id=durable_run.run_id,
+                command_type="resume",
+            ),
+        )
+        assert signal.version == 2
+        duplicate_signal = durability.accept_signal(
+            identity=identity,
+            command=SignalCommand(
+                command_id=f"resume:{suffix}",
+                run_id=durable_run.run_id,
+                command_type="resume",
+            ),
+        )
+        assert duplicate_signal.replayed
+        timeline = durability.timeline(
+            tenant_id=_TENANT_ALPHA,
+            run_id=durable_run.run_id,
+            after_cursor=0,
+            limit=10,
+            cursor_codec=CursorCodec(b"integration-cursor-signing-key-001"),
+        )
+        assert [item.event_type for item in timeline.items] == [
+            "investigation.requested",
+            "investigation.resume_requested",
+        ]
+        authority = PostgresCurrentAuthority(
+            pool=pool,
+            repository=PostgresRepository(
+                pool=pool,
+                clock=FixedClock(DEMO_TIME),
+            ),
+            clock=FixedClock(DEMO_TIME),
+            tenant_references=tenant_references,
+        )
+        requested = durability.events(
+            tenant_id=_TENANT_ALPHA,
+            aggregate_type="investigation",
+            aggregate_id=durable_run.run_id,
+            limit=1,
+        )[0]
+        tenant_ref = requested.payload["tenant_ref"]
+        assert isinstance(tenant_ref, str)
+        assert authority.tenant_id(tenant_ref=tenant_ref) == _TENANT_ALPHA
+        current = authority.identity(
+            tenant_id=_TENANT_ALPHA,
+            actor_ref=stable_id(
+                "actor",
+                identity.issuer,
+                identity.subject_id,
+                length=32,
+            ),
+            request_ref=durable_run.request_ref,
+        )
+        assert current is not None
+        assert current.roles == ("incident-responder",)
+        bundle = build_demo_bundle()
+        runtime = DurableActivityRuntime(
+            authority=authority,
+            policy=EnterprisePolicy(
+                policies=repository,
+                clock=FixedClock(DEMO_TIME),
+            ),
+            budget=repository,
+            evidence=bundle.service._evidence,
+            orchestrator=bundle.orchestrator,
+            store=durability,
+        )
+        authorized = asyncio.run(
+            runtime.authorize(
+                TemporalActivityInput(
+                    tenant_ref=tenant_ref,
+                    actor_ref=stable_id(
+                        "actor",
+                        identity.issuer,
+                        identity.subject_id,
+                        length=32,
+                    ),
+                    request_ref=durable_run.request_ref,
+                    run_id=durable_run.run_id,
+                    operation_id=f"authorize:{suffix}",
+                )
+            )
+        )
+        assert authorized.outcome == "authorized"
+        with tenant_transaction(pool, tenant_id=_TENANT_BETA) as connection:
+            hidden = connection.execute(
+                """
+                SELECT count(*) AS count
+                FROM aegis.application_events
+                WHERE event_id = %s
+                """,
+                (event_id,),
+            ).fetchone()
+            assert hidden == {"count": 0}
+        with (
+            Connection.connect(admin_dsn, autocommit=True) as admin,
+            pytest.raises(Error, match="immutable"),
+        ):
+            admin.execute(
+                """
+                UPDATE aegis.application_events
+                SET event_type = 'investigation.tampered'
+                WHERE tenant_id = %s AND event_id = %s
+                """,
+                (_TENANT_ALPHA, event_id),
             )
     finally:
         pool.close()

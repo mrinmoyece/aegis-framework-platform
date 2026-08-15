@@ -101,9 +101,9 @@ class LangfuseObservability:
         passed: bool,
     ) -> None:
         with self._client.start_as_current_observation(
-            name="aegis.layer2.eval",
+            name="aegis.layer3.eval",
             as_type="evaluator",
-            input={"suite": "layer2", "case_count": total},
+            input={"suite": "layer3", "case_count": total},
             metadata={"deterministic": True, "network_models": False},
         ) as observation:
             observation.update(

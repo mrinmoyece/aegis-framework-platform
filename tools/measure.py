@@ -1,4 +1,4 @@
-"""Measure repeatable Layer 2 size, dependencies, effort, and local runtime."""
+"""Measure repeatable Layer 3 size, dependencies, effort, and local runtime."""
 
 from __future__ import annotations
 
@@ -18,29 +18,52 @@ from pathlib import Path
 from aegis_framework.fixtures import build_demo_bundle, demo_identity, demo_request
 
 ROOT = Path(__file__).resolve().parents[1]
-FOUNDATION_SHA = "ec297ad118e3f0040f15fe0507b5da7078eefdad"
-CUSTOM_LAYER2 = {
+FOUNDATION_SHA = "754e536d10b9643b40cac2f7b6c0d1de870fd630"
+CUSTOM_LAYER3 = {
     "repository": "mrinmoyece/aegis-agent-platform",
-    "branch": "mrinmoyece-aegis-identity-governance",
-    "sha": "81409792c97698479a9ca827a4143c6391f28d2b",
+    "branch": "mrinmoyece-aegis-durable-ledger",
+    "sha": "87cefe58adbf62e6a419d38e57e0928581b7003c",
     "source_loc": {
-        "production": 1947,
-        "tests": 1272,
-        "total": 3219,
+        "production": 3765,
+        "tests": 2239,
+        "total": 6004,
     },
     "dependencies": {
-        "direct_runtime": 3,
+        "direct_runtime": 4,
         "direct_optional": 6,
         "direct_development": 0,
         "locked_total": None,
     },
     "implementation_effort_proxy": {
-        "additions": 4069,
-        "deletions": 159,
-        "changed_files": 44,
+        "additions": 3901,
+        "deletions": 176,
+        "changed_files": 42,
         "commits": 1,
     },
-    "test_functions": 53,
+    "test_functions": 77,
+}
+CUSTOM_LAYER4 = {
+    "repository": "mrinmoyece/aegis-agent-platform",
+    "branch": "mrinmoyece-aegis-worker-runtime",
+    "sha": "171fa485819334a892684544c0a993a6e2fc4ace",
+    "source_loc": {
+        "production": 7452,
+        "tests": 3687,
+        "total": 11139,
+    },
+    "dependencies": {
+        "direct_runtime": 6,
+        "direct_optional": 6,
+        "direct_development": 0,
+        "locked_total": None,
+    },
+    "incremental_effort_from_layer3": {
+        "additions": 6301,
+        "deletions": 198,
+        "changed_files": 47,
+        "commits": 1,
+    },
+    "test_functions": 99,
 }
 
 
@@ -92,14 +115,20 @@ def measure(runs: int) -> dict[str, object]:
     dependency_groups = pyproject.get("dependency-groups", {})
     effort = _git_effort()
     return {
-        "schema_version": 2,
-        "layer": 2,
+        "schema_version": 3,
+        "layer": 3,
         "comparison_basis": {
             "foundation_sha": FOUNDATION_SHA,
-            "custom": CUSTOM_LAYER2,
+            "custom_layer3": CUSTOM_LAYER3,
+            "custom_layer4": CUSTOM_LAYER4,
             "loc_definition": "non-blank, non-comment physical Python lines",
             "effort_definition": (
-                "Git additions/deletions and changed files from each Layer 1 foundation"
+                "Git additions/deletions and changed files from each prior layer"
+            ),
+            "equivalent_scenario": (
+                "tenant-scoped durable checkout investigation intent, bounded "
+                "orchestration, duplicate suppression, recovery, cancellation, "
+                "redacted timeline, and no production effect"
             ),
         },
         "measured_at": datetime.now(UTC).isoformat(),
@@ -130,6 +159,9 @@ def measure(runs: int) -> dict[str, object]:
             "HTTP routing and OpenAPI generation",
             "JWT signature and registered-claim cryptography",
             "PostgreSQL connection-pool lifecycle",
+            "cross-process workflow scheduling and replay",
+            "durable timers and signal delivery",
+            "activity retry/backoff and worker crash recovery",
         ],
         "remaining_custom_controls": [
             "issuer registry and bounded JWKS rotation policy",
@@ -141,6 +173,11 @@ def measure(runs: int) -> dict[str, object]:
             "secret-reference boundary",
             "redacted hash-chained durable audit",
             "API anti-enumeration and readiness failure policy",
+            "event envelope and dual integrity chains",
+            "transactional inbox/outbox and idempotency",
+            "projection rebuild and redacted cursor API",
+            "activity authorization and retry ownership",
+            "stale-result, poison-payload, and DLQ policy",
         ],
         "lock_in_and_escape": {
             "langgraph": "OrchestratorPort plus JSON-compatible domain state",
@@ -152,6 +189,23 @@ def measure(runs: int) -> dict[str, object]:
             ),
             "fastapi": "typed request/response models at the delivery adapter",
             "langfuse": "ObservabilityPort plus OpenTelemetry",
+            "temporal": (
+                "opaque typed payloads plus application outbox, ActivityOperations, "
+                "and application-owned ledger/projections"
+            ),
+        },
+        "required_stateful_services": ["PostgreSQL", "Temporal Server"],
+        "custom_comparison": {
+            "layer3_services": ["PostgreSQL"],
+            "layer4_services": ["PostgreSQL", "Redis Streams"],
+            "temporal_tradeoff": (
+                "Temporal removes scheduler, timers, signal history, retry/backoff, "
+                "and crash recovery code but adds a second operational control plane"
+            ),
+            "runtime_comparison_status": (
+                "framework local timing only; cross-repository throughput is not "
+                "reported because equivalent constrained environments were not run"
+            ),
         },
         "runtime": {
             "scenario": "deterministic-success",

@@ -71,3 +71,15 @@ class AuditFailure(AegisFrameworkError):
 
 class MigrationFailure(AegisFrameworkError):
     pass
+
+
+class IntegrityFailure(AegisFrameworkError):
+    pass
+
+
+class MessageClaimConflict(AegisFrameworkError):
+    pass
+
+
+class PayloadRejected(AegisFrameworkError):
+    pass

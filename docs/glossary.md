@@ -25,7 +25,7 @@ The deterministic join node that checks injection flags, specialist availability
 citations, contradictions, and corroboration before producing a proposal.
 
 **Effect**
-A mutation of an external/production system. Layer 2 has no enabled effect.
+A mutation of an external/production system. Layer 3 has no enabled effect.
 
 **Enterprise-owned control**
 Policy, tenant isolation, budget, idempotency, approval, effect fencing, verification,
@@ -62,7 +62,7 @@ unknown-key refresh cooldown. It is unavailable rather than stale-successful aft
 required refresh failure.
 
 **Langfuse**
-The selected optional framework trace/eval backend. Layer 2 uses manual minimized
+The selected optional framework trace/eval backend. Layer 3 uses manual minimized
 observations rather than automatic graph capture.
 
 **LangGraph**
@@ -102,7 +102,7 @@ superuser nor `BYPASSRLS`; migrations and saver setup use a separate administrat
 connection.
 
 **Secret reference**
-Tenant-bound provider URI/name stored instead of secret material. Layer 2 does not
+Tenant-bound provider URI/name stored instead of secret material. Layer 3 does not
 resolve it and never places values in graph, API, audit or trace state.
 
 **Structured model port**
@@ -117,5 +117,33 @@ across process boundaries.
 A bounded hash bucket exported for aggregate telemetry instead of a tenant identifier.
 
 **Verification**
-Evidence-based check that a controlled effect achieved its intended outcome. Layer 2
+Evidence-based check that a controlled effect achieved its intended outcome. Layer 3
 does not execute this journey stage.
+
+**Application event**
+Immutable tenant-scoped domain fact with aggregate sequence, tenant cursor, schema
+version, opaque actor/correlation references, bounded payload and dual integrity hashes.
+
+**Activity**
+Temporal's side-effect/I/O boundary. Layer 3 Activities reauthorize current application
+policy and are at-least-once, bounded, heartbeating, and idempotent by operation ID.
+
+**Dead letter**
+Explicit outbox state after the bounded claim/delivery attempt limit. It requires an
+audited operator decision; immutable intent is never rewritten.
+
+**Inbox / outbox**
+Application-owned transactional records that deduplicate incoming commands and publish
+committed intent to a framework boundary without dual writes.
+
+**Projection**
+Derived, rebuildable read model. It is served by the API but can always be recreated
+from verified application events.
+
+**Tenant cursor**
+Contiguous per-tenant commit order assigned in the same transaction as the event. It is
+for replay/pagination and does not grant access.
+
+**Workflow history**
+Temporal's deterministic scheduling/replay record. It is operational framework state,
+not authorization, application audit, or product status truth.

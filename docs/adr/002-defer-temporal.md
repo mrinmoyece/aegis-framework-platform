@@ -1,6 +1,6 @@
 # ADR 002: Defer Temporal until durable effects
 
-- Status: accepted
+- Status: superseded for the Layer 3 lifecycle by ADR 007
 - Date: 2026-08-15
 
 ## Context
@@ -37,3 +37,7 @@ exactly-once.
 
 Revisit when Layer 2 adds a real approval wait or an effect spans processes, exceeds
 the HTTP request lifetime, or must resume after a deployment.
+
+Layer 3 met the process/deployment recovery, timer, and signal portion of this trigger
+without adding effects. [ADR 007](007-temporal-durable-workflow.md) adopts Temporal
+around the bounded investigation while preserving the no-effect boundary.

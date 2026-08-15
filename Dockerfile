@@ -11,7 +11,7 @@ RUN uv sync --frozen --no-dev --no-editable --extra postgres
 
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/mrinmoyece/aegis-framework-platform" \
-      org.opencontainers.image.description="Aegis framework-first Layer 2"
+      org.opencontainers.image.description="Aegis framework-first durable Layer 3"
 ENV PATH="/app/.venv/bin:${PATH}" \
     LANGGRAPH_STRICT_MSGPACK=true \
     PYTHONUNBUFFERED=1 \

@@ -44,3 +44,7 @@ database credential rotation remain operator responsibilities and are unproven.
 
 Application repository ports and SQL-exportable tables isolate PostgreSQL. Replacing
 the LangGraph saver does not migrate or weaken application authority or audit.
+
+Layer 3 extends the same forced-RLS/runtime-role boundary to immutable application
+events, heads/cursors, idempotency, inbox/outbox, and rebuildable projections in
+[ADR 008](008-application-event-ledger.md).

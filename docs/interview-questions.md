@@ -167,3 +167,69 @@
 36. **What does the local Keycloak test prove?**
     One loopback token follows the same strict verifier. It does not prove production
     IdP rotation, HA, outage behavior, revocation latency or deployment.
+
+## Layer 3 durability and Temporal
+
+37. **Why introduce Temporal now but not for each LangGraph node?**
+    Cross-process recovery, timers, signals, Activity heartbeat/retry, and replay are
+    now requirements. The cognitive graph remains one bounded Activity so Temporal and
+    LangGraph do not own the same retry tree.
+
+38. **Why is Temporal history not the run-status API?**
+    History is framework scheduling state with different retention/access semantics.
+    Product status is an authorized application fact derived from immutable events and
+    remains available across framework replacement.
+
+39. **What makes the tenant cursor commit-safe?**
+    The tenant cursor row is locked and advanced in the same transaction that inserts
+    events, outbox, idempotency and projections. A rollback leaves no committed gap.
+
+40. **Why keep aggregate and tenant hash chains?**
+    Aggregate order detects per-run mutation/reordering; tenant order provides a
+    deterministic export/rebuild cursor across aggregates. Neither replaces signatures
+    or external witnessing.
+
+41. **Where is exactly-once achieved?**
+    Nowhere universally. Commands and Activity results are application-idempotent.
+    Temporal Activities and external delivery remain at-least-once; future effects need
+    fencing, idempotency and reconciliation.
+
+42. **How is a duplicate signal handled?**
+    The application inbox deduplicates command ID and the workflow maintains a bounded
+    processed-command set. The Activity still reloads the command and current signaller.
+
+43. **What happens if policy is revoked during a wait?**
+    The resume Activity reevaluates current authority and fails closed. The historical
+    start decision cannot authorize later work.
+
+44. **How does a worker crash recover?**
+    Temporal retains workflow/Activity schedule. Another compatible worker replays
+    deterministic history and retries the Activity using the same operation and budget
+    reservation IDs.
+
+45. **Why no continue-as-new?**
+    One bounded graph, at most 32 signals and a two-day execution cap keep history
+    bounded. Adding continue-as-new without measured need complicates signal handoff.
+
+46. **How is workflow code upgraded?**
+    Preserve deterministic paths with `workflow.patched` or current Worker Versioning,
+    replay representative histories in CI, then deprecate/remove patches only after old
+    executions drain.
+
+47. **What if Temporal history is lost but PostgreSQL survives?**
+    Reconcile pending application intent with the stable workflow/outbox ID or record an
+    explicit platform failure. Never infer completion from missing history.
+
+48. **What if LangGraph checkpoints are lost?**
+    The bounded graph Activity may rerun under the same operation and budget IDs. Its
+    result is accepted only through the application aggregate state machine.
+
+49. **What custom code remains after Temporal adoption?**
+    Event envelopes, hash/sequence rules, RLS, identity/policy/budget, inbox/outbox,
+    idempotency, stale-result handling, projections/API, redaction, audit, and future
+    effect controls.
+
+50. **What is the Temporal escape strategy?**
+    Consume the same application outbox, emit the same event transitions, implement
+    `ActivityOperations`, and pass retry/timer/signal/recovery/replay equivalence. No
+    application fact must be extracted from Temporal first.

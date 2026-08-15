@@ -1,109 +1,140 @@
-# Tutorial: authenticate and trace one tenant investigation
+# Tutorial: trace one durable investigation without trusting framework state
 
-## 1. Run explicit demo mode
-
-The default application mode is production and fails readiness closed without OIDC
-and PostgreSQL configuration. Use explicit demo mode for the deterministic fixture:
+## 1. Run the deterministic delivery adapter
 
 ```bash
 AEGIS_MODE=demo make serve
 ```
 
-In another shell:
+Production remains the default and fails readiness closed without configured OIDC and
+PostgreSQL. Demo identities/fixtures are never selected implicitly.
 
-```bash
-curl --fail-with-body \
-  -H 'Authorization: Bearer demo-responder-token' \
-  -H 'X-Request-ID: tutorial-001' \
-  http://127.0.0.1:8000/v1/me
-```
-
-The response contains tenant, issuer, subject, human/workload kind, roles,
-permissions, purposes, grant version and expiry. It does not echo a bearer token.
-`demo-responder-token` exists only in demo/test wiring; production never falls back to
-it.
-
-## 2. Understand the production token boundary
-
-`JwtAuthenticator` first parses an unverified header/issuer only to select an exact
-configured issuer. It then requires an allowed asymmetric algorithm and `kid`,
-retrieves a key through the bounded cache, verifies the signature/issuer/audience,
-and validates `exp`, `iat`, optional `nbf`, clock skew and maximum lifetime.
-
-The verified token carries `aegis_tenant` and `aegis_grant_version`. The tenant value
-only scopes an RLS query. Application storage must return the same tenant for the
-exact `(issuer, subject)`, an active principal, and the same grant version. Current
-roles and purposes come from application grants; token role claims are ignored.
-
-Human and service/workload tokens follow this path. The principal record—not a token
-guess—sets `principal_kind`.
-
-## 3. Read governance without enumerating tenants
-
-```bash
-curl --fail-with-body \
-  -H 'Authorization: Bearer demo-responder-token' \
-  -H 'X-Request-ID: tutorial-tenant' \
-  http://127.0.0.1:8000/v1/tenants/tenant-acme
-
-curl --fail-with-body \
-  -H 'Authorization: Bearer demo-responder-token' \
-  -H 'X-Request-ID: tutorial-policy' \
-  http://127.0.0.1:8000/v1/policies/current
-
-curl --fail-with-body \
-  -H 'Authorization: Bearer demo-responder-token' \
-  -H 'X-Request-ID: tutorial-quota' \
-  http://127.0.0.1:8000/v1/quotas/investigations
-```
-
-Requesting `tenant-beta` with the alpha token returns the same `404` used for an
-unknown tenant. Policy runs before repository lookup. Audit additionally requires the
-`tenant-auditor` or `tenant-admin` role.
-
-## 4. Run the investigation
+Submit durable intent:
 
 ```bash
 curl --fail-with-body \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer demo-responder-token' \
-  -H 'X-Request-ID: tutorial-investigation' \
-  --data @examples/investigation-request.json \
-  http://127.0.0.1:8000/v1/investigations
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-durable-001' \
+  --data '{
+    "incident_id":"checkout-20260815-001",
+    "alert":{
+      "signal":"checkout_failure_rate",
+      "service":"checkout-api",
+      "region":"eu-west-1",
+      "observed_at":"2026-08-15T00:00:00Z",
+      "failure_rate":0.42,
+      "threshold":0.05
+    },
+    "wait_for_signal":true
+  }' \
+  http://127.0.0.1:8000/v1/durable-investigations
 ```
 
-`InvestigationService` evaluates `investigation:run` for purpose
-`incident-response` at medium risk, claims the tenant/request idempotency key, and
-reserves five quota units before evidence or graph work. A retry reuses the same
-reservation. Exhaustion returns a deterministic abstention with zero graph
-checkpoints.
+The response is a redacted application projection. `202` means the requested event and
+Temporal outbox intent committed atomically. It does not mean workflow completion.
 
-The coordinator projects untrusted evidence through per-kind fact allowlists.
-Telemetry and change specialists execute in one LangGraph super-step. The reducer
-sorts findings, and the critic requires known evidence ID, locator and SHA-256 content
-hash. Injection, malformed output, missing evidence, contradiction or invalid
-citations cannot produce a proposal.
+## 2. Inspect application truth
 
-The graph may emit a rollback proposal. `InvestigationService` opens a separate
-pending approval after graph execution. There is no decision/effect route, and
-`DisabledEffectAdapter` rejects a forged approval.
+```bash
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-read-001' \
+  http://127.0.0.1:8000/v1/durable-investigations/RUN_ID
 
-## 5. Inspect durable isolation locally
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-timeline-001' \
+  'http://127.0.0.1:8000/v1/durable-investigations/RUN_ID/timeline?limit=50'
+```
 
-No database or Keycloak password is committed. Generate local values and start the
-PostgreSQL profile:
+The timeline excludes tenant ID and event payload. A next cursor is HMAC-protected and
+bound to the caller tenant and run. A cross-tenant caller receives `404`.
+
+Temporal operational queries can show schedule state, but the API never uses them as
+product truth.
+
+## 3. Understand the ledger transaction
+
+For a new command, `InMemoryDurability` (test/demo) or `PostgresDurability` (durable
+adapter) performs:
+
+```text
+lock aggregate head + tenant cursor
+check expected version
+append event with aggregate and tenant previous hashes
+claim request fingerprint
+insert Temporal start outbox
+update run/timeline projection
+advance heads
+commit
+```
+
+A conflict or outbox failure rolls back the entire operation, including the tenant
+cursor. Event/idempotency/inbox rows are immutable.
+
+## 4. Start PostgreSQL and Temporal locally
 
 ```bash
 export AEGIS_POSTGRES_ADMIN_PASSWORD="$(openssl rand -hex 24)"
 export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
-docker compose --profile durable up -d postgres
+docker compose --profile temporal up -d postgres temporal
+docker compose exec -T temporal \
+  tctl --address temporal:7233 cluster health
 ```
 
-The init script applies `migrations/0001_layer2.sql`, creates an `aegis_app` login,
-and grants the non-login `aegis_runtime` role. Application connections execute
-`SET ROLE aegis_runtime`; setup/migrations use the admin connection separately.
+Temporal is exposed only at `127.0.0.1:57233`. It stores framework history in separate
+databases. Application events remain in `aegis.*`.
 
-Run the gated tests:
+## 5. Follow workflow ownership
+
+The sandboxed workflow schedules:
+
+```text
+authorize/reserve -> collect evidence -> LangGraph -> optional wait -> complete
+```
+
+It has no database/network/random/wall-clock calls. Every Activity resolves opaque
+tenant/actor references to current application authority and reevaluates policy. The
+initial Activity reserves budget by run ID. Retries reuse that reservation.
+
+Evidence and graph output are persisted as application artifacts. Temporal returns
+only stable references. LangGraph continues to own fan-out/join and checkpoints inside
+one Activity; Temporal does not retry individual nodes.
+
+## 6. Resume or cancel safely
+
+```bash
+curl --fail-with-body -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-signal-001' \
+  --data '{"command_id":"resume-tutorial-001"}' \
+  http://127.0.0.1:8000/v1/durable-investigations/RUN_ID/signals/resume
+```
+
+Delivery stores an inbox command and outbox signal before Temporal sees it. Duplicate
+command IDs are idempotent. The workflow does not trust the signal body; a later
+Activity reloads the command and current signaller. If policy was revoked while
+waiting, resume fails closed.
+
+Cancellation follows the same path. A stale graph result after `cancel_requested` is
+rejected by the application aggregate state machine.
+
+## 7. Exercise recovery and replay
+
+```bash
+AEGIS_TEST_TEMPORAL_ADDRESS=127.0.0.1:57233 make temporal-integration
+```
+
+The test starts one workflow before any worker, then starts a worker and observes
+recovery. It also verifies one transient Activity retry, duplicate signal suppression,
+cancellation signal, timer timeout, normal completion, and `Replayer` determinism.
+
+For SDK time skipping without a network download, preinstall the Temporal test-server
+binary and set `AEGIS_TEST_TEMPORAL_TEST_SERVER`.
+
+## 8. Prove PostgreSQL controls
 
 ```bash
 export AEGIS_TEST_POSTGRES_ADMIN_DSN="postgresql://aegis_admin:${AEGIS_POSTGRES_ADMIN_PASSWORD}@127.0.0.1:55432/aegis"
@@ -111,46 +142,18 @@ export AEGIS_TEST_POSTGRES_RUNTIME_DSN="postgresql://aegis_app:${AEGIS_POSTGRES_
 make integration
 ```
 
-They prove forced RLS, pool reset safety, audit mutation rejection, concurrent quota
-reservation, and LangGraph checkpoint isolation. They do not prove production HA,
-backup/restore, or deployment.
+The tests cover forced RLS, pool reset, audit/event immutability, quota races,
+checkpoint isolation, event/outbox atomicity, projection rebuild, outbox claim, and
+cross-tenant ledger hiding.
 
-## 6. Optional local Keycloak compatibility
+## 9. Observe without payloads
 
-Start an empty, loopback-only Keycloak 26.7.1 profile with generated bootstrap
-credentials:
+OpenTelemetry application spans expose fixed operation names and allowlisted
+counts/status. The optional Temporal tracing interceptor is configured through the SDK
+and does not export application payload contents. Temporal input contains only opaque
+references. Langfuse remains model/graph telemetry; automatic graph capture is blocked.
 
-```bash
-export AEGIS_KEYCLOAK_ADMIN_PASSWORD="$(openssl rand -hex 24)"
-docker compose --profile identity up -d keycloak
-```
-
-Create a local realm/client manually, configure audience `aegis-api`, and add numeric
-`aegis_grant_version` plus string `aegis_tenant` access-token claims. Do not put
-client secrets or user passwords in the repository. The gated test requires:
-
-```text
-AEGIS_TEST_KEYCLOAK_TOKEN
-AEGIS_TEST_KEYCLOAK_ISSUER
-AEGIS_TEST_KEYCLOAK_JWKS_URI
-AEGIS_TEST_KEYCLOAK_AUDIENCE
-AEGIS_TEST_KEYCLOAK_SUBJECT
-AEGIS_TEST_KEYCLOAK_TENANT
-AEGIS_TEST_KEYCLOAK_GRANT_VERSION
-```
-
-The test refuses non-loopback issuer/JWKS hosts. It proves compatibility with one
-local token, not production rotation.
-
-## 7. Observe without leaking
-
-OpenTelemetry and optional Langfuse use fixed observation names, a 64-bucket tenant
-value, and allowlisted counts/status only. Automatic LangGraph/LangChain capture
-remains blocked because graph state contains evidence. Audit is separate: it stores
-tenant scope internally, a derived actor/request reference, allowlisted attributes,
-and a per-tenant hash chain.
-
-## 8. Run the qualification gates
+## 10. Run all release gates
 
 ```bash
 make ci
@@ -160,7 +163,5 @@ make container
 docker compose config --quiet
 ```
 
-The deterministic suite covers JWT attacks/rotation, stale and revoked grants,
-purpose/risk policy, confused deputy and anti-enumeration behavior, malformed and
-oversized input, graph authority resistance, checkpoint isolation, audit redaction,
-and exporter redaction. PostgreSQL and Keycloak remain separately environment-gated.
+Read [the runbook](runbook.md) for DLQ, worker, cancellation, reconciliation, and
+projection recovery. None of these procedures authorizes a production effect.
