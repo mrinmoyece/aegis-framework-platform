@@ -274,3 +274,42 @@
 58. **How can the provider stack be replaced?**
     Implement `ModelProviderAdapter` for the neutral request/result contracts. Routing,
     policy, budget, immutable facts, APIs, graph integration and evals remain unchanged.
+
+## Layer 5 evidence connectors and correlation
+
+59. **Why use HTTPX directly for Dynatrace and GitHub?**
+    There is no suitable official general Python SDK for either. HTTPX removes connection
+    and stream mechanics while exact paths, auth, redirects, pagination, rate limits,
+    response bounds and exceptions remain visible behind `HttpTransport`.
+
+60. **Why is the official Kubernetes client not a security boundary?**
+    It decodes API objects. Aegis still fixes the server without exec kubeconfig plugins,
+    binds tenant secrets, restricts RBAC/namespaces/resources, owns continue-token
+    expiry/relist and bounds responses/cancellation.
+
+61. **What happens after a worker dies between connector response and result commit?**
+    The ledger contains page intent without result. Retry detects ambiguity, does not
+    issue a second call, and records `reconciliation_required`.
+
+62. **How is evidence prevented from becoming instructions?**
+    Text is canonicalized/scanned, secrets and PII are redacted or quarantined, facts are
+    allowlisted, quarantine cannot enter graph state, and the model contract labels
+    evidence untrusted with provenance-bound citations.
+
+63. **Can deterministic correlation claim a deployment caused an outage?**
+    No. It emits temporal/shared-fact links with `causal=false`; conflicts, missing and
+    stale sources remain explicit and unsupported causality requires abstention.
+
+64. **Why reject LangChain, Unstructured, and LlamaIndex loaders?**
+    They add broad parser/network/metadata/RAG surfaces without removing source authority,
+    provenance, sandboxing, scanning, retention, RLS or citation controls.
+
+65. **What may an evidence API reveal?**
+    Authorized source kind, status, bounded counts, failure code, page number, cursor
+    availability and expiry—not tenant IDs, cursor values, URLs, locators, evidence,
+    scanner matches or credentials.
+
+66. **What did frameworks remove in Layer 5?**
+    HTTP pooling/streaming, Kubernetes wire/object decoding, JWT cryptography, YAML
+    syntax parsing, Temporal mechanics and LangGraph mechanics. Most secure-connector
+    controls remain custom; neutral ports preserve escape.

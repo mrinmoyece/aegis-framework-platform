@@ -239,6 +239,10 @@ def _citation(item: ModelEvidence) -> Citation:
         evidence_id=item.evidence_id,
         locator=item.locator,
         content_hash=item.content_hash,
+        provenance_digest=item.provenance_digest,
+        source_id=item.source_id,
+        query_id=item.query_id,
+        page_number=item.page_number,
     )
 
 

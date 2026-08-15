@@ -323,6 +323,15 @@ def validate_evidence(
     if len(evidence_ids) != len(set(evidence_ids)):
         raise EvidenceUnavailable("evidence adapter returned duplicate evidence ids")
     for item in collected:
+        if item.provenance_digest is not None:
+            if (
+                item.untrusted_text is None
+                or sha256(item.untrusted_text.encode()).hexdigest() != item.content_hash
+            ):
+                raise EvidenceUnavailable(
+                    "normalized evidence content hash validation failed"
+                )
+            continue
         expected_hash = evidence_hash(
             tenant_id=item.tenant_id,
             kind=item.kind,

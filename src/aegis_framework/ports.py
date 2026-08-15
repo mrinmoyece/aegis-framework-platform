@@ -38,6 +38,8 @@ class Action(StrEnum):
     MODEL_CATALOG_READ = "model:catalog:read"
     MODEL_USAGE_READ = "model:usage:read"
     MODEL_HEALTH_READ = "model:health:read"
+    EVIDENCE_QUERY_READ = "evidence:query:read"
+    EVIDENCE_CURSOR_READ = "evidence:cursor:read"
     EFFECT_EXECUTE = "effect:execute"
 
 
@@ -177,6 +179,13 @@ class Observation(Protocol):
 
 class ObservabilityPort(Protocol):
     def investigation(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+    def evidence_query(
         self,
         *,
         tenant_id: str,

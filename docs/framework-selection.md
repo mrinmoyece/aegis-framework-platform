@@ -19,6 +19,9 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | Langfuse | 4.14.4 | Hosted/self-hosted backend | Optional model/graph trace/eval UI | Payload minimization, retention | Optional behind `ObservabilityPort` |
 | OpenAI SDK | 3.1.0 | Provider network when enabled | OpenAI Responses protocol/decoding | Policy, routing, budget, pricing, usage, safety | Optional behind `ModelProviderAdapter` |
 | Anthropic SDK | 0.122.0 | Provider network when enabled | Anthropic Messages protocol/decoding | Policy, routing, budget, pricing, usage, safety | Optional behind `ModelProviderAdapter` |
+| HTTPX | 0.28.1 | Connector network when enabled | HTTP pooling, timeout and streamed response mechanics | Origin/DNS/IP/redirect policy, auth, schema, limits, retry truth | Select behind `HttpTransport` |
+| Kubernetes Python client | 36.0.3 | Kubernetes API when enabled | Official API object/wire decoding | Static safe configuration, RBAC, namespace/resource policy, pagination truth | Optional behind `KubernetesApi` |
+| PyYAML | 6.0.3 | Embedded | YAML syntax parsing | Input/structure bounds, schema, trust, redaction | Select narrowly with `safe_load` |
 | Keycloak | 26.7.1 local digest | JVM + database | Local OIDC compatibility | Realm/client/grants/production operations | Optional |
 | Redis/Valkey | Not installed | Additional state service | Queue primitives | Leases, truth, retry, tenancy still custom | Reject: Temporal owns workflow queue |
 | LiteLLM | 1.98.0 evaluated, not installed | Proxy/SDK and broad dependencies | Unified provider API/routing | Enterprise controls still remain | Reject: OpenAI 3 conflict, overlap, footprint |
@@ -26,6 +29,11 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | LangChain provider interfaces | 1.5.1 evaluated, not installed | LangChain messages/tracing/tokenizer | Provider runnable wrappers | Enterprise controls still remain | Reject: coupling without control removal |
 | Portkey/OpenRouter | Not installed | External gateway/SaaS | Hosted routing/retry/cost UI | Application truth and privacy controls | Reject: external authority/trace/retry plane |
 | pgvector/RAG | Deferred | Extension/index | Vector search | Tenant/provenance/relevance | `EvidencePort` |
+| PyGithub | 2.9.1 evaluated, not installed | Requests/urllib3/PyNaCl | GitHub object/pagination wrappers | All Layer 5 controls remain | Reject: non-official and obscures call controls |
+| githubkit | 0.16.1 evaluated, not installed | HTTPX/cache/generated schemas | GitHub generated API | All Layer 5 controls remain | Reject: non-official and excess surface |
+| LangChain community loaders | 0.4.2 evaluated, not installed | Broad loader/network stack | Loader dispatch | Trust/provenance/sandbox remain | Reject: sunset/overlap |
+| LangChain Unstructured | 1.0.1 evaluated, not installed | External API or parser stack | Document extraction | Trust/provenance/sandbox remain | Reject: Python-range/privacy/footprint |
+| LlamaIndex readers / Unstructured | Evaluated, not installed | Overlapping ingestion/RAG stack | Broad format parsing | All enterprise controls remain | Reject: overlap without control removal |
 | UI, MCP/A2A, sandbox | Deferred | New runtimes/services | N/A | Session/tool/effect security | Later layers |
 
 ## Why Temporal now
@@ -169,3 +177,60 @@ Accessed 2026-08-15:
 
 Package metadata is the source for exact SDK pins. Production service/license/security
 qualification remains an organizational responsibility.
+
+## Layer 5 connector framework decision
+
+No general official Dynatrace REST SDK or official GitHub Python Octokit exists.
+`oneagent-sdk` is instrumentation, not an API client. Direct HTTPX therefore keeps exact
+API paths, tokens, redirect denial, page semantics, response limits, and exceptions
+visible. Existing PyJWT signs GitHub App JWTs; installation tokens are narrowed to the
+configured repositories and permissions.
+
+The official Kubernetes client is selected only for Kubernetes and configured directly
+from a fixed HTTPS server plus tenant-bound service-account token. Aegis does not load
+arbitrary kubeconfig, exec credential plugins, auth providers, Secrets, ConfigMaps, or
+mutating APIs. List `_continue` values are encrypted application cursors; `410 Gone`
+requires explicit relist/reconciliation.
+
+PyYAML removes syntax parsing only. Aegis still applies byte/node/depth/schema bounds and
+projects scalar allowlisted facts. Markdown/text/JSON and bounded ZIP are handled
+narrowly. PDF, DOCX, XML, HTML, macros, active content, Unstructured, LlamaIndex, and
+LangChain loaders remain absent. This is intentionally less framework-heavy: secure
+connectors gained little from loader ecosystems and would inherit more supply-chain and
+metadata risk.
+
+## Framework Layer 5 versus custom Aegis Layer 6
+
+Pinned custom Layer 6 is
+`mrinmoyece/aegis-agent-platform@7a685bc52772e1c92467baba58a1c668646e9bf7`.
+It contains 17,119 production LOC, 8,780 test LOC, 25,899 total LOC, and 204 test
+functions. Its one-commit increment from custom Layer 5 is 10,954 additions, 123
+deletions across 50 files. Framework Layer 5 measurements are generated in
+`comparison/layer5-metrics.json`.
+
+The custom layer uses 12 broad runtime dependencies with version ranges and keeps its
+Redis worker plane. Framework Layer 5 has 12 exact runtime dependencies, seven optional
+dependencies, 131 locked packages, PostgreSQL plus Temporal, and no new stateful service.
+The official Kubernetes client adds a notable `requests`/`urllib3`/YAML/WebSocket/OAuth
+dependency subtree. HTTPX and PyYAML were already transitive but are now direct pins.
+
+For 200 equivalent in-process three-record non-causal correlations on the same
+arm64/Python 3.14.7 machine, custom Layer 6 measured 0.015 ms median/p95 and Framework
+Layer 5 measured 0.048/0.049 ms. The framework path is roughly 3x slower at microsecond
+scale because of strict Pydantic construction. This is not a service benchmark: it
+excludes ingestion, PostgreSQL, Temporal, Redis, connector networks, serialization, and
+process boundaries.
+
+Frameworks eliminate HTTP connection/stream mechanics, Kubernetes wire/object decoding,
+JWT cryptography, YAML syntax parsing, Temporal scheduling/retry/heartbeat/cancellation,
+and LangGraph scheduling/checkpoint plumbing. They do **not** eliminate tenant/source
+policy, secret references, SSRF/DNS/redirect controls, response/schema limits, durable
+intent, ambiguity/reconciliation, cursor encryption, canonicalization, scanning,
+redaction, quarantine, retention, provenance, RLS, deterministic correlation, citation
+validation, observability privacy, or authorized APIs. Secure connector work remains
+mostly custom.
+
+Operationally, Framework Layer 5 trades the custom Redis worker for Temporal and adds the
+official Kubernetes client's dependency/upgrade matrix. Escape paths are `HttpTransport`,
+`KubernetesApi`, `EvidenceConnector`, `EvidenceControlStore`, opaque Temporal messages,
+application events/SQL export, and canonical JSON/text. Loader lock-in is avoided.

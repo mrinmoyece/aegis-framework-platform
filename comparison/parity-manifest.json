@@ -2,7 +2,7 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 4,
+  "layer": 5,
   "generated_on": "2026-08-15",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
@@ -54,10 +54,10 @@
     {
       "id": "06-evidence-connectors-correlation",
       "name": "Durable evidence connectors and correlation",
-      "status": "partial",
-      "evidence": ["src/aegis_framework/activity_runtime.py", "src/aegis_framework/safety.py"],
-      "framework_owned": [],
-      "enterprise_owned": ["tenant scoping", "content hashes", "durable snapshot", "source signatures", "live connectors"]
+      "status": "delivered",
+      "evidence": ["src/aegis_framework/evidence.py", "src/aegis_framework/connector_adapters.py", "src/aegis_framework/ingestion.py", "src/aegis_framework/correlation.py", "src/aegis_framework/evidence_runtime.py", "src/aegis_framework/evidence_temporal.py", "src/aegis_framework/evidence_postgres.py", "migrations/0004_layer5.sql", "tests/test_evidence_layer5.py"],
+      "framework_owned": ["HTTP connection and streaming mechanics", "Kubernetes wire/object decoding", "safe YAML syntax parsing", "Temporal page scheduling/retry/heartbeat/cancellation"],
+      "enterprise_owned": ["tenant/source/resource allowlists", "secret references", "SSRF/DNS/redirect policy", "durable page intent and reconciliation", "cursor encryption", "canonicalization/scanning/redaction/quarantine", "provenance and citations", "deterministic non-causal correlation", "forced RLS and projection rebuild"]
     },
     {
       "id": "07-specialist-orchestration",
@@ -65,7 +65,7 @@
       "status": "partial",
       "evidence": ["src/aegis_framework/graph.py", "src/aegis_framework/temporal.py", "tests/test_graph.py"],
       "framework_owned": ["LangGraph fan-out/fan-in/checkpoints", "Temporal lifecycle recovery"],
-      "enterprise_owned": ["policy", "budget", "citation rules", "result facts", "retry ownership"]
+      "enterprise_owned": ["policy", "budget", "citation rules", "deterministic correlation context", "result facts", "retry ownership", "multi-agent expansion deferred"]
     },
     {
       "id": "08-approval-remediation",
@@ -95,25 +95,25 @@
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_temporal_integration.py"],
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_temporal_integration.py"],
       "framework_owned": ["Temporal replay", "optional Langfuse evaluator observation"],
-      "enterprise_owned": ["twenty-one hermetic safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
+      "enterprise_owned": ["twenty-six hermetic safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
     },
     {
       "id": "12-observability-replay",
       "name": "Observability and replay",
       "status": "partial",
-      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py"],
+      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py"],
       "framework_owned": ["OTel spans", "Temporal replay", "LangGraph checkpoints"],
-      "enterprise_owned": ["redaction", "cardinality", "event and model usage replay", "projection rebuild", "retention"]
+      "enterprise_owned": ["redaction", "cardinality", "event/model/evidence replay", "projection rebuild", "retention"]
     },
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
       "status": "partial",
-      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py"],
+      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py"],
       "framework_owned": ["FastAPI delivery"],
-      "enterprise_owned": ["authorized redacted status/timeline/model operations", "opaque cursor", "session security", "review UX"]
+      "enterprise_owned": ["authorized redacted status/timeline/model/evidence operations", "opaque/encrypted cursor", "session security", "review UX"]
     },
     {
       "id": "14-mcp-a2a-interoperability",

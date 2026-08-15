@@ -33,6 +33,15 @@ from aegis_framework.errors import (
     PolicyDenied,
     RepositoryUnavailable,
 )
+from aegis_framework.evidence import DataClassification as EvidenceClassification
+from aegis_framework.evidence import (
+    EvidenceQuery,
+    EvidenceSource,
+    EvidenceSourceKind,
+    EvidenceTimeRange,
+    SourceTrust,
+)
+from aegis_framework.evidence_postgres import PostgresEvidenceRepository
 from aegis_framework.fixtures import (
     DEMO_TIME,
     build_demo_bundle,
@@ -74,6 +83,7 @@ from aegis_framework.temporal import TemporalActivityInput
 _MIGRATION = Path("migrations/0001_layer2.sql")
 _LAYER3_MIGRATION = Path("migrations/0002_layer3.sql")
 _LAYER4_MIGRATION = Path("migrations/0003_layer4.sql")
+_LAYER5_MIGRATION = Path("migrations/0004_layer5.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -138,6 +148,25 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "aegis-layer4-schema" in layer4
     assert "FORCE ROW LEVEL SECURITY" in layer4
     assert "PASSWORD" not in layer4
+    layer5 = _LAYER5_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "evidence_sources",
+        "evidence_tenant_quotas",
+        "evidence_queries",
+        "evidence_cursors",
+        "evidence_metadata",
+        "evidence_quarantine",
+        "evidence_bundles",
+        "evidence_bundle_members",
+        "evidence_projection_rebuilds",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer5
+    assert "evidence_metadata_immutable" in layer5
+    assert "evidence_quarantine_immutable" in layer5
+    assert "evidence_bundles_immutable" in layer5
+    assert "aegis-layer5-schema" in layer5
+    assert "FORCE ROW LEVEL SECURITY" in layer5
+    assert "PASSWORD" not in layer5
 
 
 def _integration_dsns() -> tuple[str, str]:
@@ -332,6 +361,148 @@ def test_pool_reset_detects_leaked_tenant_and_session_drift() -> None:
     drifted = _FakeConnection(row_security="off")
     with pytest.raises(RepositoryUnavailable, match="secure defaults"):
         _reset_runtime_connection(drifted)  # pyright: ignore[reportArgumentType]
+
+
+@pytest.mark.postgres
+def test_live_evidence_projection_rebuild_and_forced_rls() -> None:
+    admin_dsn, pool, _ = _repository_context()
+    tenant_references = TenantReferenceCodec(b"postgres-reference-key-test-00001")
+    ledger = PostgresDurability(
+        pool=pool,
+        clock=FixedClock(DEMO_TIME),
+        tenant_references=tenant_references,
+    )
+    repository = PostgresEvidenceRepository(
+        pool=pool,
+        ledger=ledger,
+        clock=FixedClock(DEMO_TIME),
+    )
+    suffix = uuid4().hex
+    source = EvidenceSource(
+        tenant_id=_TENANT_ALPHA,
+        source_id=f"source-{suffix}",
+        kind=EvidenceSourceKind.GITHUB,
+        trust=SourceTrust.EXTERNAL_UNTRUSTED,
+        classification=EvidenceClassification.INTERNAL,
+        region="local",
+        policy_revision=1,
+        allowed_resources=("acme/checkout/deployments",),
+        enabled=True,
+    )
+    query = EvidenceQuery(
+        query_id=f"query-{suffix}",
+        tenant_id=_TENANT_ALPHA,
+        incident_id=f"incident-{suffix}",
+        run_id=f"run-{suffix}",
+        source=source,
+        window=EvidenceTimeRange(
+            start=DEMO_TIME,
+            end=DEMO_TIME.replace(hour=1),
+        ),
+        resource="acme/checkout/deployments",
+        created_at=DEMO_TIME,
+    )
+    with Connection.connect(admin_dsn, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO aegis.evidence_sources (
+                tenant_id, source_id, source_kind, policy_revision,
+                source_digest, document, enabled
+            )
+            VALUES (%s, %s, %s, %s, %s, %s, true)
+            """,
+            (
+                _TENANT_ALPHA,
+                source.source_id,
+                source.kind.value,
+                source.policy_revision,
+                source.digest,
+                Jsonb(source.model_dump(mode="json")),
+            ),
+        )
+    ledger.append(
+        tenant_id=_TENANT_ALPHA,
+        aggregate_type="evidence-query",
+        aggregate_id=query.query_id,
+        expected_version=0,
+        drafts=(
+            EventDraft(
+                event_id=f"event:{suffix}:requested",
+                event_type="evidence.query.requested",
+                occurred_at=DEMO_TIME,
+                actor_ref="system:evidence",
+                correlation_ref=query.run_id,
+                payload={"query": query.model_dump(mode="json")},
+            ),
+            EventDraft(
+                event_id=f"event:{suffix}:page-requested",
+                event_type="evidence.page.requested",
+                occurred_at=DEMO_TIME,
+                actor_ref="system:evidence",
+                correlation_ref=query.run_id,
+                payload={"page_number": 1},
+            ),
+            EventDraft(
+                event_id=f"event:{suffix}:page-completed",
+                event_type="evidence.page.completed",
+                occurred_at=DEMO_TIME,
+                actor_ref="system:evidence",
+                correlation_ref=query.run_id,
+                payload={
+                    "accepted_count": 2,
+                    "cursor_present": False,
+                    "page_number": 1,
+                    "quarantined_count": 1,
+                    "record_count": 3,
+                },
+            ),
+            EventDraft(
+                event_id=f"event:{suffix}:completed",
+                event_type="evidence.query.completed",
+                occurred_at=DEMO_TIME,
+                actor_ref="system:evidence",
+                correlation_ref=query.run_id,
+                payload={"bundle_ref": f"bundle:{suffix}"},
+            ),
+        ),
+    )
+    assert repository.rebuild_projections(tenant_id=_TENANT_ALPHA) >= 1
+    status = repository.status(
+        tenant_id=_TENANT_ALPHA,
+        query_id=query.query_id,
+    )
+    assert status is not None
+    assert status.status.value == "completed"
+    assert status.record_count == 3
+    assert status.accepted_count == 2
+    assert status.quarantined_count == 1
+    assert (
+        repository.status(
+            tenant_id=_TENANT_BETA,
+            query_id=query.query_id,
+        )
+        is None
+    )
+    with Connection.connect(
+        admin_dsn, autocommit=True, row_factory=dict_row
+    ) as connection:
+        rows = connection.execute(
+            """
+            SELECT relname, relrowsecurity, relforcerowsecurity
+            FROM pg_class
+            WHERE oid IN (
+                'aegis.evidence_sources'::regclass,
+                'aegis.evidence_queries'::regclass,
+                'aegis.evidence_cursors'::regclass,
+                'aegis.evidence_metadata'::regclass,
+                'aegis.evidence_quarantine'::regclass,
+                'aegis.evidence_bundles'::regclass
+            )
+            """
+        ).fetchall()
+    assert len(rows) == 6
+    assert all(row["relrowsecurity"] and row["relforcerowsecurity"] for row in rows)
+    pool.close()
 
 
 @pytest.mark.postgres

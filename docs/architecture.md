@@ -1,16 +1,16 @@
-# Layer 4 governed model gateway architecture
+# Layer 5 durable evidence connector and correlation architecture
 
 ## Product boundary
 
-Layer 4 accepts a tenant-authorized investigation command, records immutable
+Layer 5 accepts a tenant-authorized investigation command, records immutable
 application intent, schedules a crash-resilient lifecycle, runs the existing bounded
-LangGraph investigation, optionally waits for a signal, and publishes application-owned
-status and timeline projections.
+connector pagination and LangGraph investigation, optionally waits for a signal, and
+publishes application-owned evidence, status, and timeline projections.
 
-It still cannot approve, execute, or verify a production change. Official provider
-adapters are implemented but live provider qualification and credential brokering remain
-deferred, as do live evidence connectors, controlled effects/approvals, sandboxing,
-memory/RAG, UI/BFF, MCP/A2A, and production deployment.
+It still cannot approve, execute, or verify a production change. Production-shaped
+Dynatrace, GitHub App, Kubernetes, and runbook adapters are disabled by default; live
+provider qualification and credential brokering remain deferred, as do controlled
+effects/approvals, sandboxing, memory/RAG, UI/BFF, MCP/A2A, and deployment.
 
 ## Three durable owners
 
@@ -20,6 +20,7 @@ memory/RAG, UI/BFF, MCP/A2A, and production deployment.
 | Temporal 1.29.1 server + Python SDK 1.31.0 | Cross-process scheduling, Activity retry/backoff, durable timers, signals, cancellation delivery, workflow replay | Tenant grants, policy, quota, audit, API status, external-effect truth |
 | LangGraph 1.2.11 | Bounded cognitive fan-out/fan-in, reducers, specialist/critic state, graph checkpoints | Workflow lifecycle, authorization, audit, idempotency, approval, effects |
 | Official OpenAI 3.1.0 / Anthropic 0.122.0 SDKs | Provider HTTP protocol and response decoding | Routing, policy, pricing, budget, usage, safety, retry truth |
+| HTTPX 0.28.1 / Kubernetes client 36.0.3 / PyYAML 6.0.3 | HTTP mechanics, Kubernetes object decoding, safe YAML syntax | Source authority, SSRF, secrets, query/page intent, provenance, quarantine, cursor truth |
 
 Framework histories and checkpoints can be deleted and reconstructed operationally
 without changing application facts. Losing the application ledger is data loss.
@@ -31,7 +32,10 @@ flowchart LR
   L --> O[Transactional outbox]
   O --> T[Temporal workflow]
   T --> A[Reauthorizing Activities]
-  A --> E[Evidence adapter]
+  A --> EQ[Durable evidence query Activities]
+  EQ --> E[Disabled-by-default connector adapter]
+  E --> ING[Canonicalize / scan / quarantine]
+  ING --> L
   A --> G[LangGraph]
   G --> CPG[(LangGraph checkpoints)]
   A --> L
@@ -56,12 +60,18 @@ flowchart LR
 6. Before every Activity, application code resolves opaque references to current
    application authority and reevaluates policy. The initial authorization Activity
    reserves budget once by run ID before evidence or LangGraph work.
-7. Evidence collection persists a content-hashed application artifact. The next
-   Activity reloads it, validates tenancy/integrity, and invokes one bounded LangGraph
+7. Evidence collection records each source/page intent before I/O. Connectors return
+   ephemeral bounded records; ingestion canonicalizes, hashes, deduplicates, scans,
+   redacts or quarantines, and persists provenance metadata. Cursor values are encrypted.
+   An intent without result requires reconciliation.
+8. Current source policy and credential version are rechecked before accepting every
+   page. Accepted evidence is deterministically correlated for timeline, shared facts,
+   conflicts, freshness, and missing sources. Temporal carries only opaque references.
+9. The next Activity reloads accepted cited evidence and invokes one bounded LangGraph
    run. Temporal does not retry individual graph nodes.
-8. Graph output is persisted as an application result event. Optional wait/resume,
+10. Graph output is persisted as an application result event. Optional wait/resume,
    cancellation intent, timeout, completion, and failure are separate events.
-9. The API reads application projections under current authorization. Temporal queries
+11. The API reads application projections under current authorization. Temporal queries
    are operational convenience and are never returned as product truth.
 
 ## Immutable event envelope
@@ -217,3 +227,48 @@ Current policy authorizes redacted `/v1/models/catalog`, `/v1/models/usage/{run_
 `/v1/models/health`. Catalog views omit tenant and credential references. Usage/cost facts
 come from the application ledger. Health is a replaceable projection of observed outcomes,
 not provider or product truth. Forced RLS applies to every Layer 4 model table.
+
+## Layer 5 evidence contracts and ingestion
+
+`EvidenceSource`, `EvidenceQuery`, `ConnectorPage`, `EvidenceCursor`,
+`EvidenceProvenance`, `NormalizedEvidence`, `EvidenceCitation`, and `EvidenceBundle` are
+strict frozen version-one contracts. Canonical SHA-256 digests bind tenant, incident,
+run, source trust/configuration, query/window, page, locator, raw and canonical content,
+classification, retention, policy and credential revisions. Citation validation extends
+the original ID/locator/content-hash triple with provenance digest, source, query, and
+page.
+
+Evidence text is untrusted data, never instructions. JSON and safe YAML are projected
+through explicit fact allowlists. Text is normalized to UTF-8/NFC and bounded. ZIP
+handling rejects traversal, active types, unsupported extensions, compression bombs,
+member/count/aggregate overflow, and malformed UTF-8. Secret, PII, injection, and
+injected scanners run before persistence/model projection. Quarantined and duplicate
+records cannot enter graph state.
+
+## Connector and retry ownership
+
+HTTP origins/resources are administrator configured. Full caller/model URLs are never
+accepted. HTTPS origin, host, DNS A/AAAA, global/exact-CIDR address, redirect, proxy,
+timeout, content-length/stream size, MIME, JSON shape, record and page bounds are checked
+explicitly. The remaining DNS rebind race requires production egress enforcement.
+
+Dynatrace and GitHub use HTTPX with no client retry. GitHub App JWTs use existing PyJWT;
+installation tokens are repository/permission scoped and held only in adapter memory.
+Kubernetes uses the official client with direct static configuration, not executable
+kubeconfig plugins. Runbooks use a neutral trusted repository port. See
+[ADR 010](adr/010-secure-evidence-connectors.md) and the
+[connector runbook](connector-runbook.md).
+
+Temporal `aegis.evidence-query.v1` owns page scheduling, Activity retry/heartbeat, and
+cancellation delivery. Workflow history contains opaque references and counts only.
+Application events own query/page intent/result, stale/revoked outcomes, ambiguity, and
+projection rebuild. No code claims exactly-once connector reads.
+
+## Deterministic correlation
+
+Correlation orders events by observed UTC time, kind, and evidence ID. It emits only
+`temporal_proximity` and `shared_fact` links with `causal=false`; repeated conflicting
+facts become explicit conflict records. Missing telemetry/change makes the critic
+abstain, stale telemetry/change makes it abstain, and a missing runbook prevents a
+proposal while preserving a cited hypothesis. The model cannot choose or erase these
+deterministic facts.

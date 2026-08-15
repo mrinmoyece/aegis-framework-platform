@@ -72,18 +72,31 @@ class LangfuseObservability:
     ) -> AbstractContextManager[Observation]:
         return self._run(tenant_id=tenant_id, attributes=attributes)
 
+    def evidence_query(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._run(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "evidence_query"},
+            name="aegis.evidence.query",
+        )
+
     @contextmanager
     def _run(
         self,
         *,
         tenant_id: str,
         attributes: Mapping[str, str | int | bool],
+        name: str = "aegis.investigation",
     ) -> Iterator[Observation]:
         safe = safe_observability_attributes(attributes)
-        safe["operation"] = "checkout_investigation"
+        safe.setdefault("operation", "checkout_investigation")
         safe["tenant_bucket"] = tenant_bucket(tenant_id)
         with self._client.start_as_current_observation(
-            name="aegis.investigation",
+            name=name,
             as_type="chain",
             input=safe,
             metadata={

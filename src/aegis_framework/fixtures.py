@@ -77,6 +77,8 @@ def demo_identity(
         "incident-responder": (
             "investigation:read",
             "investigation:run",
+            "evidence:cursor:read",
+            "evidence:query:read",
             "model:catalog:read",
             "model:health:read",
             "model:usage:read",
@@ -86,6 +88,8 @@ def demo_identity(
         ),
         "incident-viewer": (
             "investigation:read",
+            "evidence:cursor:read",
+            "evidence:query:read",
             "model:catalog:read",
             "model:health:read",
             "model:usage:read",
@@ -95,6 +99,8 @@ def demo_identity(
         ),
         "tenant-admin": (
             "audit:read",
+            "evidence:cursor:read",
+            "evidence:query:read",
             "model:catalog:read",
             "model:health:read",
             "model:usage:read",
@@ -188,6 +194,8 @@ def build_demo_bundle(
             revision=1,
             allowed_actions=(
                 "audit:read",
+                "evidence:cursor:read",
+                "evidence:query:read",
                 "investigation:read",
                 "investigation:run",
                 "model:catalog:read",

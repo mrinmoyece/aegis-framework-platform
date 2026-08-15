@@ -1,4 +1,4 @@
-# Layer 4 threat model
+# Layer 5 threat model
 
 ## Assets and trust boundaries
 
@@ -45,6 +45,20 @@ trusted to provide their documented mechanics, not enterprise authority.
 | Policy revoked during call | Current revision/cancellation recheck; settle billing then reject output | Revocation-store latency |
 | Circuit/health treated as truth | Circuit is bounded availability control; health is derived projection | Small-sample false signal |
 | Prompt/completion telemetry leak | No automatic tracing; manual redacted OTel counts/status only | SDK/operator instrumentation changes |
+| Model/evidence supplies connector URL | Connector origins/resources come only from current administrator configuration | Configuration compromise |
+| SSRF, DNS rebinding, redirect to credential sink | Exact HTTPS host/origin, A/AAAA global/exact-CIDR validation, redirects/proxies disabled; production egress required | DNS resolution/connect TOCTOU without egress enforcement |
+| Stale connector credential/policy | Tenant-bound secret reference/version and source digest rechecked before and after page I/O | Revocation-store latency |
+| Oversized/malformed/wrong-MIME response | Content-length plus streamed byte bounds, MIME and strict JSON/SDK shape checks | Decompression/native SDK defect |
+| Pagination loop/cursor substitution | Page/record/byte bounds; source/query/page-bound AES-GCM cursor; no cursor API value | Provider pagination defect |
+| Worker crash after connector call | Persisted page intent blocks duplicate call and requires reconciliation | Provider without reconciliation identifier |
+| Prompt injection/poisoned runbook | Canonicalization, injection scanner, quarantine, fact allowlist; text framed as untrusted | Novel semantic injection |
+| Secret/PII in evidence | Scanner hooks, redaction or quarantine before graph/model projection | Detector false negative |
+| Archive/parser bomb or active content | UTF-8/JSON/safe-YAML only; bounded ZIP traversal/type/ratio/member/byte checks | Parser CPU not sandboxed |
+| Loader metadata grants authority | No broad loader installed; application provenance rebuilt from current source/query/page bindings | Adapter mapping defect |
+| Duplicate/conflicting source facts | Tenant/incident digest dedupe; explicit deterministic conflicts; no model winner | Semantically equivalent different values |
+| Temporal proximity treated as cause | Correlation links set `causal=false`; critic/model cannot elevate unsupported links | Human misinterpretation |
+| Quarantined evidence reaches model | Disposition gate plus extended citation validation | Application wiring defect |
+| Cursor/status cross-tenant read | Current policy, anti-enumeration and forced RLS | DBA/superuser boundary |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.
@@ -64,14 +78,23 @@ threats remain applicable.
    and the failure is non-retryable/DLQ-bounded rather than crashing every worker.
 6. Temporal reports completion after the database was unavailable. The application API
    continues to show its last durable fact and reconciliation raises an incident.
+7. A runbook contains “ignore previous instructions” and a token. Ingestion redacts the
+   token, records scanner counts, quarantines the document, and excludes it from graph
+   state.
+8. A Dynatrace hostname resolves to loopback or redirects to another origin. The request
+   is rejected before credentials are sent; egress policy supplies connection-time
+   enforcement.
+9. A worker dies after a GitHub page response but before result commit. The existing page
+   intent becomes `reconciliation_required`; Temporal retry cannot issue a second call.
 
 ## Explicitly unproven
 
 Temporal mTLS/authentication, production namespace/task-queue isolation, HA/failover,
 server schema upgrades, worker version routing, backup/restore, multi-cluster
 replication, load limits, and disaster recovery are not proven. PostgreSQL HA/PITR,
-external event witnessing, retention/erasure, live connectors/models, approvals,
-effects, fencing, reconciliation, sandbox tools, UI, MCP/A2A, and deployment are also
-unproven. Official provider adapters are present, but live credentials, regional data
+external event witnessing, retention/erasure execution, live connector/model
+qualification, DNS-rebinding egress enforcement, parser sandboxing, approvals, effects,
+fencing, external reconciliation, UI, MCP/A2A, and deployment are also unproven.
+Official adapters are present, but live credentials, regional data
 handling, model/version qualification, tokenizer accuracy, pricing feed freshness,
 provider retention/abuse policy, and load/failover are unproven.

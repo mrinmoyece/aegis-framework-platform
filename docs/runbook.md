@@ -1,4 +1,8 @@
-# Layer 4 local operations runbook
+# Layer 5 local operations runbook
+
+Evidence connector enablement, source-specific operations, cursor recovery and
+reconciliation are in the [connector runbook](connector-runbook.md). Connector code is
+disabled by default; this general runbook does not authorize enabling it.
 
 ## Start application PostgreSQL
 
@@ -8,7 +12,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 through Layer 4 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 5 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -70,6 +74,24 @@ Pause projection writers for the tenant or use a shadow projection. Replay
 `application_events` in tenant cursor order, validate both hash chains and contiguous
 aggregate sequences, write a projection checkpoint, compare counts/statuses, then swap.
 Never edit source events to repair a projection.
+
+For evidence status, first verify the application ledger hash chain, then rebuild
+`evidence_queries` from `evidence-query` aggregate events and record
+`evidence.projection_rebuilt`. Never reconstruct a page result from Temporal history,
+connector logs, or a framework cursor.
+
+## Evidence connector incident
+
+1. Disable the affected tenant/source revision without deleting its current facts.
+2. Read only the authorized redacted query and cursor-status APIs. Cursor values, URLs,
+   payloads, locators, credentials, and tenant identifiers must not enter tickets/traces.
+3. Preserve unresolved page intent as `reconciliation_required`. Do not let an Activity
+   retry repeat an ambiguous external read.
+4. Treat cross-tenant visibility, cursor decryption, provenance/content digest,
+   quarantine bypass, impossible transition, DNS/private-address, or RLS failures as
+   security incidents.
+5. Rotate a credential by creating a new secret/source version. In-flight old-version
+   results are stale and cannot be accepted.
 
 ## Model call and billing reconciliation
 

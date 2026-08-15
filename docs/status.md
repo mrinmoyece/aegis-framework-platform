@@ -1,4 +1,4 @@
-# Layer 4 qualification status
+# Layer 5 qualification status
 
 ## Delivered
 
@@ -14,7 +14,7 @@
 - optional digest-pinned Temporal 1.29.1 Compose server and CI integration job;
 - provider-neutral worker runtime that drains explicitly configured trusted tenant
   partitions; it is an embeddable runtime rather than a production CLI because live
-  evidence/model adapters are deliberately deferred;
+  connector/model qualification and credential brokering are deliberately deferred;
 - manual OTel/optional Langfuse privacy boundary with no payload export;
 - immutable provider-neutral message/content/tool/schema/safety/usage/pricing/error
   contracts with canonical digests and tenant/run/purpose bindings;
@@ -27,26 +27,47 @@
   repair, exact tool allowlists, citation rejection, and safe abstention;
 - forced-RLS model policy/catalog/reservation/call/usage/health tables and authorized
   redacted model operations APIs.
+- immutable versioned source/query/page/cursor/provenance/evidence/citation/bundle
+  contracts with tenant/incident/run/time/trust/policy/credential/retention bindings;
+- disabled-by-default Dynatrace and GitHub App HTTPX adapters, official Kubernetes
+  client adapter, and neutral trusted-runbook adapter;
+- exact origins/resources, tenant secret references, DNS/IP/redirect/proxy, timeout,
+  response byte/MIME/schema, page/record, cancellation and rate-limit controls;
+- opaque Temporal evidence-query workflow/Activities with page intent/result,
+  heartbeat, cancellation, retry ownership, cursor checkpoints, stale-result rejection
+  and reconciliation-required outcomes;
+- safe JSON/YAML/text/ZIP ingestion with canonical hashes, tenant/incident deduplication,
+  secret/PII/injection scanner hooks, redaction, classification, quarantine and retention
+  references;
+- deterministic non-LLM timeline/shared-fact/conflict/freshness/missing-source
+  correlation integrated into LangGraph specialist context and extended citations;
+- forced-RLS evidence source/query/cursor/metadata/quarantine/bundle/rebuild tables,
+  authorized redacted query/cursor endpoints, and application-ledger projection rebuild;
+- fixed-name OTel/Langfuse evidence observations containing only source kind,
+  status/counts and reconciliation flags.
 
 ## Qualification snapshot
 
-- 163 deterministic tests pass with at least 90% branch coverage;
-- 21 deterministic evals pass;
-- five local PostgreSQL integration tests cover the Layer 3 controls plus model
+- 215 deterministic tests pass with 90.11% meaningful branch coverage;
+- 26 deterministic evals pass, including pagination, poisoning, source revocation,
+  deterministic non-causal correlation and private-destination rejection;
+- six local PostgreSQL integration tests cover the prior controls plus evidence
+  forced RLS, tenant isolation, application-event replay and projection rebuild;
   reservation races, crash-window ambiguity, reconciliation, RLS, immutability and
   projection rebuild;
-- two local Temporal integration tests cover no-worker recovery, Activity retry,
-  duplicate signal, cancellation, timeout, replay, and the real application
-  outbox/Activity/projection path;
+- three local Temporal integration tests cover no-worker recovery, Activity retry,
+  duplicate signal, cancellation, timeout, replay, opaque evidence pagination, and the
+  real application outbox/Activity/projection path;
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer4-metrics.json`.
+`comparison/layer5-metrics.json`.
 
 ## Not proven
 
 Production Temporal HA/upgrade/failover, PostgreSQL HA/PITR/restore, multi-region order,
 load/capacity, WORM witnessing, retention/erasure execution, live IdP rotation, live
-evidence connectors, live model credentials/provider qualification,
+connector/model credentials and provider qualification, production DNS/egress,
+complex-document parser isolation,
 approvals/effects/fencing/reconciliation, sandbox tools, memory/RAG, UI/BFF, MCP/A2A,
 and deployment admission remain unproven.

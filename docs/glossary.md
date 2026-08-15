@@ -1,5 +1,21 @@
 # Glossary
 
+**Evidence source** — Current tenant-owned configuration binding source kind, exact
+resources, trust, classification, region, policy revision and secret reference/version.
+
+**Page intent** — Immutable application fact recorded before one connector page I/O. An
+intent without result is ambiguous and requires reconciliation.
+
+**Evidence provenance** — Immutable tenant/incident/run/source/query/page/locator/time/
+trust/classification/retention and raw-hash binding for a normalized record.
+
+**Quarantine** — Fail-closed disposition that prevents malformed, active, oversized,
+secret-bearing, injection-bearing or scanner-rejected content from entering graph/model
+context.
+
+**Non-causal correlation** — Deterministic timeline/shared-fact relationship that
+explicitly does not assert one event caused another.
+
 **Abstention**
 A deliberate non-answer when evidence, budget, validation, or corroboration is
 insufficient. It is not a successful empty investigation.

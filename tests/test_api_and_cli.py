@@ -41,6 +41,7 @@ def test_health_and_success_endpoint() -> None:
     assert health.json() == {
         "status": "ok",
         "identity_mode": "demo",
+        "network_connectors_enabled": False,
         "network_models_enabled": False,
         "effects_enabled": False,
     }

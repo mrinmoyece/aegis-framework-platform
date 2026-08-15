@@ -30,7 +30,7 @@ class _SpanObservation:
 
 class OpenTelemetryObservability:
     def __init__(self, tracer: Tracer | None = None) -> None:
-        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.3.0")
+        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.5.0")
 
     def investigation(
         self,
@@ -40,16 +40,29 @@ class OpenTelemetryObservability:
     ) -> AbstractContextManager[Observation]:
         return self._span(tenant_id=tenant_id, attributes=attributes)
 
+    def evidence_query(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._span(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "evidence_query"},
+            span_name="aegis.evidence.query",
+        )
+
     @contextmanager
     def _span(
         self,
         *,
         tenant_id: str,
         attributes: Mapping[str, str | int | bool],
+        span_name: str = "aegis.investigation",
     ) -> Iterator[Observation]:
         safe = safe_observability_attributes(attributes)
-        safe["operation"] = "checkout_investigation"
-        with self._tracer.start_as_current_span("aegis.investigation") as span:
+        safe.setdefault("operation", "checkout_investigation")
+        with self._tracer.start_as_current_span(span_name) as span:
             span.set_attribute("aegis.tenant.bucket", tenant_bucket(tenant_id))
             for key, value in safe.items():
                 span.set_attribute(f"aegis.{key}", value)
@@ -58,6 +71,15 @@ class OpenTelemetryObservability:
 
 class NoopObservability:
     def investigation(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        del tenant_id, attributes
+        return self._observation()
+
+    def evidence_query(
         self,
         *,
         tenant_id: str,

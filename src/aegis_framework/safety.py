@@ -29,6 +29,13 @@ _ALLOWED_FACTS: dict[EvidenceKind, frozenset[str]] = {
             "region",
             "error_code",
             "sample_count",
+            "count",
+            "involved_kind",
+            "involved_name",
+            "namespace",
+            "reason",
+            "timestamp",
+            "type",
         }
     ),
     EvidenceKind.CHANGE: frozenset(
@@ -37,10 +44,16 @@ _ALLOWED_FACTS: dict[EvidenceKind, frozenset[str]] = {
             "version",
             "minutes_before_alert",
             "change_id",
+            "deployment",
+            "environment",
+            "sha",
             "status",
+            "timestamp",
         }
     ),
-    EvidenceKind.RUNBOOK: frozenset({"action", "condition", "service"}),
+    EvidenceKind.RUNBOOK: frozenset(
+        {"action", "condition", "owner", "service", "title", "version"}
+    ),
 }
 
 _SENSITIVE_KEY_PARTS = frozenset(
@@ -69,6 +82,13 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "injection_detected",
         "replayed",
         "error_code",
+        "connector_kind",
+        "page_count",
+        "record_count",
+        "quarantined_count",
+        "rate_limited",
+        "reconciliation_required",
+        "stale_result",
     }
 )
 _SAFE_AUDIT_KEYS = frozenset(
@@ -120,6 +140,10 @@ def prepare_model_evidence(
                 locator=item.locator,
                 content_hash=item.content_hash,
                 facts=safe_facts,
+                provenance_digest=item.provenance_digest,
+                source_id=item.source_id,
+                query_id=item.query_id,
+                page_number=item.page_number,
             )
         )
     return tuple(projected), injection_detected
@@ -131,6 +155,10 @@ def citation_is_valid(citation: Citation, evidence: Sequence[Evidence]) -> bool:
         expected is not None
         and citation.locator == expected.locator
         and citation.content_hash == expected.content_hash
+        and citation.provenance_digest == expected.provenance_digest
+        and citation.source_id == expected.source_id
+        and citation.query_id == expected.query_id
+        and citation.page_number == expected.page_number
     )
 
 
