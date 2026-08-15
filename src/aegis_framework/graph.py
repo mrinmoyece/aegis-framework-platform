@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from threading import Lock
 from typing import cast
 
 from langchain_core.runnables import RunnableConfig
@@ -46,6 +47,8 @@ class LangGraphInvestigator:
         checkpointer: BaseCheckpointSaver[str] | None = None,
     ) -> None:
         self._model = model
+        self._thread_tenants: dict[str, str] = {}
+        self._thread_lock = Lock()
         self._checkpointer = checkpointer or InMemorySaver(
             serde=strict_checkpoint_serializer()
         )
@@ -255,6 +258,10 @@ class LangGraphInvestigator:
         thread_ref: str,
         evidence: Sequence[Evidence],
     ) -> InvestigationResult:
+        with self._thread_lock:
+            owner = self._thread_tenants.setdefault(thread_ref, tenant_id)
+            if owner != tenant_id:
+                raise OrchestrationFailure("checkpoint thread tenant mismatch")
         config: RunnableConfig = {
             "configurable": {"thread_id": thread_ref},
             "recursion_limit": 8,
@@ -308,7 +315,11 @@ class LangGraphInvestigator:
             proposal=proposal,
         )
 
-    def checkpoint_count(self, thread_ref: str) -> int:
+    def checkpoint_count(self, *, tenant_id: str, thread_ref: str) -> int:
+        with self._thread_lock:
+            owner = self._thread_tenants.get(thread_ref)
+        if owner is not None and owner != tenant_id:
+            raise OrchestrationFailure("checkpoint thread tenant mismatch")
         config: RunnableConfig = {"configurable": {"thread_id": thread_ref}}
         try:
             history = cast(Iterator[object], self._graph.get_state_history(config))

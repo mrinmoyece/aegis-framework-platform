@@ -22,6 +22,17 @@ from pydantic import (
 Identifier = Annotated[
     str, Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9._:-]+$")
 ]
+Issuer = Annotated[
+    str,
+    Field(
+        min_length=8,
+        max_length=512,
+        pattern=r"^https?://[a-zA-Z0-9][a-zA-Z0-9._:-]*(?:/[a-zA-Z0-9._~:/-]*)?$",
+    ),
+]
+SubjectIdentifier = Annotated[
+    str, Field(min_length=1, max_length=255, pattern=r"^[\x21-\x7e]+$")
+]
 Sha256Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 type FactValue = str | int | float | bool | None
 type StateRecord = dict[str, JsonValue]
@@ -64,17 +75,89 @@ class ApprovalStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class PrincipalKind(StrEnum):
+    HUMAN = "human"
+    WORKLOAD = "workload"
+
+
+class RiskLevel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class GrantBinding(StrictModel):
+    role: Identifier
+    purpose: Identifier
+    permissions: tuple[Identifier, ...]
+    risk_ceiling: RiskLevel
+    expires_at: AwareDatetime
+
+    @field_validator("permissions")
+    @classmethod
+    def normalize_permissions(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(sorted(set(value)))
+
+
 class IdentityContext(StrictModel):
     tenant_id: Identifier
-    subject_id: Identifier
+    issuer: Issuer
+    subject_id: SubjectIdentifier
+    principal_kind: PrincipalKind
     roles: tuple[Identifier, ...]
+    permissions: tuple[Identifier, ...]
+    purposes: tuple[Identifier, ...]
+    grants: tuple[GrantBinding, ...]
+    grant_version: Annotated[int, Field(ge=1)]
+    authenticated_at: AwareDatetime
+    expires_at: AwareDatetime
     request_id: Identifier
     trace_id: Identifier
 
-    @field_validator("roles")
+    @field_validator("roles", "permissions", "purposes")
     @classmethod
-    def normalize_roles(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def normalize_authority(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(sorted(set(value)))
+
+    @field_validator("grants")
+    @classmethod
+    def normalize_grants(
+        cls, value: tuple[GrantBinding, ...]
+    ) -> tuple[GrantBinding, ...]:
+        return tuple(
+            sorted(
+                set(value),
+                key=lambda grant: (
+                    grant.purpose,
+                    grant.role,
+                    grant.risk_ceiling.value,
+                    grant.expires_at,
+                ),
+            )
+        )
+
+    @model_validator(mode="after")
+    def validate_authority_projection(self) -> IdentityContext:
+        if self.expires_at <= self.authenticated_at:
+            raise ValueError("identity expiry must follow authentication")
+        expected_roles = tuple(sorted({grant.role for grant in self.grants}))
+        expected_permissions = tuple(
+            sorted(
+                {
+                    permission
+                    for grant in self.grants
+                    for permission in grant.permissions
+                }
+            )
+        )
+        expected_purposes = tuple(sorted({grant.purpose for grant in self.grants}))
+        if self.roles != expected_roles:
+            raise ValueError("identity roles must match immutable grant bindings")
+        if self.permissions != expected_permissions:
+            raise ValueError("identity permissions must match immutable grant bindings")
+        if self.purposes != expected_purposes:
+            raise ValueError("identity purposes must match immutable grant bindings")
+        return self
 
 
 class CheckoutAlert(StrictModel):

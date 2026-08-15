@@ -7,21 +7,21 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aegis_framework.api import create_app
+from aegis_framework.api import AppMode, create_app
 from aegis_framework.cli import main
 from aegis_framework.errors import OptionalDependencyMissing
 from aegis_framework.fixtures import demo_request
+
+_DEFAULT_BEARER = "demo-responder-token"
 
 
 def _headers(
     *,
     request_id: str,
-    roles: str = "incident-responder",
+    identity_fixture: str = _DEFAULT_BEARER,
 ) -> dict[str, str]:
     return {
-        "X-Tenant-ID": "tenant-acme",
-        "X-Subject-ID": "responder-alice",
-        "X-Roles": roles,
+        "Authorization": f"Bearer {identity_fixture}",
         "X-Request-ID": request_id,
     }
 
@@ -35,11 +35,12 @@ def _payload() -> dict[str, object]:
 
 
 def test_health_and_success_endpoint() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(mode=AppMode.DEMO))
     health = client.get("/healthz")
     assert health.status_code == 200
     assert health.json() == {
         "status": "ok",
+        "identity_mode": "demo",
         "network_models_enabled": False,
         "effects_enabled": False,
     }
@@ -53,19 +54,76 @@ def test_health_and_success_endpoint() -> None:
     assert body["status"] == "complete"
     assert body["approval"]["status"] == "pending"
     assert body["proposal"]["requires_approval"] is True
+    ready = client.get("/readyz")
+    assert ready.status_code == 200
+    assert ready.json()["status"] == "ready"
+
+
+def test_authenticated_identity_and_governance_routes_are_scoped() -> None:
+    client = TestClient(create_app(mode=AppMode.DEMO))
+    responder = _headers(request_id="api-me")
+    me = client.get("/v1/me", headers=responder)
+    assert me.status_code == 200
+    assert me.json()["tenant_id"] == "tenant-acme"
+    assert me.json()["issuer"] == "https://demo.aegis.invalid"
+    assert me.json()["roles"] == ["incident-responder"]
+
+    own_tenant = client.get("/v1/tenants/tenant-acme", headers=responder)
+    assert own_tenant.status_code == 200
+    assert own_tenant.json()["status"] == "active"
+    assert client.get("/v1/tenants/tenant-beta", headers=responder).status_code == 404
+    assert client.get("/v1/policies/current", headers=responder).status_code == 200
+    assert client.get("/v1/quotas/investigations", headers=responder).status_code == 200
+    assert client.get("/v1/audit", headers=responder).status_code == 404
+
+    client.post(
+        "/v1/investigations",
+        headers=_headers(request_id="api-audit-source"),
+        json=_payload(),
+    )
+    audit = client.get(
+        "/v1/audit",
+        headers=_headers(
+            request_id="api-audit-read",
+            identity_fixture="demo-admin-token",
+        ),
+    )
+    assert audit.status_code == 200
+    assert [record["event_type"] for record in audit.json()] == [
+        "investigation.accepted",
+        "investigation.complete",
+    ]
+    assert "tenant_id" not in audit.text
+
+
+def test_production_identity_and_readiness_fail_closed() -> None:
+    client = TestClient(create_app(mode=AppMode.PRODUCTION))
+    health = client.get("/healthz")
+    assert health.status_code == 200
+    assert health.json()["identity_mode"] == "production"
+    assert client.get("/readyz").status_code == 503
+    response = client.get(
+        "/v1/me",
+        headers=_headers(request_id="api-production-closed"),
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "identity service is unavailable"
 
 
 def test_endpoint_denial_and_validation() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(mode=AppMode.DEMO))
     denied = client.post(
         "/v1/investigations",
-        headers=_headers(request_id="api-denied", roles="incident-viewer"),
+        headers=_headers(
+            request_id="api-denied",
+            identity_fixture="demo-viewer-token",
+        ),
         json=_payload(),
     )
     assert denied.status_code == 403
     assert denied.json()["detail"] == "investigation is not authorized"
     missing_identity = client.post("/v1/investigations", json=_payload())
-    assert missing_identity.status_code == 422
+    assert missing_identity.status_code == 401
     malformed = client.post(
         "/v1/investigations",
         headers=_headers(request_id="api-malformed"),
@@ -76,22 +134,48 @@ def test_endpoint_denial_and_validation() -> None:
         "/v1/investigations",
         headers={
             **_headers(request_id="api-bad-identity"),
-            "X-Tenant-ID": "tenant acme!",
+            "Authorization": "Bearer invalid-token",
         },
         json=_payload(),
     )
-    assert bad_identity.status_code == 422
-    assert bad_identity.json()["detail"] == "identity headers are invalid"
+    assert bad_identity.status_code == 401
+    assert bad_identity.json()["detail"] == "authentication failed"
     bad_incident = client.post(
         "/v1/investigations",
         headers=_headers(request_id="api-bad-incident"),
         json={**_payload(), "incident_id": "bad incident id"},
     )
     assert bad_incident.status_code == 422
+    malformed_request_id = client.post(
+        "/v1/investigations",
+        headers=_headers(request_id="bad request id"),
+        json=_payload(),
+    )
+    assert malformed_request_id.status_code == 401
+    oversized_auth = client.post(
+        "/v1/investigations",
+        headers={
+            "Authorization": f"Bearer {'x' * 17_000}",
+            "X-Request-ID": "api-oversized-auth",
+        },
+        json=_payload(),
+    )
+    assert oversized_auth.status_code == 401
+
+
+def test_oversized_body_is_rejected_before_validation() -> None:
+    client = TestClient(create_app(mode=AppMode.DEMO, maximum_body_bytes=1_024))
+    response = client.post(
+        "/v1/investigations",
+        headers=_headers(request_id="api-large-body"),
+        content=b"x" * 1_025,
+    )
+    assert response.status_code == 413
+    assert response.json()["detail"] == "request body is too large"
 
 
 def test_endpoint_duplicate_and_conflict() -> None:
-    client = TestClient(create_app())
+    client = TestClient(create_app(mode=AppMode.DEMO))
     headers = _headers(request_id="api-duplicate")
     first = client.post("/v1/investigations", headers=headers, json=_payload())
     duplicate = client.post("/v1/investigations", headers=headers, json=_payload())
@@ -108,7 +192,7 @@ def test_endpoint_duplicate_and_conflict() -> None:
 
 
 def test_apps_have_isolated_configurable_demo_budgets() -> None:
-    first = TestClient(create_app(budget_units=5))
+    first = TestClient(create_app(mode=AppMode.DEMO, budget_units=5))
     headers = _headers(request_id="api-budget-one")
     assert (
         first.post("/v1/investigations", headers=headers, json=_payload()).json()[
@@ -123,7 +207,7 @@ def test_apps_have_isolated_configurable_demo_budgets() -> None:
     )
     assert exhausted.json()["critic"]["reasons"] == ["tenant_budget_exhausted"]
 
-    fresh = TestClient(create_app(budget_units=5))
+    fresh = TestClient(create_app(mode=AppMode.DEMO, budget_units=5))
     result = fresh.post(
         "/v1/investigations",
         headers=_headers(request_id="api-budget-fresh"),
@@ -131,11 +215,11 @@ def test_apps_have_isolated_configurable_demo_budgets() -> None:
     )
     assert result.json()["status"] == "complete"
     with pytest.raises(ValueError, match="at least one"):
-        create_app(budget_units=4)
+        create_app(mode=AppMode.DEMO, budget_units=4)
 
 
 def test_concurrent_cold_start_cannot_duplicate_budget() -> None:
-    client = TestClient(create_app(budget_units=5))
+    client = TestClient(create_app(mode=AppMode.DEMO, budget_units=5))
 
     def invoke(index: int) -> str:
         response = client.post(

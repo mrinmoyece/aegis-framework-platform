@@ -19,6 +19,7 @@ from aegis_framework.domain import (
     InvestigationRequest,
     InvestigationResult,
     RemediationProposal,
+    RiskLevel,
     SpecialistFinding,
     SpecialistTask,
     StrictModel,
@@ -28,12 +29,21 @@ from aegis_framework.domain import (
 class Action(StrEnum):
     INVESTIGATION_RUN = "investigation:run"
     INVESTIGATION_READ = "investigation:read"
+    TENANT_READ = "tenant:read"
+    POLICY_READ = "policy:read"
+    POLICY_WRITE = "policy:write"
+    QUOTA_READ = "quota:read"
+    QUOTA_WRITE = "quota:write"
+    AUDIT_READ = "audit:read"
     EFFECT_EXECUTE = "effect:execute"
 
 
 class PolicyDecision(StrictModel):
     allowed: bool
     policy_id: str
+    policy_revision: int = Field(ge=0)
+    purpose: str
+    risk: RiskLevel
     reason: str
 
 
@@ -65,6 +75,8 @@ class PolicyPort(Protocol):
         action: Action,
         *,
         resource_tenant_id: str,
+        purpose: str,
+        risk: RiskLevel,
     ) -> PolicyDecision: ...
 
 
@@ -101,7 +113,7 @@ class OrchestratorPort(Protocol):
         evidence: Sequence[Evidence],
     ) -> InvestigationResult: ...
 
-    def checkpoint_count(self, thread_ref: str) -> int: ...
+    def checkpoint_count(self, *, tenant_id: str, thread_ref: str) -> int: ...
 
 
 class ApprovalPort(Protocol):

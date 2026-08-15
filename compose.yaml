@@ -6,17 +6,38 @@ services:
     profiles: ["durable"]
     environment:
       POSTGRES_DB: aegis
-      POSTGRES_USER: aegis
-      POSTGRES_PASSWORD: local-development-only
+      POSTGRES_USER: aegis_admin
+      POSTGRES_PASSWORD: ${AEGIS_POSTGRES_ADMIN_PASSWORD:-change-me-before-use}
+      AEGIS_POSTGRES_RUNTIME_PASSWORD: ${AEGIS_POSTGRES_RUNTIME_PASSWORD:-change-me-before-use}
     ports:
       - "127.0.0.1:55432:5432"
-    volumes:
-      - aegis-postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis"]
+      test: ["CMD-SHELL", "pg_isready -U aegis_admin -d aegis"]
       interval: 2s
       timeout: 3s
       retries: 20
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - aegis-postgres:/var/lib/postgresql/data
+      - ./migrations:/opt/aegis/migrations:ro
+      - ./tools/postgres-init.sh:/docker-entrypoint-initdb.d/010-aegis.sh:ro
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.1@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
+    profiles: ["identity"]
+    command: ["start-dev", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${AEGIS_KEYCLOAK_ADMIN_USERNAME:-local-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${AEGIS_KEYCLOAK_ADMIN_PASSWORD:-change-me-before-use}
+    ports:
+      - "127.0.0.1:58080:8080"
+    read_only: true
+    tmpfs:
+      - /opt/keycloak/data:size=256m,mode=1770
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
 
@@ -26,6 +47,12 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     read_only: true
+    environment:
+      AEGIS_MODE: ${AEGIS_MODE:-production}
+      AEGIS_POSTGRES_DSN: ${AEGIS_POSTGRES_DSN:-}
+      AEGIS_OIDC_ISSUER: ${AEGIS_OIDC_ISSUER:-}
+      AEGIS_OIDC_AUDIENCE: ${AEGIS_OIDC_AUDIENCE:-}
+      AEGIS_OIDC_JWKS_URI: ${AEGIS_OIDC_JWKS_URI:-}
     tmpfs:
       - /tmp:size=16m,mode=1777
     cap_drop:

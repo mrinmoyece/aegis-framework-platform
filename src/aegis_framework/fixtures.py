@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 
+from aegis_framework.access import PolicyRecord, QuotaRecord, TenantRecord, TenantStatus
 from aegis_framework.adapters import (
     DisabledEffectAdapter,
     FixedClock,
@@ -13,20 +14,25 @@ from aegis_framework.adapters import (
     InMemoryApprovalBoundary,
     InMemoryBudget,
     InMemoryEvidence,
+    InMemoryGovernance,
     InMemoryIdempotency,
-    RolePolicy,
 )
+from aegis_framework.authorization import EnterprisePolicy
 from aegis_framework.domain import (
     CheckoutAlert,
     Evidence,
     EvidenceKind,
+    GrantBinding,
     IdentityContext,
     InvestigationRequest,
+    PrincipalKind,
+    RiskLevel,
     Specialist,
     evidence_hash,
     stable_id,
 )
 from aegis_framework.graph import LangGraphInvestigator
+from aegis_framework.identity import StaticAuthenticator
 from aegis_framework.model import (
     DeterministicStructuredModel,
     ModelMode,
@@ -55,6 +61,9 @@ class DemoBundle:
     audit: HashChainAudit
     orchestrator: LangGraphInvestigator
     effects: DisabledEffectAdapter
+    authenticator: StaticAuthenticator
+    governance: InMemoryGovernance
+    policy: EnterprisePolicy
 
 
 def demo_identity(
@@ -64,10 +73,53 @@ def demo_identity(
     request_id: str = "request-001",
     roles: tuple[str, ...] = ("incident-responder",),
 ) -> IdentityContext:
+    permissions_by_role = {
+        "incident-responder": (
+            "investigation:read",
+            "investigation:run",
+            "policy:read",
+            "quota:read",
+            "tenant:read",
+        ),
+        "incident-viewer": (
+            "investigation:read",
+            "policy:read",
+            "quota:read",
+            "tenant:read",
+        ),
+        "tenant-admin": (
+            "audit:read",
+            "policy:read",
+            "policy:write",
+            "quota:read",
+            "quota:write",
+            "tenant:read",
+        ),
+    }
+    grants = tuple(
+        GrantBinding(
+            role=role,
+            purpose="incident-response",
+            permissions=permissions_by_role.get(role, ()),
+            risk_ceiling=RiskLevel.MEDIUM,
+            expires_at=DEMO_TIME + timedelta(hours=1),
+        )
+        for role in sorted(set(roles))
+    )
     return IdentityContext(
         tenant_id=tenant_id,
+        issuer="https://demo.aegis.invalid",
         subject_id=subject_id,
-        roles=roles,
+        principal_kind=PrincipalKind.HUMAN,
+        roles=tuple(grant.role for grant in grants),
+        permissions=tuple(
+            sorted({permission for grant in grants for permission in grant.permissions})
+        ),
+        purposes=("incident-response",),
+        grants=grants,
+        grant_version=1,
+        authenticated_at=DEMO_TIME,
+        expires_at=DEMO_TIME + timedelta(hours=1),
         request_id=request_id,
         trace_id=stable_id("trace", tenant_id, request_id),
     )
@@ -106,6 +158,41 @@ def build_demo_bundle(
     model = DeterministicStructuredModel(model_modes)
     orchestrator = LangGraphInvestigator(model)
     audit = HashChainAudit(clock)
+    tenants = (
+        TenantRecord(
+            tenant_id="tenant-acme",
+            display_name="Acme checkout",
+            status=TenantStatus.ACTIVE,
+            version=1,
+        ),
+        TenantRecord(
+            tenant_id="tenant-beta",
+            display_name="Beta checkout",
+            status=TenantStatus.ACTIVE,
+            version=1,
+        ),
+    )
+    policies = tuple(
+        PolicyRecord(
+            policy_id=f"policy-{tenant_id}",
+            tenant_id=tenant_id,
+            revision=1,
+            allowed_actions=(
+                "audit:read",
+                "investigation:read",
+                "investigation:run",
+                "policy:read",
+                "policy:write",
+                "quota:read",
+                "quota:write",
+                "tenant:read",
+            ),
+            allowed_purposes=("incident-response",),
+            max_risk=RiskLevel.MEDIUM,
+            version=1,
+        )
+        for tenant_id in ("tenant-acme", "tenant-beta")
+    )
     limits = {
         "tenant-acme": (
             1 if scenario is DemoScenario.BUDGET_EXHAUSTION else budget_units
@@ -119,8 +206,27 @@ def build_demo_bundle(
         )
         for tenant_id in ("tenant-acme", "tenant-beta")
     }
+    quotas = tuple(
+        QuotaRecord(
+            tenant_id=tenant_id,
+            quota_key="investigation-units",
+            limit_units=limits[tenant_id],
+            used_units=0,
+            period_start=DEMO_TIME,
+            period_end=DEMO_TIME + timedelta(days=1),
+            version=1,
+        )
+        for tenant_id in ("tenant-acme", "tenant-beta")
+    )
+    governance = InMemoryGovernance(
+        tenants=tenants,
+        policies=policies,
+        quotas=quotas,
+        audit=audit,
+    )
+    policy = EnterprisePolicy(policies=governance, clock=clock)
     service = InvestigationService(
-        policy=RolePolicy(),
+        policy=policy,
         budget=InMemoryBudget(limits),
         evidence=InMemoryEvidence(evidence),
         orchestrator=orchestrator,
@@ -136,6 +242,19 @@ def build_demo_bundle(
         audit=audit,
         orchestrator=orchestrator,
         effects=DisabledEffectAdapter(),
+        authenticator=StaticAuthenticator(
+            {
+                "demo-responder-token": demo_identity(),
+                "demo-viewer-token": demo_identity(roles=("incident-viewer",)),
+                "demo-admin-token": demo_identity(roles=("tenant-admin",)),
+                "demo-beta-token": demo_identity(
+                    tenant_id="tenant-beta",
+                    subject_id="responder-bob",
+                ),
+            }
+        ),
+        governance=governance,
+        policy=policy,
     )
 
 

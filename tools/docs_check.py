@@ -21,12 +21,15 @@ REQUIRED_DOCS = (
     "docs/limitations.md",
     "docs/roadmap.md",
     "docs/interview-questions.md",
+    "docs/curriculum.md",
     "docs/glossary.md",
     "docs/experiment-protocol.md",
     "docs/adr/001-langgraph-orchestration.md",
     "docs/adr/002-defer-temporal.md",
     "docs/adr/003-langfuse-and-opentelemetry.md",
     "docs/adr/004-postgresql-without-redis.md",
+    "docs/adr/005-pyjwt-and-explicit-authorization.md",
+    "docs/adr/006-postgresql-rls-and-application-audit.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -41,6 +44,7 @@ def main() -> int:
     ]
     errors.extend(_broken_markdown_links())
     errors.extend(_manifest_errors())
+    errors.extend(_measurement_errors())
     errors.extend(_workflow_pin_errors())
     errors.extend(_container_pin_errors())
     if errors:
@@ -107,6 +111,25 @@ def _workflow_pin_errors() -> list[str]:
                 errors.append(
                     f"{workflow.relative_to(ROOT)} has mutable action reference {use}"
                 )
+    return errors
+
+
+def _measurement_errors() -> list[str]:
+    path = ROOT / "comparison/layer2-metrics.json"
+    if not path.is_file():
+        return ["missing comparison/layer2-metrics.json"]
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    errors = []
+    if payload.get("schema_version") != 2 or payload.get("layer") != 2:
+        errors.append("Layer 2 metrics schema/layer is invalid")
+    basis = payload.get("comparison_basis", {})
+    custom = basis.get("custom", {}) if isinstance(basis, dict) else {}
+    if custom.get("sha") != "81409792c97698479a9ca827a4143c6391f28d2b":
+        errors.append("Layer 2 custom comparison SHA is not pinned")
+    if not payload.get("remaining_custom_controls"):
+        errors.append("Layer 2 metrics must list remaining custom controls")
+    if not payload.get("lock_in_and_escape"):
+        errors.append("Layer 2 metrics must list lock-in and escape hatches")
     return errors
 
 

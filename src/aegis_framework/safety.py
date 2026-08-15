@@ -71,6 +71,19 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "error_code",
     }
 )
+_SAFE_AUDIT_KEYS = frozenset(
+    {
+        "approval_required",
+        "attempt",
+        "citation_count",
+        "error_code",
+        "evidence_count",
+        "policy_id",
+        "policy_revision",
+        "reason",
+        "request_ref",
+    }
+)
 
 
 def contains_prompt_injection(evidence: Evidence) -> bool:
@@ -151,3 +164,17 @@ def safe_observability_attributes(
         for key, value in attributes.items()
         if key in _SAFE_OBSERVABILITY_KEYS
     }
+
+
+def safe_audit_attributes(
+    attributes: Mapping[str, str | int | bool],
+) -> dict[str, str | int | bool]:
+    safe: dict[str, str | int | bool] = {}
+    for key, value in attributes.items():
+        if key not in _SAFE_AUDIT_KEYS:
+            continue
+        if isinstance(value, str):
+            safe[key] = value[:128]
+        else:
+            safe[key] = value
+    return dict(sorted(safe.items()))

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 1,
+  "layer": 2,
   "generated_on": "2026-08-15",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
@@ -22,18 +22,25 @@
     {
       "id": "02-tenant-identity-authorization",
       "name": "Tenant identity and authorization",
-      "status": "partial",
-      "evidence": ["src/aegis_framework/domain.py", "src/aegis_framework/adapters.py"],
-      "framework_owned": [],
-      "enterprise_owned": ["identity", "policy", "tenant enforcement"]
+      "status": "delivered",
+      "evidence": [
+        "src/aegis_framework/identity.py",
+        "src/aegis_framework/authorization.py",
+        "src/aegis_framework/access.py",
+        "migrations/0001_layer2.sql",
+        "tests/test_identity_and_authorization.py",
+        "tests/test_postgres.py"
+      ],
+      "framework_owned": ["JWT/JWS cryptography", "HTTP validation", "database driver/pool mechanics"],
+      "enterprise_owned": ["issuer registry", "current principals/grants", "RBAC/purpose/risk policy", "forced tenant RLS"]
     },
     {
       "id": "03-durable-event-ledger",
       "name": "Durable PostgreSQL event ledger",
       "status": "partial",
-      "evidence": ["src/aegis_framework/postgres.py", "compose.yaml"],
+      "evidence": ["src/aegis_framework/postgres.py", "migrations/0001_layer2.sql", "compose.yaml"],
       "framework_owned": ["graph checkpoints"],
-      "enterprise_owned": ["audit", "idempotency", "RLS", "retention"]
+      "enterprise_owned": ["durable audit", "quota reservations", "RLS", "retention", "generalized event ledger"]
     },
     {
       "id": "04-distributed-worker-runtime",
@@ -49,7 +56,7 @@
       "status": "partial",
       "evidence": ["src/aegis_framework/ports.py", "src/aegis_framework/model.py"],
       "framework_owned": ["structured graph node invocation"],
-      "enterprise_owned": ["provider policy", "quotas", "credentials", "schema validation"]
+      "enterprise_owned": ["provider policy", "tenant quotas", "secret references", "credential resolution", "schema validation"]
     },
     {
       "id": "06-evidence-connectors-correlation",
@@ -63,9 +70,9 @@
       "id": "07-specialist-orchestration",
       "name": "Governed durable specialist orchestration",
       "status": "partial",
-      "evidence": ["src/aegis_framework/graph.py", "tests/test_graph.py"],
+      "evidence": ["src/aegis_framework/graph.py", "src/aegis_framework/postgres.py", "tests/test_graph.py", "tests/test_postgres.py"],
       "framework_owned": ["fan-out", "fan-in", "reducers", "checkpoints"],
-      "enterprise_owned": ["policy", "budget", "citation rules", "run idempotency"]
+      "enterprise_owned": ["policy", "quota", "checkpoint tenant ownership/RLS", "citation rules", "run idempotency"]
     },
     {
       "id": "08-approval-remediation",
@@ -95,9 +102,9 @@
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py"],
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_identity_and_authorization.py", "tests/test_postgres.py"],
       "framework_owned": ["optional Langfuse evaluator observations"],
-      "enterprise_owned": ["case equivalence", "release thresholds"]
+      "enterprise_owned": ["identity/tenant attack cases", "case equivalence", "release thresholds"]
     },
     {
       "id": "12-observability-replay",
@@ -105,15 +112,15 @@
       "status": "partial",
       "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/langfuse_adapter.py"],
       "framework_owned": ["OTel spans", "Langfuse view", "checkpoint history"],
-      "enterprise_owned": ["redaction", "cardinality", "audit replay", "retention"]
+      "enterprise_owned": ["redaction", "cardinality", "durable audit", "audit replay", "retention"]
     },
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
-      "status": "planned",
-      "evidence": ["src/aegis_framework/api.py", "docs/roadmap.md"],
+      "status": "partial",
+      "evidence": ["src/aegis_framework/api.py", "tests/test_api_and_cli.py", "docs/roadmap.md"],
       "framework_owned": ["FastAPI delivery"],
-      "enterprise_owned": ["authentication", "session security", "review UX"]
+      "enterprise_owned": ["bearer authentication", "anti-enumeration", "session security", "review UX"]
     },
     {
       "id": "14-mcp-a2a-interoperability",
@@ -127,9 +134,9 @@
       "id": "15-production-deployment",
       "name": "Production deployment foundations",
       "status": "partial",
-      "evidence": ["Dockerfile", "compose.yaml", ".github/workflows"],
+      "evidence": ["Dockerfile", "compose.yaml", "migrations/0001_layer2.sql", ".github/workflows"],
       "framework_owned": ["dependency build tooling"],
-      "enterprise_owned": ["provenance", "admission", "secrets", "HA", "DR"]
+      "enterprise_owned": ["RLS/runtime role", "provenance", "admission", "secret resolution", "HA", "DR"]
     },
     {
       "id": "16-enterprise-qualification",

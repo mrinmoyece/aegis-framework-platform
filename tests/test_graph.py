@@ -83,11 +83,18 @@ def test_success_is_cited_deterministic_and_checkpointed() -> None:
     bundle = build_demo_bundle()
     identity = demo_identity(request_id="checkpoint-determinism")
     result = bundle.service.investigate(identity, demo_request())
-    initial_checkpoints = bundle.orchestrator.checkpoint_count(result.thread_ref)
+    initial_checkpoints = bundle.orchestrator.checkpoint_count(
+        tenant_id=result.tenant_id,
+        thread_ref=result.thread_ref,
+    )
     replayed = bundle.service.investigate(identity, demo_request())
     assert initial_checkpoints == 5
     assert (
-        bundle.orchestrator.checkpoint_count(result.thread_ref) == initial_checkpoints
+        bundle.orchestrator.checkpoint_count(
+            tenant_id=result.tenant_id,
+            thread_ref=result.thread_ref,
+        )
+        == initial_checkpoints
     )
     assert replayed.replayed is True
     assert replayed.hypotheses == result.hypotheses
@@ -247,3 +254,23 @@ def test_invalid_evidence_target_safely_omits_proposal() -> None:
     assert result.status is InvestigationStatus.ABSTAINED
     assert result.proposal is None
     assert result.critic.reasons == ("corroborated_but_no_valid_action",)
+
+
+def test_checkpoint_owner_cannot_be_rebound_across_tenants() -> None:
+    source = build_demo_bundle()
+    graph = LangGraphInvestigator(DeterministicStructuredModel())
+    evidence = source.service._evidence.collect(demo_identity(), demo_request())
+    _run_direct(graph, evidence, thread_ref="thread:tenant-owned")
+    with pytest.raises(OrchestrationFailure, match="tenant mismatch"):
+        graph.run(
+            tenant_id="tenant-beta",
+            request=demo_request(),
+            request_id="direct-cross-tenant",
+            thread_ref="thread:tenant-owned",
+            evidence=evidence,
+        )
+    with pytest.raises(OrchestrationFailure, match="tenant mismatch"):
+        graph.checkpoint_count(
+            tenant_id="tenant-beta",
+            thread_ref="thread:tenant-owned",
+        )

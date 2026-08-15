@@ -25,7 +25,7 @@ The deterministic join node that checks injection flags, specialist availability
 citations, contradictions, and corroboration before producing a proposal.
 
 **Effect**
-A mutation of an external/production system. Layer 1 has no enabled effect.
+A mutation of an external/production system. Layer 2 has no enabled effect.
 
 **Enterprise-owned control**
 Policy, tenant isolation, budget, idempotency, approval, effect fencing, verification,
@@ -47,8 +47,22 @@ mechanics managed by LangGraph/Langfuse/Temporal.
 Application behavior ensuring retries/duplicates with the same tenant/request/input do
 not duplicate work, while conflicting input is rejected.
 
+**Grant version**
+Monotonic principal authority revision carried by a token and matched against current
+application storage. A mismatch makes a signed but stale token unusable.
+
+**IdentityContext**
+Immutable application projection created at delivery after JWT verification and
+current principal/grant resolution. It contains tenant, issuer/subject, principal
+kind, purpose-bound grant bindings, request and trace references.
+
+**JWKS rotation cache**
+Bounded cache of configured-issuer signing keys with key-count/ID limits, TTL and
+unknown-key refresh cooldown. It is unavailable rather than stale-successful after a
+required refresh failure.
+
 **Langfuse**
-The selected optional framework trace/eval backend. Layer 1 uses manual minimized
+The selected optional framework trace/eval backend. Layer 2 uses manual minimized
 observations rather than automatic graph capture.
 
 **LangGraph**
@@ -78,6 +92,19 @@ deferred.
 PostgreSQL row-level security. Required for production tenant data, not supplied by
 framework checkpoints.
 
+**Purpose binding**
+Requirement that one current grant permit an action for the exact declared business
+purpose. Permissions from unrelated purposes cannot be combined.
+
+**Runtime role**
+The `aegis_runtime` PostgreSQL group role used after connection setup. It is neither
+superuser nor `BYPASSRLS`; migrations and saver setup use a separate administrative
+connection.
+
+**Secret reference**
+Tenant-bound provider URI/name stored instead of secret material. Layer 2 does not
+resolve it and never places values in graph, API, audit or trace state.
+
 **Structured model port**
 Provider-neutral interface that accepts a typed specialist task and returns output
 that must pass domain validation.
@@ -90,5 +117,5 @@ across process boundaries.
 A bounded hash bucket exported for aggregate telemetry instead of a tenant identifier.
 
 **Verification**
-Evidence-based check that a controlled effect achieved its intended outcome. Layer 1
+Evidence-based check that a controlled effect achieved its intended outcome. Layer 2
 does not execute this journey stage.

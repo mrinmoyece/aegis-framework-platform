@@ -12,7 +12,7 @@ cache, rate-limit, or pub/sub requirement.
 
 ## Decision
 
-Use PostgreSQL 17 with pgvector 0.8.6 in the pinned local image. Provide
+Use the PostgreSQL 17 line with pgvector 0.8.6 in the pinned local image. Provide
 `langgraph-checkpoint-postgres` 3.1.2 and Psycopg 3.3.4 as an optional adapter.
 Keep the network-free demo on memory checkpoints. Do not add Redis or its client.
 Do not implement vector retrieval until evidence tenancy, provenance, and relevance
@@ -20,10 +20,12 @@ evals exist.
 
 ## Consequences
 
-Production users must design migrations, RLS, encryption, HA, backup, retention,
-pruning, and erasure. The checkpoint tables are still framework state, not audit or
-authority tables. The pgvector extension being available is not a claim that Layer 1
-uses embeddings.
+Layer 2 now supplies application migrations, a non-bypass runtime role, forced tenant
+RLS, quota/audit repositories, and an RLS overlay for checkpoint tables as described
+by [ADR 006](006-postgresql-rls-and-application-audit.md). Operators must still design
+encryption, HA, backup/restore, retention, pruning, erasure, and regional policy. The
+checkpoint tables remain framework state, not audit or authority tables. pgvector
+being available is not a claim that Layer 2 uses embeddings.
 
 ## Escape
 

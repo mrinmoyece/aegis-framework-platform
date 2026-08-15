@@ -1,169 +1,221 @@
-# Layer 1 architecture
+# Layer 2 architecture
 
-## Product journey
+## Product boundary
 
-The canonical target journey is:
+The product still investigates checkout incidents and opens a pending approval. It
+does not approve, execute, or verify a production change. Layer 2 makes identity,
+tenancy, authorization, quota, secrets references, checkpoints, and audit
+production-shaped without expanding the effect boundary.
 
-1. checkout telemetry raises a tenant-scoped alert;
-2. evidence is collected and integrity-addressed;
-3. telemetry and change specialists investigate in parallel;
-4. hypotheses cite evidence;
-5. a critic rejects contradictions, malformed output, and invalid citations;
-6. a remediation proposal crosses an approval boundary;
-7. an approved, fenced effect executes;
-8. independent verification reconciles intended and observed state;
-9. durable audit records the complete chain.
+The journey remains:
 
-Layer 1 executes steps 1–6 only, where step 6 means **opening a pending approval
-request**. It appends educational in-memory audit events for the executed steps. It
-has no approval decision endpoint, effect, production verification, or durable audit
-store, and makes no claim that steps 7–9 run.
+1. authenticate a human or workload access token at delivery;
+2. resolve the authoritative principal and tenant from application storage;
+3. evaluate a current purpose-bound grant and tenant policy;
+4. reserve tenant quota before evidence or graph work;
+5. investigate with the bounded LangGraph graph;
+6. open a pending approval outside the graph;
+7. append redacted application audit.
 
-## Components
+Steps for approval decisions, effects, fencing, verification, and reconciliation
+remain absent.
+
+## Components and authority
 
 ```mermaid
 flowchart TB
   subgraph Delivery
-    CLI[CLI]
-    API[FastAPI]
+    API[FastAPI bearer-token API]
+    CLI[Explicit deterministic demo CLI]
   end
-  subgraph Enterprise["Enterprise-owned application controls"]
-    SVC[InvestigationService]
-    ID[IdentityContext]
-    POL[PolicyPort]
-    BUD[BudgetPort]
-    EVI[EvidencePort]
-    IDEM[IdempotencyPort]
-    APP[ApprovalPort]
-    AUD[AuditPort]
-    EFF[EffectPort: disabled]
-    OBS[ObservabilityPort]
+  subgraph Identity["Application identity and governance"]
+    JWT[PyJWT verifier]
+    JWKS[Bounded JWKS cache]
+    IDR[Identity repository]
+    RBAC[RBAC + purpose + risk policy]
+    QUOTA[Atomic quota repository]
+    SECRET[Secret-reference boundary]
+    AUDIT[Immutable audit repository]
   end
-  subgraph Framework["Framework-owned mechanics"]
-    LG[LangGraph adapter]
-    CO[Coordinator]
-    TS[Telemetry specialist]
-    CS[Change specialist]
-    CR[Critic]
-    CP[(Checkpoint saver)]
+  subgraph Database["PostgreSQL application authority"]
+    RLS[Forced tenant RLS]
+    TEN[(tenants/principals/grants)]
+    POL[(policies/quotas/secrets)]
+    AUD[(audit heads/events)]
+    OWNER[(checkpoint thread owners)]
+  end
+  subgraph Framework["Framework mechanics only"]
+    LG[LangGraph]
+    CP[(LangGraph saver tables)]
+    LF[Manual Langfuse adapter]
   end
 
-  CLI --> SVC
-  API --> SVC
-  ID --> SVC
-  SVC --> POL
-  SVC --> IDEM
-  SVC --> BUD
-  SVC --> EVI
-  SVC --> LG
-  SVC --> APP
-  SVC --> AUD
-  SVC --> OBS
-  LG --> CO
-  CO --> TS
-  CO --> CS
-  TS --> CR
-  CS --> CR
-  LG --> CP
-  APP -. no call path .-> EFF
+  API --> JWT --> JWKS
+  JWT --> IDR --> TEN
+  API --> RBAC --> POL
+  API --> QUOTA --> POL
+  API --> LG --> CP
+  LG -. no authority .-> RBAC
+  OWNER --> CP
+  API --> AUDIT --> AUD
+  SECRET --> POL
+  RLS --> TEN
+  RLS --> POL
+  RLS --> AUD
+  RLS --> OWNER
+  RLS --> CP
+  LG --> LF
 ```
 
-`ports.py` is the stable application seam. `graph.py`, `postgres.py`, and
-`langfuse_adapter.py` contain framework-specific behavior. `adapters.py` contains
-deterministic local enterprise-control doubles; they demonstrate boundaries but are
-not production storage.
+`ports.py` and `access.py` are provider-neutral boundaries. `identity.py` owns JOSE
+and JWKS mechanics. `authorization.py` owns immutable role definitions and current
+policy evaluation. `postgres.py` is the PostgreSQL/Psycopg/LangGraph-saver adapter.
+LangGraph and Langfuse never approve or grant access.
 
-## Sequence
+## Authentication sequence
 
 ```mermaid
 sequenceDiagram
-  actor R as Responder
-  participant A as CLI / FastAPI
-  participant S as InvestigationService
-  participant P as Policy + budget
-  participant E as Evidence port
+  actor C as Caller
+  participant A as FastAPI
+  participant J as JWT verifier
+  participant K as Bounded JWKS cache
+  participant D as Identity repository
+  participant P as Policy repository
+  participant S as Investigation service
   participant G as LangGraph
-  participant T as Telemetry specialist
-  participant C as Change specialist
-  participant K as Critic
-  participant V as Checkpointer
-  participant Q as Approval boundary
-  participant U as Audit port
+  participant U as Durable audit
 
-  R->>A: alert + identity headers
-  A->>S: typed request and IdentityContext
-  S->>P: authorize and reserve
-  P-->>S: explicit allow + reservation
-  S->>E: collect(tenant, incident)
-  E-->>S: sorted tenant evidence
-  S->>G: invoke typed state + opaque thread_ref
-  G->>V: checkpoint input/super-steps
-  G->>T: sanitized structured facts
-  G->>C: sanitized structured facts
-  par same LangGraph super-step
-    T-->>K: typed cited finding
-    C-->>K: typed cited finding
-  end
-  K-->>G: verdict + hypothesis + proposal
-  G-->>S: application result
-  S->>Q: open pending approval
-  S->>U: append outcome
-  S-->>A: cited result
-  Note over Q,U: No approval decision or effect execution in Layer 1
+  C->>A: Authorization: Bearer + request ID
+  A->>J: bounded token
+  J->>K: configured issuer + required kid + allowed alg
+  K-->>J: current verification key
+  J->>J: signature, iss, aud, exp, iat, nbf, lifetime
+  J->>D: tenant claim scope + exact issuer/subject
+  D-->>J: active principal + grant version + current grants
+  J-->>A: immutable IdentityContext
+  A->>P: action + tenant + purpose + risk
+  P-->>A: current allow/deny decision
+  A->>S: typed identity + alert
+  S->>G: tenant-derived thread + evidence
+  G-->>S: cited result/proposal
+  S->>U: redacted application event
+  S-->>C: investigation result
 ```
 
-## Graph semantics
+Unverified token content may select only an exact preconfigured issuer and an RLS
+scope. It cannot establish a tenant: the resolved `(issuer, subject)` principal must
+exist in that tenant and its application `grant_version` must match the token.
+Application grants—not token roles—produce immutable role/purpose/permission/risk
+bindings. Human and workload identities use the same contract with an explicit
+`principal_kind`.
 
-The graph has one bounded pass:
+The verifier:
 
-```mermaid
-flowchart LR
-  START --> coordinator
-  coordinator --> telemetry_specialist
-  coordinator --> change_specialist
-  telemetry_specialist --> critic
-  change_specialist --> critic
-  critic --> END
+- accepts only configured `RS256`, `PS256`, or `ES256`;
+- requires a bounded `kid` and rejects `crit` and unexpected token types;
+- verifies signature, exact issuer, configured audience, and required claims;
+- applies an explicit maximum clock skew and token lifetime;
+- validates `exp`, `iat`, and optional `nbf` against the injected clock;
+- limits token and JWKS response size, key count, key use, operations, and algorithms;
+- refreshes on expiry or an unfamiliar key after a cooldown;
+- never uses stale keys after a refresh failure.
+
+## Authorization and anti-enumeration
+
+Every service run and checkpoint read uses `PolicyPort`. Delivery routes use the same
+policy for tenant, policy, quota, and audit reads. A decision requires all of:
+
+- resource tenant equals identity tenant;
+- identity and grant have not expired;
+- current tenant policy exists and permits the action/purpose/risk;
+- one immutable current grant permits that exact action for that purpose and risk.
+
+Missing and forbidden tenant resources both return `404`; investigation denial is a
+generic `403`; authentication failures are generic `401`. Responses never explain
+whether another tenant's object exists.
+
+| Route | Authentication | Required permission |
+|---|---|---|
+| `GET /healthz` | none; liveness only | none |
+| `GET /readyz` | none | production identity and governance configured |
+| `GET /v1/me` | bearer token | current authenticated principal |
+| `GET /v1/tenants/{tenant_id}` | bearer token | `tenant:read` |
+| `GET /v1/policies/current` | bearer token | `policy:read` |
+| `GET /v1/quotas/investigations` | bearer token | `quota:read` |
+| `GET /v1/audit` | bearer token | `audit:read` |
+| `POST /v1/investigations` | bearer token | `investigation:run` |
+
+The deterministic static bearer identities exist only when `AEGIS_MODE=demo` or an
+explicit test runtime is injected. The default is production mode. Missing OIDC or
+PostgreSQL settings leave readiness and authenticated routes closed.
+
+## PostgreSQL transaction and RLS boundary
+
+`migrations/0001_layer2.sql` creates tenant-first keys/indexes for tenants,
+principals, grants, policies, quotas/reservations, secret references, audit, and
+checkpoint owners. Every tenant table enables and forces RLS using:
+
+```sql
+tenant_id = aegis.current_tenant_id()
 ```
 
-The two specialists share a LangGraph super-step and join before the critic.
-Reducers sort/deduplicate findings, so scheduler completion order cannot change the
-result. There is no model-directed routing and no loop; `recursion_limit=8` is a
-secondary guard. The structured fake model consumes only allowlisted facts.
+The runtime login must be a member of `aegis_runtime`. Pool configuration executes
+`SET ROLE aegis_runtime`, enables row security, verifies the role is neither
+superuser nor `BYPASSRLS`, and applies statement/lock/idle-transaction timeouts.
+Every repository call uses `set_config(..., true)` inside one transaction. Both the
+transaction helper and pool reset hook reject leaked tenant state.
 
-## Checkpoint contract
+Policy and quota updates use version predicates. Quota reservation serializes the
+tenant/reservation key, locks the quota row, stores allow and deny decisions, and
+returns the stored result on retry.
 
-`InMemorySaver` is the default only so the demo and tests have no external service.
-The state is made of JSON-compatible records, and tests enable
-`LANGGRAPH_STRICT_MSGPACK=true` as defense in depth. Both memory and PostgreSQL
-adapters explicitly install a strict `JsonPlusSerializer`, so runtime safety does not
-depend on that environment variable. The optional PostgreSQL adapter calls
-`PostgresSaver.setup()` and is the production-shaped checkpoint path.
+Audit uses one locked head per tenant. The application stores only a derived actor
+reference and allowlisted attributes, then hashes canonical event content with the
+previous tenant hash. Runtime privileges deny update/delete, and a trigger rejects
+mutation even by a more privileged writer. PostgreSQL durability is audit truth;
+LangGraph checkpoints and traces are not.
 
-A checkpoint guarantees recoverable graph state at framework super-step boundaries
-when the selected saver persists successfully. It does not guarantee:
+## Tenant-bound LangGraph persistence
 
-- authorization or tenant access to that state;
-- idempotency of external calls or effects;
-- approval integrity;
-- append-only audit;
-- exactly-once execution;
-- retention, erasure, backup, or regional policy;
-- safe streaming—LangGraph value streaming can expose private channels unless
-  outputs are explicitly filtered.
+Administrative setup runs `PostgresSaver.setup()` and then forces RLS on
+`checkpoints`, `checkpoint_blobs`, and `checkpoint_writes`. Their policies join
+`thread_id` to `aegis.checkpoint_threads` under the current tenant. Runtime setup is
+not permitted.
 
-The service reauthorizes checkpoint reads and derives the opaque, tenant-bound thread
-reference rather than accepting an arbitrary one.
+`TenantPostgresOrchestrator` registers an opaque tenant-derived thread and performs
+all saver work in the same tenant transaction. A conflicting cross-tenant thread
+hits the global uniqueness constraint but remains invisible through RLS. The memory
+saver also records thread ownership for deterministic tests.
 
-## Replaceability
+Checkpoint content can resume graph mechanics. It remains non-authoritative for
+identity, grants, policy, quota, approval, audit, idempotency, secrets, fencing, or
+effects.
 
-- Replace LangGraph by implementing `OrchestratorPort`; domain models and controls
-  do not import LangGraph.
-- Replace Langfuse by implementing `ObservabilityPort`; OpenTelemetry remains the
-  portable signal format.
-- Replace PostgreSQL saver construction inside `postgres.py`; it is not an
-  authorization or audit database.
-- Add OpenAI or Anthropic through `StructuredModelPort`; provider output still passes
-  Pydantic and citation validation.
-- Introduce Temporal outside the graph when durable effects arrive. Temporal owns the
-  effect workflow; LangGraph owns investigation. Neither nests the other's retries.
+## Framework versus custom responsibilities
+
+| Concern | Proven library/framework | Explicit application responsibility |
+|---|---|---|
+| JWT/JWS | PyJWT + cryptography | issuer registry, allowed algorithms, cache bounds, lifetime/skew, principal/grant resolution |
+| HTTP | FastAPI/Pydantic | bearer boundary, body/token bounds, anti-enumeration, readiness behavior |
+| Graph | LangGraph | policy before execution, tenant thread ownership, citation/risk/approval boundaries |
+| Pool/SQL | Psycopg/PostgreSQL | forced RLS, role attributes, tenant transaction, schema and audit semantics |
+| Checkpoints | LangGraph PostgreSQL saver | RLS overlay, owner registry, access authorization |
+| Trace/eval | OpenTelemetry/Langfuse | allowlists, buckets, exporter redaction, no automatic graph capture |
+| Policy | none selected | immutable RBAC, purposes, risk, current policy and revocation |
+
+No second agent framework or orchestration owner is introduced.
+
+## Replaceability and unproven evidence
+
+- Replace PyJWT through `AuthenticatorPort`.
+- Replace an IdP through configured issuer/JWKS and `(issuer, subject)` mapping.
+- Replace PostgreSQL repositories through the access/governance/audit/budget ports.
+- Replace LangGraph through `OrchestratorPort`.
+- Replace Langfuse through `ObservabilityPort` and OpenTelemetry.
+
+Deterministic key rotation and a local environment-gated Keycloak test exist. Live
+IdP rotation under production traffic is unproven. Production deployment, TLS,
+network policy, database HA/backups/restore, retention/erasure execution, KMS-backed
+secret resolution, external evidence/model adapters, and all production effects are
+also unproven.
