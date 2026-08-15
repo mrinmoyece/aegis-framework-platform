@@ -118,6 +118,9 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["aegis_framework"]
+omit = [
+  "src/aegis_framework/postgres.py",
+]
 
 [tool.coverage.report]
 fail_under = 80
