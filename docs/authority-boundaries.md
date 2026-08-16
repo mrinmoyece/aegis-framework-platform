@@ -1,4 +1,4 @@
-# Layer 5 authority and retry ownership
+# Layer 6 authority and retry ownership
 
 ## Ownership matrix
 
@@ -25,6 +25,9 @@
 | Evidence bundle/citation | Application evidence bundle | LangGraph/model receives cited allowlisted facts | Bundle/member facts |
 | Correlation timeline/link/conflict | Deterministic application reducer | May enter graph context; never causal authority | Accepted cited evidence |
 | Hypothesis/proposal | Domain result with citations | Yes, non-authoritative candidate | Application result event |
+| Specialist role/capability | Closed application role/transition policy | Role label only | Application code/version |
+| Task dispatch/result | Immutable application orchestration fact with fence | Checkpoint may mirror progress | Application ledger |
+| Reasoning artifact/decision | Immutable application artifact fact/projection | Graph state may hold a copy | Application ledger rebuild |
 | API status/timeline | Rebuildable application projection | Temporal query is convenience only | Event replay |
 | Audit | Application PostgreSQL audit/ledger | No | Application database |
 | Approval/effect/fencing/receipt | Not implemented in Layer 3 | Never | Future application layer |
@@ -40,6 +43,7 @@
 | Evidence connector call | Activity only | Connector SDK retries disabled or counted inside Activity limit |
 | Connector page | Temporal Activity + application page intent | Three Activity deliveries; unresolved intent blocks another network call pending reconciliation |
 | LangGraph run | One Activity attempt | No Temporal per-node retry and no graph retry loop |
+| Specialist node | No framework retry | Application dispatch intent/result and model-call identity suppress duplicates |
 | Provider SDK | None | `max_retries=0`; one network intent per durable attempt ID |
 | Structured repair/fallback | Application gateway | Policy bound; no ambiguous-billing fallback by default |
 | Signal | Temporal may redeliver | Workflow command-reference set + application inbox |
@@ -63,6 +67,10 @@
     credential revision, policy and cancellation before accepting a page.
 12. Canonicalize/scan/quarantine before graph projection; expose only authorized,
     redacted query and cursor status from forced-RLS projections.
+13. Persist the fixed task dispatch before a model call and accept the result only under
+    the current run/task fence.
+14. Validate role, artifact transition, provenance, citation, confidence, graph version,
+    and input digest before recording the final application artifact/decision facts.
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.

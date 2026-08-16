@@ -88,7 +88,7 @@ def test_success_is_cited_deterministic_and_checkpointed() -> None:
         thread_ref=result.thread_ref,
     )
     replayed = bundle.service.investigate(identity, demo_request())
-    assert initial_checkpoints == 5
+    assert initial_checkpoints == 8
     assert (
         bundle.orchestrator.checkpoint_count(
             tenant_id=result.tenant_id,
@@ -205,12 +205,13 @@ def test_uncited_model_output_abstains() -> None:
 def test_unexpected_adapter_error_is_explicit() -> None:
     source = build_demo_bundle()
     evidence = source.service._evidence.collect(demo_identity(), demo_request())
-    with pytest.raises(OrchestrationFailure, match="LangGraph invocation failed"):
-        _run_direct(
-            LangGraphInvestigator(_UnexpectedFailureModel()),
-            evidence,
-            thread_ref="thread:unexpected",
-        )
+    result = _run_direct(
+        LangGraphInvestigator(_UnexpectedFailureModel()),
+        evidence,
+        thread_ref="thread:unexpected",
+    )
+    assert result.status is InvestigationStatus.ABSTAINED
+    assert "model_adapter_exception" in result.critic.reasons
 
 
 def test_missing_runbook_never_produces_action() -> None:

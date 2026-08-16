@@ -51,6 +51,11 @@ class EvalCase(StrictModel):
         "evidence-policy-revocation",
         "evidence-correlation",
         "evidence-ssrf",
+        "orchestration-artifacts",
+        "orchestration-replay",
+        "orchestration-role-denial",
+        "orchestration-duplicate-task",
+        "orchestration-projection-rebuild",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -96,6 +101,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 
 def _run_case(case: EvalCase) -> EvalOutcome:
+    if case.kind.startswith("orchestration-"):
+        return _run_orchestration_case(case)
     if case.kind.startswith("evidence-"):
         return _run_evidence_case(case)
     if case.kind.startswith("model-"):
@@ -169,6 +176,117 @@ def _run_case(case: EvalCase) -> EvalOutcome:
         if secondary.tenant_id != "tenant-beta":
             details.append("secondary_tenant_mismatch")
 
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details),
+    )
+
+
+def _run_orchestration_case(case: EvalCase) -> EvalOutcome:
+    from aegis_framework.graph import LangGraphInvestigator
+    from aegis_framework.model import DeterministicStructuredModel
+    from aegis_framework.orchestration import (
+        GRAPH_VERSION,
+        AgentRole,
+        GovernanceArtifact,
+        InMemoryOrchestrationLedger,
+        TaskDispatchStatus,
+    )
+
+    evidence_bundle = build_demo_bundle()
+    evidence = tuple(
+        evidence_bundle.service._evidence.collect(demo_identity(), demo_request())
+    )
+    ledger = InMemoryOrchestrationLedger()
+    investigator = LangGraphInvestigator(
+        DeterministicStructuredModel(),
+        ledger=ledger,
+    )
+    details: list[str] = []
+    if case.kind == "orchestration-role-denial":
+        try:
+            AgentRole("dynamic_role")
+        except ValueError:
+            pass
+        else:
+            details.append("dynamic_role_was_accepted")
+    elif case.kind == "orchestration-duplicate-task":
+        ledger.begin_run(
+            tenant_id="tenant-acme",
+            incident_id="eval-incident",
+            run_id="run:eval-duplicate",
+            thread_ref="thread:eval-duplicate",
+            graph_version=GRAPH_VERSION,
+            input_digest="a" * 64,
+        )
+        first = ledger.claim_task(
+            tenant_id="tenant-acme",
+            run_id="run:eval-duplicate",
+            task_id="task:eval-duplicate",
+            role=AgentRole.TELEMETRY_SPECIALIST,
+            input_digest="a" * 64,
+        )
+        second = ledger.claim_task(
+            tenant_id="tenant-acme",
+            run_id="run:eval-duplicate",
+            task_id="task:eval-duplicate",
+            role=AgentRole.TELEMETRY_SPECIALIST,
+            input_digest="a" * 64,
+        )
+        if (
+            first.status is not TaskDispatchStatus.STARTED
+            or second.status is not TaskDispatchStatus.RECONCILIATION_REQUIRED
+        ):
+            details.append("duplicate_dispatch_was_not_suppressed")
+    else:
+        result = investigator.run(
+            tenant_id="tenant-acme",
+            request=demo_request(),
+            request_id=f"eval-{case.case_id}",
+            run_id=f"run:{case.case_id}",
+            thread_ref=f"thread:{case.case_id}",
+            evidence=evidence,
+        )
+        if case.kind == "orchestration-artifacts":
+            try:
+                artifacts = tuple(
+                    GovernanceArtifact.model_validate(item) for item in result.artifacts
+                )
+            except ValueError:
+                details.append("artifact_validation_failed")
+            else:
+                if len(artifacts) != 16:
+                    details.append("artifact_chain_incomplete")
+        elif case.kind == "orchestration-replay":
+            investigator._graph.update_state(
+                {"configurable": {"thread_id": f"thread:{case.case_id}"}},
+                {"graph_version": "5.0.0"},
+            )
+            try:
+                investigator.run(
+                    tenant_id="tenant-acme",
+                    request=demo_request(),
+                    request_id=f"eval-{case.case_id}",
+                    run_id=f"run:{case.case_id}",
+                    thread_ref=f"thread:{case.case_id}",
+                    evidence=evidence,
+                )
+            except OrchestrationFailure:
+                pass
+            else:
+                details.append("incompatible_checkpoint_was_accepted")
+        elif case.kind == "orchestration-projection-rebuild":
+            before = ledger.projection(
+                tenant_id="tenant-acme",
+                run_id=result.run_id,
+            )
+            rebuilt = ledger.rebuild_projection(
+                tenant_id="tenant-acme",
+                run_id=result.run_id,
+            )
+            if rebuilt != before or rebuilt.artifact_count != 16:
+                details.append("projection_rebuild_changed_truth")
     return EvalOutcome(
         case_id=case.case_id,
         passed=not details,
@@ -714,6 +832,7 @@ def _run_durable_case(case: EvalCase) -> EvalOutcome:
             tenant_id: str,
             request: InvestigationRequest,
             request_id: str,
+            run_id: str | None = None,
             thread_ref: str,
             evidence: Sequence[Evidence],
         ) -> InvestigationResult:
@@ -724,6 +843,7 @@ def _run_durable_case(case: EvalCase) -> EvalOutcome:
                 tenant_id=tenant_id,
                 request=request,
                 request_id=request_id,
+                run_id=run_id,
                 thread_ref=thread_ref,
                 evidence=evidence,
             )
@@ -733,6 +853,9 @@ def _run_durable_case(case: EvalCase) -> EvalOutcome:
                 tenant_id=tenant_id,
                 thread_ref=thread_ref,
             )
+
+        def cancel_run(self, *, tenant_id: str, run_id: str) -> None:
+            bundle.orchestrator.cancel_run(tenant_id=tenant_id, run_id=run_id)
 
     fail_once = _FailOnce()
     runtime = DurableActivityRuntime(

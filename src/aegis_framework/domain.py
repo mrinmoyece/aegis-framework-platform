@@ -58,12 +58,15 @@ class EvidenceKind(StrEnum):
 class Specialist(StrEnum):
     TELEMETRY = "telemetry"
     CHANGE = "change"
+    RUNTIME = "runtime"
+    KNOWLEDGE = "knowledge"
 
 
 class InvestigationStatus(StrEnum):
     COMPLETE = "complete"
     ABSTAINED = "abstained"
     DENIED = "denied"
+    CANCELLED = "cancelled"
 
 
 class CriticDecision(StrEnum):
@@ -315,9 +318,9 @@ class SpecialistFinding(StrictModel):
     statement: Annotated[str, Field(min_length=1, max_length=1_000)]
     cause_code: Identifier | None
     confidence: Annotated[float, Field(ge=0.0, le=1.0)]
-    citations: tuple[Citation, ...]
+    citations: Annotated[tuple[Citation, ...], Field(max_length=16)]
     abstained: bool = False
-    reason: Annotated[str | None, Field(max_length=500)] = None
+    reason: Annotated[str | None, Field(max_length=256)] = None
 
     @field_validator("citations")
     @classmethod
@@ -343,14 +346,14 @@ class Hypothesis(StrictModel):
     statement: Annotated[str, Field(min_length=1, max_length=1_000)]
     cause_code: Identifier
     confidence: Annotated[float, Field(ge=0.0, le=1.0)]
-    citations: Annotated[tuple[Citation, ...], Field(min_length=1)]
+    citations: Annotated[tuple[Citation, ...], Field(min_length=1, max_length=64)]
 
 
 class CriticVerdict(StrictModel):
     decision: CriticDecision
-    reasons: tuple[str, ...]
+    reasons: Annotated[tuple[str, ...], Field(max_length=16)]
     checked_citations: Annotated[int, Field(ge=0)]
-    contradictions: tuple[str, ...] = ()
+    contradictions: Annotated[tuple[str, ...], Field(max_length=64)] = ()
     injection_contained: bool = False
 
 
@@ -394,15 +397,18 @@ class InvestigationResult(StrictModel):
     status: InvestigationStatus
     tenant_id: Identifier
     incident_id: Identifier
+    run_id: Identifier
     request_id: Identifier
     thread_ref: Identifier
     hypotheses: tuple[Hypothesis, ...]
     critic: CriticVerdict
     proposal: RemediationProposal | None
+    artifacts: Annotated[tuple[StateRecord, ...], Field(max_length=64)] = ()
     approval: ApprovalRequest | None = None
     replayed: bool = False
     framework: Literal["langgraph"] = "langgraph"
     graph_iterations: Literal[1] = 1
+    graph_version: Literal["6.0.0"] = "6.0.0"
 
 
 class NodeError(StrictModel):
@@ -437,21 +443,55 @@ def merge_node_errors(
     )
 
 
+def merge_artifacts(
+    left: list[StateRecord], right: list[StateRecord]
+) -> list[StateRecord]:
+    merged: dict[str, StateRecord] = {}
+    digests: dict[str, str] = {}
+    for artifact in (*left, *right):
+        artifact_id = str(artifact["artifact_id"])
+        digest = str(artifact["canonical_digest"])
+        existing = digests.get(artifact_id)
+        if existing is not None and existing != digest:
+            raise ValueError("artifact id was reused with a different digest")
+        digests[artifact_id] = digest
+        merged[artifact_id] = artifact
+    return sorted(
+        merged.values(),
+        key=lambda artifact: (
+            int(str(artifact["ordinal"])),
+            str(artifact["artifact_id"]),
+        ),
+    )
+
+
+def merge_cancelled(left: bool, right: bool) -> bool:
+    return left or right
+
+
 class InvestigationState(TypedDict, total=False):
     tenant_id: str
     incident_id: str
+    run_id: str
     request_id: str
     thread_ref: str
+    graph_version: str
+    input_digest: str
+    fence_token: str
     correlation_reference: str
     evidence: tuple[StateRecord, ...]
     safe_evidence: tuple[StateRecord, ...]
     correlation: StateRecord
     findings: Annotated[list[StateRecord], merge_findings]
     node_errors: Annotated[list[StateRecord], merge_node_errors]
+    artifacts: Annotated[list[StateRecord], merge_artifacts]
     injection_detected: bool
     hypotheses: tuple[StateRecord, ...]
     critic: StateRecord
     proposal: StateRecord | None
+    terminal_state: str
+    critic_iteration: int
+    cancelled: Annotated[bool, merge_cancelled]
 
 
 def stable_id(prefix: str, *parts: str, length: int = 24) -> str:

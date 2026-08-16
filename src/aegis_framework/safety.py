@@ -89,6 +89,10 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "rate_limited",
         "reconciliation_required",
         "stale_result",
+        "node",
+        "role",
+        "artifact_count",
+        "critic_decision",
     }
 )
 _SAFE_AUDIT_KEYS = frozenset(

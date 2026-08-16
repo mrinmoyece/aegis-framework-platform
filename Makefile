@@ -63,10 +63,10 @@ serve:
 	$(UV) run aegis-framework serve
 
 measure:
-	$(UV) run python tools/measure.py --write comparison/layer5-metrics.json
+	$(UV) run python tools/measure.py --write comparison/layer6-metrics.json --runs 200
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer5 .
+	docker build --pull --tag aegis-framework-platform:layer6 .
 
 compose-config:
 	docker compose config --quiet

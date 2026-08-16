@@ -1,4 +1,4 @@
-# Tutorial: trace one durable evidence-backed investigation without trusting frameworks
+# Tutorial: trace one governed specialist investigation without trusting frameworks
 
 ## 1. Run the deterministic delivery adapter
 
@@ -237,3 +237,25 @@ docker compose config --quiet
 
 Read [the runbook](runbook.md) for DLQ, worker, cancellation, reconciliation, and
 projection recovery. None of these procedures authorizes a production effect.
+
+## 14. Trace the Layer 6 artifact chain
+
+After the deterministic investigation response returns `run_id`, read the authorized
+redacted artifact projection:
+
+```bash
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: tutorial-artifacts-001' \
+  'http://127.0.0.1:8000/v1/orchestrations/RUN_ID/artifacts?limit=50'
+```
+
+The response exposes artifact ID, schema version, ordinal, fixed producer role, kind,
+and task reference only. It omits tenant, payload, evidence, citations, locators,
+prompts, completions, and digests. The opaque next cursor is tenant/run bound.
+
+Follow `orchestration.py` for artifact/capability/transition contracts,
+`graph.py` for static fan-out/fan-in and critic routing, migration 0005 plus
+`orchestration_postgres.py` for application truth, and `activity_runtime.py` for the
+single Temporal Activity boundary. Deleting LangGraph checkpoints must not delete these
+application facts.

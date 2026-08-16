@@ -1,4 +1,4 @@
-# Layer 5 local operations runbook
+# Layer 6 local operations runbook
 
 Evidence connector enablement, source-specific operations, cursor recovery and
 reconciliation are in the [connector runbook](connector-runbook.md). Connector code is
@@ -12,7 +12,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 through Layer 5 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 6 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -79,6 +79,28 @@ For evidence status, first verify the application ledger hash chain, then rebuil
 `evidence_queries` from `evidence-query` aggregate events and record
 `evidence.projection_rebuilt`. Never reconstruct a page result from Temporal history,
 connector logs, or a framework cursor.
+
+For specialist artifacts, verify application event/fact integrity, replay immutable
+`orchestration_facts` and `orchestration_artifacts` in deterministic ordinal/ID order,
+validate each canonical digest/provenance transition, rebuild the run/task/artifact
+projection, record `projection.rebuilt`, and compare the final decision. Never rebuild
+artifact truth from a LangGraph checkpoint or trace.
+
+## Specialist graph recovery
+
+1. Confirm current application run state and cancellation before reading a checkpoint.
+2. Verify tenant/run/thread ownership, graph version `6.0.0`, and input digest.
+3. A completed task result may be reused; dispatch intent without result is
+   reconciliation-required and must not silently repeat a possibly billed model call.
+4. If the checkpoint is lost, rerun only under the same run/budget/model/task identities
+   and accept output through the application fence.
+5. If checkpoint compatibility fails, retain application facts, deploy a compatible
+   graph or start an explicit new run. Do not edit checkpoint or artifact rows.
+6. A critic rejection, abstention, or escalation is a valid fail-closed terminal—not an
+   operator reason to bypass citations or create an effect.
+7. Keep the LangGraph saver and orchestration-ledger connection pools separate. Sharing
+   one bounded pool can deadlock when an outer checkpoint transaction holds a connection
+   while parallel specialist branches persist application facts.
 
 ## Evidence connector incident
 

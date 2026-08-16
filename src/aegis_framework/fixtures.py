@@ -82,6 +82,7 @@ def demo_identity(
             "model:catalog:read",
             "model:health:read",
             "model:usage:read",
+            "orchestration:artifact:read",
             "policy:read",
             "quota:read",
             "tenant:read",
@@ -93,6 +94,7 @@ def demo_identity(
             "model:catalog:read",
             "model:health:read",
             "model:usage:read",
+            "orchestration:artifact:read",
             "policy:read",
             "quota:read",
             "tenant:read",
@@ -104,6 +106,7 @@ def demo_identity(
             "model:catalog:read",
             "model:health:read",
             "model:usage:read",
+            "orchestration:artifact:read",
             "policy:read",
             "policy:write",
             "quota:read",
@@ -171,7 +174,8 @@ def build_demo_bundle(
         model_modes[Specialist.CHANGE] = ModelMode.ERROR
 
     model = DeterministicStructuredModel(model_modes)
-    orchestrator = LangGraphInvestigator(model)
+    observability = OpenTelemetryObservability() if use_otel else NoopObservability()
+    orchestrator = LangGraphInvestigator(model, observability=observability)
     audit = HashChainAudit(clock)
     tenants = (
         TenantRecord(
@@ -201,6 +205,7 @@ def build_demo_bundle(
                 "model:catalog:read",
                 "model:health:read",
                 "model:usage:read",
+                "orchestration:artifact:read",
                 "policy:read",
                 "policy:write",
                 "quota:read",
@@ -253,9 +258,7 @@ def build_demo_bundle(
         approvals=InMemoryApprovalBoundary(clock),
         audit=audit,
         idempotency=InMemoryIdempotency(),
-        observability=(
-            OpenTelemetryObservability() if use_otel else NoopObservability()
-        ),
+        observability=observability,
     )
     return DemoBundle(
         service=service,

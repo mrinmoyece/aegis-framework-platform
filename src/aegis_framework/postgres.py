@@ -41,6 +41,7 @@ from aegis_framework.errors import (
     RepositoryUnavailable,
 )
 from aegis_framework.graph import LangGraphInvestigator
+from aegis_framework.orchestration import OrchestrationLedgerPort
 from aegis_framework.ports import BudgetDecision, ClockPort, StructuredModelPort
 from aegis_framework.safety import safe_audit_attributes
 
@@ -53,6 +54,7 @@ _MIGRATIONS = (
     _ROOT / "migrations/0002_layer3.sql",
     _ROOT / "migrations/0003_layer4.sql",
     _ROOT / "migrations/0004_layer5.sql",
+    _ROOT / "migrations/0005_layer6.sql",
 )
 _CHECKPOINT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 
@@ -804,9 +806,21 @@ class PostgresRepository:
 class TenantPostgresOrchestrator:
     """Bind every saver call to an RLS transaction and registered thread owner."""
 
-    def __init__(self, *, pool: RuntimePool, model: StructuredModelPort) -> None:
+    def __init__(
+        self,
+        *,
+        pool: RuntimePool,
+        model: StructuredModelPort,
+        ledger: OrchestrationLedgerPort | None = None,
+    ) -> None:
         self._pool = pool
         self._model = model
+        if ledger is None:
+            raise ValueError(
+                "a dedicated orchestration ledger/pool is required to avoid "
+                "checkpoint transaction pool deadlock"
+            )
+        self._ledger = ledger
 
     def run(
         self,
@@ -814,6 +828,7 @@ class TenantPostgresOrchestrator:
         tenant_id: str,
         request: InvestigationRequest,
         request_id: str,
+        run_id: str | None = None,
         thread_ref: str,
         evidence: Sequence[Any],
     ) -> Any:
@@ -827,6 +842,7 @@ class TenantPostgresOrchestrator:
                     tenant_id=tenant_id,
                     request=request,
                     request_id=request_id,
+                    run_id=run_id,
                     thread_ref=thread_ref,
                     evidence=evidence,
                 )
@@ -853,6 +869,10 @@ class TenantPostgresOrchestrator:
         except RepositoryUnavailable as exc:
             raise OrchestrationFailure("tenant checkpoint read failed") from exc
 
+    def cancel_run(self, *, tenant_id: str, run_id: str) -> None:
+        if self._ledger.projection(tenant_id=tenant_id, run_id=run_id) is not None:
+            self._ledger.cancel(tenant_id=tenant_id, run_id=run_id)
+
     @staticmethod
     def _claim_thread(
         connection: DictConnection,
@@ -877,6 +897,7 @@ class TenantPostgresOrchestrator:
     def _investigator(self, connection: DictConnection) -> LangGraphInvestigator:
         return LangGraphInvestigator(
             model=self._model,
+            ledger=self._ledger,
             checkpointer=PostgresSaver(
                 connection,
                 serde=strict_checkpoint_serializer(),

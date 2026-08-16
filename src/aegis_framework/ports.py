@@ -40,6 +40,7 @@ class Action(StrEnum):
     MODEL_HEALTH_READ = "model:health:read"
     EVIDENCE_QUERY_READ = "evidence:query:read"
     EVIDENCE_CURSOR_READ = "evidence:cursor:read"
+    ORCHESTRATION_ARTIFACT_READ = "orchestration:artifact:read"
     EFFECT_EXECUTE = "effect:execute"
 
 
@@ -114,11 +115,14 @@ class OrchestratorPort(Protocol):
         tenant_id: str,
         request: InvestigationRequest,
         request_id: str,
+        run_id: str | None = None,
         thread_ref: str,
         evidence: Sequence[Evidence],
     ) -> InvestigationResult: ...
 
     def checkpoint_count(self, *, tenant_id: str, thread_ref: str) -> int: ...
+
+    def cancel_run(self, *, tenant_id: str, run_id: str) -> None: ...
 
 
 class ApprovalPort(Protocol):
@@ -186,6 +190,22 @@ class ObservabilityPort(Protocol):
     ) -> AbstractContextManager[Observation]: ...
 
     def evidence_query(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+
+class GraphObservabilityPort(Protocol):
+    def graph_node(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+    def model_call(
         self,
         *,
         tenant_id: str,

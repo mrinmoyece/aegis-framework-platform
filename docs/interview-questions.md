@@ -313,3 +313,53 @@
     HTTP pooling/streaming, Kubernetes wire/object decoding, JWT cryptography, YAML
     syntax parsing, Temporal mechanics and LangGraph mechanics. Most secure-connector
     controls remain custom; neutral ports preserve escape.
+
+## Layer 6 governed specialist orchestration
+
+67. **Why add four specialists without adding CrewAI or AutoGen?**
+    LangGraph already supplies the required static graph mechanics. Another agent
+    framework would overlap scheduling, messages, retries, memory and tracing without
+    replacing application role, artifact, citation, ledger or tenant controls.
+
+68. **Why are roles an enum rather than model-created agents?**
+    Fixed roles make maximum work, evidence access, outputs, budgets and reviewable
+    authority explicit. Unknown roles and capabilities deny before dispatch.
+
+69. **What did LangGraph genuinely remove?**
+    Custom DAG scheduling, parallel super-step execution, synchronized fan-in, reducer
+    invocation, conditional routing, checkpoint serialization and history traversal.
+    It did not remove governance or application persistence.
+
+70. **Why not use `Send`, `Command`, subgraphs, or interrupts here?**
+    They are stable APIs, but the topology has exactly four known branches and two
+    deterministic routes. Static edges are simpler to audit. Interrupts cannot represent
+    approval; approval remains an external future service.
+
+71. **What makes a reasoning artifact durable and neutral?**
+    A strict schema-versioned envelope binds tenant, incident, run, task, producer role,
+    typed payload, provenance digests, deterministic ordinal and canonical SHA-256
+    digest. No LangGraph or provider type crosses the boundary.
+
+72. **How is duplicate specialist work prevented?**
+    The application ledger records dispatch intent before a model call and a fenced
+    result afterward. A completed result is cached; unresolved intent requires
+    reconciliation instead of a silent second call.
+
+73. **What happens when one model adapter raises unexpectedly?**
+    The node boundary emits a named abstention and fixed low-cardinality failure status;
+    the critic cannot accept a failed core specialist. The worker process remains alive.
+
+74. **How is graph replay versioned?**
+    Every run binds graph version `6.0.0`, tenant/run/thread, request and canonical input
+    digest. Incompatible checkpoints fail closed. Application artifacts can rebuild
+    projections even if the checkpoint is discarded.
+
+75. **Why does Temporal still wrap one graph Activity?**
+    Temporal owns cross-process scheduling, retry, heartbeat, signals and cancellation.
+    Per-node Temporal Activities or its experimental LangGraph plugin would overlap the
+    existing graph/application retry and intent boundaries.
+
+76. **Can the verification agent claim a rollback worked?**
+    No. It emits a future verification plan with
+    `production_verification_performed=false`. There is no approval or effect edge,
+    fencing token, executor, reconciler or receipt.

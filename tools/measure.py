@@ -1,4 +1,4 @@
-"""Measure repeatable Layer 5 size, dependencies, effort, and local runtime."""
+"""Measure repeatable Layer 6 size, dependencies, effort, and local runtime."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ from aegis_framework.model_gateway import (
 
 ROOT = Path(__file__).resolve().parents[1]
 FOUNDATION_SHA = "754e536d10b9643b40cac2f7b6c0d1de870fd630"
-LAYER4_SHA = "1d8a6d2b05c3a80eb32ab779ddd35159612f5f4d"
+LAYER5_SHA = "a3f01e5709b0f32644909d55636a310d26eb9789"
 CUSTOM_LAYER3 = {
     "repository": "mrinmoyece/aegis-agent-platform",
     "branch": "mrinmoyece-aegis-durable-ledger",
@@ -133,6 +133,29 @@ CUSTOM_LAYER6 = {
     },
     "test_functions": 204,
 }
+CUSTOM_LAYER7 = {
+    "repository": "mrinmoyece/aegis-agent-platform",
+    "branch": "mrinmoyece-aegis-specialist-dag",
+    "sha": "dce0054a40c34ab4cc9d515aa753bc71d73fab57",
+    "source_loc": {
+        "production": 21581,
+        "tests": 9975,
+        "total": 31556,
+    },
+    "dependencies": {
+        "direct_runtime": 12,
+        "direct_optional": 6,
+        "direct_development": 0,
+        "locked_total": None,
+    },
+    "incremental_effort_from_layer6": {
+        "additions": 6749,
+        "deletions": 177,
+        "changed_files": 41,
+        "commits": 3,
+    },
+    "test_functions": 221,
+}
 
 
 def main() -> int:
@@ -185,14 +208,15 @@ def measure(runs: int) -> dict[str, object]:
     gateway_runtime = _gateway_runtime(runs)
     evidence_runtime = _evidence_runtime(runs)
     return {
-        "schema_version": 5,
-        "layer": 5,
+        "schema_version": 6,
+        "layer": 6,
         "comparison_basis": {
             "foundation_sha": FOUNDATION_SHA,
             "custom_layer3": CUSTOM_LAYER3,
             "custom_layer4": CUSTOM_LAYER4,
             "custom_layer5": CUSTOM_LAYER5,
             "custom_layer6": CUSTOM_LAYER6,
+            "custom_layer7": CUSTOM_LAYER7,
             "loc_definition": "non-blank, non-comment physical Python lines",
             "effort_definition": (
                 "Git additions/deletions and changed files from each prior layer"
@@ -205,6 +229,11 @@ def measure(runs: int) -> dict[str, object]:
             "equivalent_evidence_scenario": (
                 "three tenant-bound cited records correlated in process with stable "
                 "timeline ordering, shared-fact links, no network, and no causal claim"
+            ),
+            "equivalent_orchestration_scenario": (
+                "fixed-role checkout specialist fan-out/fan-in through critic, "
+                "proposal-only planner and verification-plan gate using deterministic "
+                "models, in-memory application facts, no network or production effect"
             ),
         },
         "measured_at": datetime.now(UTC).isoformat(),
@@ -242,6 +271,8 @@ def measure(runs: int) -> dict[str, object]:
             "HTTP connection pooling and streaming response mechanics",
             "Kubernetes API object decoding and list transport",
             "safe YAML syntax parsing",
+            "fixed specialist DAG scheduling and synchronized fan-in",
+            "graph checkpoint serialization and replay traversal",
         ],
         "remaining_custom_controls": [
             "issuer registry and bounded JWKS rotation policy",
@@ -268,6 +299,9 @@ def measure(runs: int) -> dict[str, object]:
             "evidence canonicalization, provenance, redaction and quarantine",
             "durable page intent, cursor encryption and ambiguous-outcome handling",
             "deterministic non-causal correlation and extended citation validation",
+            "fixed role capability and artifact transition policy",
+            "immutable orchestration dispatch/artifact/decision facts",
+            "graph-version and checkpoint compatibility gates",
         ],
         "lock_in_and_escape": {
             "langgraph": "OrchestratorPort plus JSON-compatible domain state",
@@ -296,6 +330,7 @@ def measure(runs: int) -> dict[str, object]:
             "layer4_services": ["PostgreSQL", "Redis Streams"],
             "layer5_services": ["PostgreSQL", "Redis Streams"],
             "layer6_services": ["PostgreSQL", "Redis Streams"],
+            "layer7_services": ["PostgreSQL", "Redis Streams"],
             "temporal_tradeoff": (
                 "Temporal removes scheduler, timers, signal history, retry/backoff, "
                 "and crash recovery code but adds a second operational control plane"
@@ -309,6 +344,11 @@ def measure(runs: int) -> dict[str, object]:
                 "HTTPX, PyYAML, and the official Kubernetes client remove transport, "
                 "syntax, and Kubernetes object decoding only. They do not remove "
                 "tenant, provenance, SSRF, pagination, ledger, or quarantine controls"
+            ),
+            "layer7_tradeoff": (
+                "LangGraph removes custom DAG scheduler, synchronized fan-in, reducers "
+                "and checkpoint traversal, but application role policy, artifact "
+                "transitions, fencing, facts, RLS, citations and final gates remain"
             ),
         },
         "runtime": {
@@ -348,6 +388,27 @@ def measure(runs: int) -> dict[str, object]:
                 "Temporal, Redis, connector networks, ingestion, and process boundaries"
             ),
         },
+        "equivalent_orchestration_benchmark": {
+            "scenario": "deterministic-fixed-role-specialist-investigation",
+            "network": False,
+            "runs": runs,
+            "framework_layer6": {
+                "median_ms": round(statistics.median(durations_ms), 3),
+                "p95_ms": round(ordered[percentile_index], 3),
+            },
+            "custom_layer7": {
+                "median_ms": 25.922,
+                "p95_ms": 29.305,
+                "sha": CUSTOM_LAYER7["sha"],
+            },
+            "limitations": (
+                "Both use deterministic in-memory fixtures, but custom includes its "
+                "async event repository and creates an event loop per sample while "
+                "framework includes strict Pydantic artifacts and LangGraph "
+                "checkpoints; no PostgreSQL, Temporal, Redis, network or process "
+                "boundary is included"
+            ),
+        },
     }
 
 
@@ -356,7 +417,7 @@ def _git_effort() -> dict[str, int]:
     if git is None:
         raise RuntimeError("git is required to measure implementation effort")
     completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
-        [git, "diff", "--numstat", LAYER4_SHA, "--"],
+        [git, "diff", "--numstat", LAYER5_SHA, "--"],
         cwd=ROOT,
         check=True,
         capture_output=True,

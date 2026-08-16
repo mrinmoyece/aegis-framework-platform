@@ -37,6 +37,7 @@ REQUIRED_DOCS = (
     "docs/adr/008-application-event-ledger.md",
     "docs/adr/009-provider-neutral-model-gateway.md",
     "docs/adr/010-secure-evidence-connectors.md",
+    "docs/adr/011-governed-specialist-orchestration.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -122,18 +123,19 @@ def _workflow_pin_errors() -> list[str]:
 
 
 def _measurement_errors() -> list[str]:
-    path = ROOT / "comparison/layer5-metrics.json"
+    path = ROOT / "comparison/layer6-metrics.json"
     if not path.is_file():
-        return ["missing comparison/layer5-metrics.json"]
+        return ["missing comparison/layer6-metrics.json"]
     payload = json.loads(path.read_text(encoding="utf-8"))
     errors = []
-    if payload.get("schema_version") != 5 or payload.get("layer") != 5:
-        errors.append("Layer 5 metrics schema/layer is invalid")
+    if payload.get("schema_version") != 6 or payload.get("layer") != 6:
+        errors.append("Layer 6 metrics schema/layer is invalid")
     basis = payload.get("comparison_basis", {})
     custom_layer3 = basis.get("custom_layer3", {}) if isinstance(basis, dict) else {}
     custom_layer4 = basis.get("custom_layer4", {}) if isinstance(basis, dict) else {}
     custom_layer5 = basis.get("custom_layer5", {}) if isinstance(basis, dict) else {}
     custom_layer6 = basis.get("custom_layer6", {}) if isinstance(basis, dict) else {}
+    custom_layer7 = basis.get("custom_layer7", {}) if isinstance(basis, dict) else {}
     if custom_layer3.get("sha") != ("87cefe58adbf62e6a419d38e57e0928581b7003c"):
         errors.append("Layer 3 custom comparison SHA is not pinned")
     if custom_layer5.get("sha") != ("7c22d380a66f57aad943fe926ffff3ca8fc06ed6"):
@@ -142,19 +144,23 @@ def _measurement_errors() -> list[str]:
         errors.append("Layer 4 custom comparison SHA is not pinned")
     if custom_layer6.get("sha") != ("7a685bc52772e1c92467baba58a1c668646e9bf7"):
         errors.append("Layer 6 custom comparison SHA is not pinned")
+    if custom_layer7.get("sha") != ("dce0054a40c34ab4cc9d515aa753bc71d73fab57"):
+        errors.append("Layer 7 custom comparison SHA is not pinned")
     if not payload.get("remaining_custom_controls"):
-        errors.append("Layer 5 metrics must list remaining custom controls")
+        errors.append("Layer 6 metrics must list remaining custom controls")
     if not payload.get("lock_in_and_escape"):
-        errors.append("Layer 5 metrics must list lock-in and escape hatches")
+        errors.append("Layer 6 metrics must list lock-in and escape hatches")
     if payload.get("required_stateful_services") != [
         "PostgreSQL",
         "Temporal Server",
     ]:
-        errors.append("Layer 5 metrics must list exact stateful services")
+        errors.append("Layer 6 metrics must list exact stateful services")
     if not payload.get("equivalent_gateway_benchmark"):
-        errors.append("Layer 5 metrics must include the equivalent gateway benchmark")
+        errors.append("Layer 6 metrics must include the equivalent gateway benchmark")
     if not payload.get("equivalent_evidence_benchmark"):
-        errors.append("Layer 5 metrics must include the evidence benchmark")
+        errors.append("Layer 6 metrics must include the evidence benchmark")
+    if not payload.get("equivalent_orchestration_benchmark"):
+        errors.append("Layer 6 metrics must include the orchestration benchmark")
     return errors
 
 

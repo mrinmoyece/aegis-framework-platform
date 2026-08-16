@@ -224,6 +224,7 @@ class DurableActivityRuntime(ActivityOperations):
             tenant_id=tenant_id,
             request=request,
             request_id=value.request_ref,
+            run_id=value.run_id,
             thread_ref=thread_ref,
             evidence=evidence,
         )
@@ -286,6 +287,10 @@ class DurableActivityRuntime(ActivityOperations):
         )
         if current is None or current.status is not RunStatus.CANCEL_REQUESTED:
             raise IntegrityFailure("cancellation intent is not current")
+        self._orchestrator.cancel_run(
+            tenant_id=tenant_id,
+            run_id=value.run_id,
+        )
         self._store.record_transition(
             tenant_id=tenant_id,
             run_id=value.run_id,

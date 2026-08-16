@@ -2,8 +2,8 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 5,
-  "generated_on": "2026-08-15",
+  "layer": 6,
+  "generated_on": "2026-08-16",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
     "partial": "A boundary or deterministic subset exists; enterprise completion is explicit",
@@ -62,10 +62,10 @@
     {
       "id": "07-specialist-orchestration",
       "name": "Governed durable specialist orchestration",
-      "status": "partial",
-      "evidence": ["src/aegis_framework/graph.py", "src/aegis_framework/temporal.py", "tests/test_graph.py"],
-      "framework_owned": ["LangGraph fan-out/fan-in/checkpoints", "Temporal lifecycle recovery"],
-      "enterprise_owned": ["policy", "budget", "citation rules", "deterministic correlation context", "result facts", "retry ownership", "multi-agent expansion deferred"]
+      "status": "delivered",
+      "evidence": ["src/aegis_framework/orchestration.py", "src/aegis_framework/graph.py", "src/aegis_framework/orchestration_postgres.py", "migrations/0005_layer6.sql", "tests/test_orchestration_layer6.py"],
+      "framework_owned": ["LangGraph static fan-out/fan-in, reducers, conditional routing, checkpoint serialization/history", "Temporal lifecycle recovery around one bounded graph Activity"],
+      "enterprise_owned": ["fixed roles/capabilities", "typed artifacts/transitions/digests", "dispatch intent/result fencing", "policy/budget/citations/confidence/critic gates", "application facts/RLS/projection rebuild", "graph-version compatibility", "retry ownership"]
     },
     {
       "id": "08-approval-remediation",
@@ -95,25 +95,25 @@
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_temporal_integration.py"],
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_temporal_integration.py"],
       "framework_owned": ["Temporal replay", "optional Langfuse evaluator observation"],
-      "enterprise_owned": ["twenty-six hermetic safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
+      "enterprise_owned": ["thirty-one hermetic safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
     },
     {
       "id": "12-observability-replay",
       "name": "Observability and replay",
       "status": "partial",
-      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py"],
+      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py", "src/aegis_framework/orchestration_postgres.py"],
       "framework_owned": ["OTel spans", "Temporal replay", "LangGraph checkpoints"],
-      "enterprise_owned": ["redaction", "cardinality", "event/model/evidence replay", "projection rebuild", "retention"]
+      "enterprise_owned": ["redaction", "cardinality", "event/model/evidence/artifact replay", "graph-version compatibility", "projection rebuild", "retention"]
     },
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
       "status": "partial",
-      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py"],
+      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py"],
       "framework_owned": ["FastAPI delivery"],
-      "enterprise_owned": ["authorized redacted status/timeline/model/evidence operations", "opaque/encrypted cursor", "session security", "review UX"]
+      "enterprise_owned": ["authorized redacted status/timeline/model/evidence/artifact operations", "opaque/encrypted cursor", "session security", "review UX"]
     },
     {
       "id": "14-mcp-a2a-interoperability",

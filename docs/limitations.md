@@ -1,4 +1,4 @@
-# Layer 5 limitations
+# Layer 6 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -95,7 +95,15 @@
   prove causality, clock correctness, semantic equivalence, or source truth. Missing or
   stale required sources cause abstention; operators must not reinterpret proximity as
   cause.
-- Multi-agent expansion beyond the existing two-specialist graph, approvals/effects,
-  sandboxing, memory/RAG, UI, MCP/A2A, and deployment remain explicitly deferred.
+- The eight-role graph is fixed and incident-specific. It does not support dynamic role
+  creation, peer free chat, open-ended delegation, unbounded debate, or autonomous tools.
+- LangGraph checkpoint compatibility is enforced by graph/input version binding, but
+  long-lived production checkpoint migrations, pruning, restore, node renames, and
+  multi-version worker rollout remain unqualified.
+- The in-memory orchestration ledger is test/demo only. PostgreSQL schema/repository
+  integration is environment-gated; HA, partitioning, retention and load remain unproven.
+- The verification agent produces a plan only. Approval service/effects, effect fencing,
+  production verification/reconciliation, sandboxing, memory/RAG, UI, MCP/A2A, and
+  deployment remain explicitly deferred.
 
 These are explicit non-production boundaries, not implied capabilities.

@@ -16,6 +16,16 @@ context.
 **Non-causal correlation** — Deterministic timeline/shared-fact relationship that
 explicitly does not assert one event caused another.
 
+**Governance artifact** — Immutable schema-versioned neutral envelope binding tenant,
+incident, run, task, producer role, typed payload, provenance and canonical digest.
+
+**Specialist dispatch intent** — Application-ledger fact written before model work. A
+result is accepted only with the matching task fence; unresolved intent requires
+reconciliation.
+
+**Graph version binding** — Compatibility check joining a checkpoint to the exact
+tenant/run/request, canonical input digest and graph contract version.
+
 **Abstention**
 A deliberate non-answer when evidence, budget, validation, or corroboration is
 insufficient. It is not a successful empty investigation.

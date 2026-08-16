@@ -395,7 +395,7 @@ def test_checkpoint_reads_reauthorize_and_derive_tenant_thread() -> None:
             identity,
             incident_id=demo_request().incident_id,
         )
-        == 5
+        == 8
     )
     with pytest.raises(PolicyDenied):
         bundle.service.checkpoint_count(

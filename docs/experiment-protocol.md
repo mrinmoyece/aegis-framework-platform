@@ -61,6 +61,11 @@ compared layer.
 40. source policy/credential revocation, cancellation and stale-result exclusion;
 41. deterministic correlation order, conflict, freshness, missing source and citation;
 42. evidence forced-RLS isolation and application-event projection rebuild.
+43. fixed-role fan-out/fan-in and deterministic artifact order;
+44. role/capability and artifact-transition denial;
+45. duplicate task intent/result fencing and cancellation race;
+46. graph-version/input/checkpoint compatibility and projection rebuild;
+47. malformed/hostile specialist output, fabricated citations and critic rejection.
 
 Inputs, expected status, citation rules, and authority boundaries must match. A
 framework feature cannot be credited if the custom implementation is tested against
@@ -87,6 +92,9 @@ Capture on a clean checkout:
 - evidence correlation equivalent scenario against custom Aegis Layer 6
   `7a685bc52772e1c92467baba58a1c668646e9bf7`, including connector/parser dependencies,
   retained security controls, operational cost and whether framework use removed code.
+- governed specialist equivalent scenario against custom Aegis Layer 7
+  `dce0054a40c34ab4cc9d515aa753bc71d73fab57`, including fixed roles/artifacts,
+  scheduler/checkpoint LOC removed, remaining controls, operational cost and escape plan.
 
 Record OS, architecture, Python, framework versions, CPU/memory limits, network
 policy, and run count. Do not compare local Apple Silicon numbers with cloud x86

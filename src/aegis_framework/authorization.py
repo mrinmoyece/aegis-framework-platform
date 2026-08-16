@@ -28,6 +28,7 @@ class RoleCatalog:
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
+                Action.ORCHESTRATION_ARTIFACT_READ,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -39,6 +40,7 @@ class RoleCatalog:
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
+                Action.ORCHESTRATION_ARTIFACT_READ,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -55,6 +57,7 @@ class RoleCatalog:
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
+                Action.ORCHESTRATION_ARTIFACT_READ,
             }
         ),
         "tenant-auditor": frozenset(
@@ -66,6 +69,7 @@ class RoleCatalog:
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
+                Action.ORCHESTRATION_ARTIFACT_READ,
             }
         ),
         "workload-investigator": frozenset(
@@ -73,6 +77,7 @@ class RoleCatalog:
                 Action.INVESTIGATION_RUN,
                 Action.INVESTIGATION_READ,
                 Action.MODEL_CATALOG_READ,
+                Action.ORCHESTRATION_ARTIFACT_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
                 Action.QUOTA_READ,

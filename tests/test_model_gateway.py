@@ -996,7 +996,7 @@ def test_gateway_structured_generation_runs_inside_langgraph_nodes() -> None:
         evidence=evidence,
     )
     assert result.status.value == "complete"
-    assert result.critic.checked_citations == 4
+    assert result.critic.checked_citations == 8
     replay = investigator.run(
         tenant_id=identity.tenant_id,
         request=demo_request(),

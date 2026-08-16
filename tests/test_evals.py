@@ -12,8 +12,8 @@ from aegis_framework.evals import EvalCase, load_cases, run_eval_suite
 def test_repository_eval_cases_all_pass() -> None:
     cases = load_cases(Path("evals/cases.json"))
     report = run_eval_suite(cases)
-    assert report.total == 26
-    assert report.succeeded == 26
+    assert report.total == 31
+    assert report.succeeded == 31
     assert report.passed is True
     assert all(outcome.passed for outcome in report.outcomes)
 

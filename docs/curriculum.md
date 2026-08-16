@@ -1,4 +1,4 @@
-# Layer 5 curriculum
+# Layer 6 curriculum
 
 ## Learning outcomes
 
@@ -34,6 +34,12 @@ After this layer, an engineer should be able to:
 28. correlate timelines/conflicts deterministically without causal claims;
 29. rebuild forced-RLS evidence projections and expose redacted status/cursor APIs;
 30. critically compare narrow official clients with broad loader/connector frameworks.
+31. design immutable typed reasoning artifacts with provenance and canonical digests;
+32. enforce fixed role capabilities and artifact transitions without peer free chat;
+33. use LangGraph fan-out/fan-in/reducers while keeping authority in application ports;
+34. bind checkpoint replay to tenant/run/input/graph version and rebuild from ledger facts;
+35. assign Temporal, LangGraph, gateway and application-ledger retry ownership;
+36. compare Framework Layer 6 candidly with custom Aegis Layer 7.
 
 ## Suggested sequence
 
@@ -63,6 +69,9 @@ After this layer, an engineer should be able to:
 | Correlation | `correlation.py`, `graph.py` | Reverse input and add conflicts/stale sources | Why is proximity never cause? |
 | Evidence persistence/API | migration 0004, `evidence_postgres.py`, `api.py` | Rebuild and cross-tenant query/cursor reads | Which ledger facts rebuild status? |
 | Framework comparison | `framework-selection.md`, Layer 5 metrics | Compare custom Layer 6 LOC/deps/runtime | What code did frameworks actually remove? |
+| Governed artifacts | ADR 011, `orchestration.py` | Forge role, transition, provenance and digest | Which artifact fields can grant authority? |
+| Specialist graph | `graph.py` | Reverse branch completion and inject node failure | What does LangGraph remove versus retain? |
+| Replay and ledger | migration 0005, orchestration repository | Lose/tamper checkpoint then rebuild projection | Which state is disposable? |
 
 ## Practical exercises
 
@@ -90,6 +99,10 @@ After this layer, an engineer should be able to:
 16. Rotate a source credential revision during a page call and prove stale rejection.
 17. Add a scanner hook and prove blocking findings create quarantine metadata only.
 18. Add contradictory evidence in reverse order and prove identical non-causal output.
+19. Attempt dynamic role creation and an illegal artifact transition; prove denial.
+20. Leave task dispatch intent unresolved and prove retry does not duplicate the model call.
+21. Change graph version/input digest under an existing thread and prove replay fails closed.
+22. Rebuild the artifact projection without reading LangGraph state.
 
 ## Assessment rubric
 
