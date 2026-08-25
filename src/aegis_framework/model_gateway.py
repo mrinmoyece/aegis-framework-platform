@@ -1110,11 +1110,25 @@ class ModelGateway:
                 retryable=False,
                 billing=BillingDisposition.NOT_BILLED,
             )
-        return adapter.invoke(
-            entry=entry,
-            request=request,
-            credential_reference=entry.credential,
-        )
+        try:
+            return adapter.invoke(
+                entry=entry,
+                request=request,
+                credential_reference=entry.credential,
+            )
+        except ProviderInvocationError:
+            raise
+        except Exception as exc:
+            # An unexpected adapter failure (e.g. secret-resolver RuntimeError,
+            # non-SDK client exception) that escapes after append_requested()
+            # would leave the attempt reservation permanently pending and block
+            # retries.  Wrap it in a typed ambiguous-billing failure so the
+            # gateway reconciles the attempt record correctly.
+            raise ProviderInvocationError(
+                ModelErrorCode.UNAVAILABLE,
+                retryable=False,
+                billing=BillingDisposition.AMBIGUOUS,
+            ) from exc
 
     def _require_policy(self, request: ModelRequest) -> TenantModelPolicy:
         policy = self._store.current_policy(tenant_id=request.binding.tenant_id)

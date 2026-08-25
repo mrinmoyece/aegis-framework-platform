@@ -913,10 +913,20 @@ class PostgresModelControlStore:
         with tenant_transaction(self._pool, tenant_id=tenant_id) as connection:
             rows = connection.execute(
                 """
-                SELECT provider, model, region, observed_calls, failure_count
-                FROM aegis.provider_health_projection
-                WHERE tenant_id = %s
-                ORDER BY provider, model, region
+                SELECT
+                    c.provider,
+                    c.model,
+                    c.region,
+                    COALESCE(h.observed_calls, 0) AS observed_calls,
+                    COALESCE(h.failure_count, 0) AS failure_count
+                FROM aegis.model_catalog AS c
+                LEFT JOIN aegis.provider_health_projection AS h
+                    ON h.tenant_id = c.tenant_id
+                   AND h.provider = c.provider
+                   AND h.model = c.model
+                   AND h.region = c.region
+                WHERE c.tenant_id = %s AND c.enabled
+                ORDER BY c.provider, c.model, c.region
                 """,
                 (tenant_id,),
             ).fetchall()
@@ -925,7 +935,11 @@ class PostgresModelControlStore:
                 provider=ModelProvider(row["provider"]),
                 model=row["model"],
                 region=row["region"],
-                status=("degraded" if int(row["failure_count"]) else "healthy"),
+                status=(
+                    "unknown"
+                    if int(row["observed_calls"]) == 0
+                    else ("degraded" if int(row["failure_count"]) else "healthy")
+                ),
                 observed_calls=row["observed_calls"],
                 failure_count=row["failure_count"],
             )

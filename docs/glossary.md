@@ -111,8 +111,9 @@ that must pass domain validation.
 
 **Model gateway**
 Application-owned policy and accounting boundary that converts neutral model requests
-into one provider adapter call. It owns routing, reservation, resilience, settlement and
-stale-result rejection; it is not a hosted vendor gateway.
+into one or more provider adapter calls (each with a distinct durable attempt ID for
+reservation, resilience, and settlement). It owns routing, reservation, resilience,
+settlement and stale-result rejection; it is not a hosted vendor gateway.
 
 **Model catalog**
 Tenant-authorized declaration of exact provider/model/region capabilities, context/output

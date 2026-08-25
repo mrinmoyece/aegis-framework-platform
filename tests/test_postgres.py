@@ -10,13 +10,11 @@ import pytest
 from psycopg import Connection, Error
 from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
-from psycopg.types.json import Jsonb
-from pydantic import Field
 
 from aegis_framework.activity_runtime import DurableActivityRuntime
 from aegis_framework.adapters import FixedClock
 from aegis_framework.authorization import EnterprisePolicy
-from aegis_framework.domain import RiskLevel, StrictModel, stable_id
+from aegis_framework.domain import RiskLevel, stable_id
 from aegis_framework.durability import (
     CursorCodec,
     EventDraft,
@@ -32,6 +30,7 @@ from aegis_framework.errors import (
     ConcurrencyConflict,
     IntegrityFailure,
     OrchestrationFailure,
+    PolicyDenied,
     RepositoryUnavailable,
 )
 from aegis_framework.fixtures import (
@@ -56,7 +55,6 @@ from aegis_framework.model_gateway import (
     ModelRole,
     ModelRoute,
     ModelUsage,
-    StructuredOutputDefinition,
     TenantModelPolicy,
     TextContent,
 )
@@ -420,6 +418,122 @@ def test_live_quota_races_are_atomic_and_retry_idempotent() -> None:
         assert first == second
     finally:
         pool.close()
+
+
+def _seed_model_control(
+    admin_dsn: str,
+    *,
+    tenant_id: str = _TENANT_ALPHA,
+) -> tuple[TenantModelPolicy, ModelCatalogEntry]:
+    """Insert a model policy and catalog entry for integration tests."""
+    entry = ModelCatalogEntry(
+        tenant_id=tenant_id,
+        provider=ModelProvider.FAKE,
+        model="model-a",
+        region="eu-west-1",
+        capabilities=frozenset({ModelCapability.JSON_SCHEMA}),
+        context_tokens=8_192,
+        maximum_output_tokens=1_024,
+        tokenizer=None,
+        tokenizer_limitations="Conservative estimate.",
+        usage_limitations="Provider-reported after settlement.",
+        price=ModelPrice(
+            version="price-model-a-v1",
+            currency="USD",
+            input_microunits_per_million_tokens=2_000,
+            output_microunits_per_million_tokens=4_000,
+            cache_read_microunits_per_million_tokens=500,
+            cache_write_microunits_per_million_tokens=1_000,
+        ),
+        credential=CredentialReference(reference="secret:fake-model-a", version=1),
+        enabled=True,
+    )
+    policy = TenantModelPolicy(
+        tenant_id=tenant_id,
+        policy_id="model-policy-alpha",
+        revision=1,
+        allowed_providers=frozenset({ModelProvider.FAKE}),
+        allowed_models=frozenset({"model-a"}),
+        allowed_regions=frozenset({"eu-west-1"}),
+        allowed_data_classifications=frozenset({DataClassification.INTERNAL}),
+        allowed_purposes=frozenset({"incident-response"}),
+        required_capabilities=frozenset({ModelCapability.JSON_SCHEMA}),
+        risk_ceiling=RiskLevel.MEDIUM,
+        routes=(
+            ModelRoute(
+                provider=ModelProvider.FAKE,
+                model="model-a",
+                region="eu-west-1",
+                priority=1,
+            ),
+        ),
+        maximum_input_tokens=4_096,
+        maximum_output_tokens=1_024,
+        maximum_cost_microunits=100_000,
+        maximum_calls_per_run=5,
+        repair_attempts=1,
+        fallback_on_ambiguous_billing=False,
+    )
+    with Connection.connect(admin_dsn, autocommit=True) as admin:
+        admin.execute(
+            """
+            INSERT INTO aegis.model_catalog
+                (tenant_id, provider, model, region, document, enabled)
+            VALUES (%s, %s, %s, %s, %s::jsonb, true)
+            ON CONFLICT (tenant_id, provider, model, region) DO UPDATE
+                SET document = EXCLUDED.document, enabled = true
+            """,
+            (
+                tenant_id,
+                entry.provider.value,
+                entry.model,
+                entry.region,
+                entry.model_dump_json(),
+            ),
+        )
+        admin.execute(
+            """
+            INSERT INTO aegis.model_policies
+                (tenant_id, policy_id, revision, document, active)
+            VALUES (%s, %s, %s, %s::jsonb, true)
+            ON CONFLICT (tenant_id) DO UPDATE
+                SET policy_id = EXCLUDED.policy_id,
+                    revision = EXCLUDED.revision,
+                    document = EXCLUDED.document,
+                    active = true
+            """,
+            (tenant_id, policy.policy_id, policy.revision, policy.model_dump_json()),
+        )
+    return policy, entry
+
+
+def _model_request(
+    call_id: str,
+    *,
+    tenant_id: str = _TENANT_ALPHA,
+    run_id: str = "run:one",
+    purpose: str = "incident-response",
+) -> ModelRequest:
+    return ModelRequest(
+        binding=ModelCallBinding(
+            tenant_id=tenant_id,
+            run_id=run_id,
+            call_id=call_id,
+            purpose=purpose,
+            data_classification=DataClassification.INTERNAL,
+            risk=RiskLevel.MEDIUM,
+        ),
+        messages=(
+            ModelMessage(
+                role=ModelRole.USER,
+                content=(TextContent(text="Analyze the evidence."),),
+            ),
+        ),
+        max_output_tokens=100,
+        tools=(),
+        allowed_tool_names=(),
+        structured_output=None,
+    )
 
 
 @pytest.mark.postgres
