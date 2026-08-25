@@ -397,7 +397,7 @@ class DynatraceConnector:
             reference=source.credential_ref,
             expected_version=source.credential_version,
         )
-        _validate_secret(secret, query)
+        _validate_secret(secret, query, now=self._clock())
         parameters = (
             (("nextPageKey", cursor),)
             if cursor is not None
@@ -490,9 +490,14 @@ class GitHubAppConnector:
             reference=source.credential_ref,
             expected_version=source.credential_version,
         )
-        _validate_secret(secret, query)
+        _validate_secret(secret, query, now=self._clock())
         token = self._installation_token(secret, cancelled=cancelled)
-        page = int(cursor) if cursor is not None and cursor.isdigit() else page_number
+        if cursor is None:
+            page = page_number
+        elif cursor.isdigit():
+            page = int(cursor)
+        else:
+            raise ConnectorRejected("GitHub cursor is malformed")
         if page < 1 or page > query.bounds.maximum_pages:
             raise ConnectorRejected("GitHub cursor is outside the page bound")
         body, response = self._client.get_json(
@@ -865,13 +870,18 @@ def _build_connector_page(
         raise ConnectorRejected("connector page is outside schema bounds") from exc
 
 
-def _validate_secret(secret: SecretLease, query: EvidenceQuery) -> None:
+def _validate_secret(
+    secret: SecretLease,
+    query: EvidenceQuery,
+    *,
+    now: datetime,
+) -> None:
     source = query.source
     if (
         secret.tenant_id != query.tenant_id
         or secret.reference != source.credential_ref
         or secret.version != source.credential_version
-        or secret.expires_at <= query.created_at
+        or secret.expires_at <= now
     ):
         raise ConnectorRejected("connector credential binding is stale or invalid")
 
