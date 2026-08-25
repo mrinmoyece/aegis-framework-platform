@@ -10,6 +10,7 @@ import pytest
 from psycopg import Connection, Error
 from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
+from psycopg.types.json import Jsonb
 
 from aegis_framework.activity_runtime import DurableActivityRuntime
 from aegis_framework.adapters import FixedClock

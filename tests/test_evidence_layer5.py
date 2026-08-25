@@ -980,6 +980,7 @@ def _legacy_evidence(
             kind=kind,
             locator=locator,
             observed_at=observed_at,
+            summary=f"{kind.value} summary",
             facts=facts,
         ),
     )

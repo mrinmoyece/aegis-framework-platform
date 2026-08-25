@@ -378,13 +378,28 @@ class EvidenceBundle(StrictModel):
             if item.disposition
             in {EvidenceDisposition.ACCEPTED, EvidenceDisposition.REDACTED}
         }
+        cited_ids = {citation.evidence_id for citation in self.citations}
+        if cited_ids != set(accepted.keys()):
+            raise ValueError(
+                "bundle citations must cover exactly all accepted evidence"
+            )
         for citation in self.citations:
-            item = accepted.get(citation.evidence_id)
+            item = accepted[citation.evidence_id]
+            if item.tenant_id != self.tenant_id:
+                raise ValueError("evidence tenant_id does not match bundle")
+            if item.incident_id != self.incident_id:
+                raise ValueError("evidence incident_id does not match bundle")
+            if item.provenance.run_id != self.run_id:
+                raise ValueError("evidence run_id does not match bundle")
+            if item.provenance.query_id not in self.query_ids:
+                raise ValueError("evidence query_id is not in bundle query_ids")
             if (
-                item is None
-                or citation.locator != item.provenance.locator
+                citation.locator != item.provenance.locator
                 or citation.content_hash != item.content_hash
                 or citation.provenance_digest != item.provenance.digest
+                or citation.source_id != item.provenance.source_id
+                or citation.query_id != item.provenance.query_id
+                or citation.page_number != item.provenance.page_number
             ):
                 raise ValueError("bundle citation is not bound to accepted evidence")
         expected = canonical_digest(

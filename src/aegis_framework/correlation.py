@@ -57,12 +57,20 @@ def correlate_evidence(
     )
     present = {item.kind for item in ordered}
     missing = tuple(sorted(required_sources - present, key=lambda item: item.value))
+    # Freshness: a kind is stale only when its newest record is old.
+    latest_per_kind: dict[EvidenceKind, object] = {}
+    for item in ordered:
+        if (
+            item.kind not in latest_per_kind
+            or item.observed_at > latest_per_kind[item.kind]  # type: ignore[operator]
+        ):
+            latest_per_kind[item.kind] = item.observed_at
     stale = tuple(
         sorted(
             {
-                item.kind
-                for item in ordered
-                if reference_time - item.observed_at > _FRESHNESS[item.kind]
+                kind
+                for kind, latest_at in latest_per_kind.items()
+                if reference_time - latest_at > _FRESHNESS[kind]  # type: ignore[operator]
             },
             key=lambda item: item.value,
         )
@@ -91,10 +99,12 @@ def correlate_evidence(
         status = CorrelationStatus.STALE
     else:
         status = CorrelationStatus.COMPLETE
+    # CorrelationContext bounds: timeline ≤ 1,000 and links ≤ 2,000.
+    # Cap deterministically to avoid Pydantic validation errors on large inputs.
     return CorrelationContext(
         status=status,
-        timeline=timeline,
-        links=links,
+        timeline=timeline[:1_000],
+        links=tuple(sorted(links, key=lambda lnk: lnk.link_id))[:2_000],
         conflicts=conflicts,
         missing_sources=missing,
         stale_sources=stale,
@@ -196,6 +206,10 @@ def _citation(item: Evidence) -> Citation:
         evidence_id=item.evidence_id,
         locator=item.locator,
         content_hash=item.content_hash,
+        provenance_digest=item.provenance_digest,
+        source_id=item.source_id,
+        query_id=item.query_id,
+        page_number=item.page_number,
     )
 
 

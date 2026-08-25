@@ -12,19 +12,15 @@ import subprocess
 import sys
 import time
 import tomllib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pydantic import Field
 
 from aegis_framework.api import _demo_model_control
-from aegis_framework.correlation import correlate_evidence
 from aegis_framework.domain import (
-    Evidence,
-    EvidenceKind,
     RiskLevel,
     StrictModel,
-    evidence_hash,
 )
 from aegis_framework.fixtures import build_demo_bundle, demo_identity, demo_request
 from aegis_framework.model_gateway import (
@@ -432,6 +428,65 @@ def _gateway_runtime(runs: int) -> dict[str, float]:
     for index in range(runs):
         started = time.perf_counter_ns()
         gateway.generate(request(index), _BenchmarkOutput)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _evidence_runtime(runs: int) -> dict[str, float]:
+    from datetime import timedelta
+
+    from aegis_framework.evidence import (
+        DataClassification,
+        EvidenceBounds,
+        EvidenceQuery,
+        EvidenceSource,
+        EvidenceSourceKind,
+        EvidenceTimeRange,
+        SourceTrust,
+    )
+    from aegis_framework.evidence_runtime import (
+        CursorVault,
+        InMemoryEvidenceControlStore,
+    )
+
+    store = InMemoryEvidenceControlStore(
+        cursor_vault=CursorVault(b"b" * 32),
+    )
+    now = datetime(2026, 8, 15, 12, 0, 0, tzinfo=UTC)
+    source = EvidenceSource(
+        tenant_id="tenant-bench",
+        source_id="source-github",
+        kind=EvidenceSourceKind.GITHUB,
+        trust=SourceTrust.EXTERNAL_UNTRUSTED,
+        classification=DataClassification.INTERNAL,
+        region="eu-west-1",
+        policy_revision=1,
+        allowed_resources=("bench/repo/deployments",),
+        enabled=True,
+    )
+    durations: list[float] = []
+    for index in range(runs):
+        query = EvidenceQuery(
+            query_id=f"query-bench-{index}",
+            tenant_id="tenant-bench",
+            incident_id="bench-incident",
+            run_id=f"run-bench-{index}",
+            source=source,
+            window=EvidenceTimeRange(
+                start=now - timedelta(minutes=30),
+                end=now,
+            ),
+            resource="bench/repo/deployments",
+            parameters={},
+            bounds=EvidenceBounds(),
+            created_at=now,
+        )
+        started = time.perf_counter_ns()
+        store.request(query, operation_id=f"op-bench-{index}")
         durations.append((time.perf_counter_ns() - started) / 1_000_000)
     ordered = sorted(durations)
     return {

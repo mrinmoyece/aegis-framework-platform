@@ -140,6 +140,8 @@ class EvidenceControlStore(Protocol):
         self, *, tenant_id: str, query_id: str
     ) -> EvidenceCursorView | None: ...
 
+    def current_cursor_ref(self, *, tenant_id: str, query_id: str) -> str | None: ...
+
 
 class EvidenceStatusPort(Protocol):
     def status(self, *, tenant_id: str, query_id: str) -> EvidenceQueryView | None: ...
@@ -308,12 +310,17 @@ class InMemoryEvidenceControlStore:
             if self._page_intents.get(page_key) != operation_id:
                 raise ConcurrencyConflict("evidence page intent is not owned")
             self._page_results.add(page_key)
-            current_ids = {
+            # Update the deduplicated set incrementally so two records with the
+            # same derived evidence ID in one page do not both get stored.
+            current_ids: set[str] = {
                 item.evidence_id for item in self._evidence.get(query_key, ())
             }
-            self._evidence.setdefault(query_key, []).extend(
-                item for item in evidence if item.evidence_id not in current_ids
-            )
+            new_items: list[NormalizedEvidence] = []
+            for item in evidence:
+                if item.evidence_id not in current_ids:
+                    current_ids.add(item.evidence_id)
+                    new_items.append(item)
+            self._evidence.setdefault(query_key, []).extend(new_items)
             cursor = None
             if next_cursor is not None:
                 digest = sha256(next_cursor.encode()).hexdigest()
@@ -475,6 +482,13 @@ class InMemoryEvidenceControlStore:
             expires_at=cursor.expires_at,
             available=cursor.expires_at > self._clock(),
         )
+
+    def current_cursor_ref(self, *, tenant_id: str, query_id: str) -> str | None:
+        item = self._cursors.get((tenant_id, query_id))
+        if item is None:
+            return None
+        cursor, _ = item
+        return cursor.cursor_ref
 
     def events(
         self, *, tenant_id: str, query_id: str
@@ -673,10 +687,26 @@ class EvidenceCollector:
                         query_id=query.query_id,
                     )
                     if current is None:
+                        # Page already completed without a continuation cursor —
+                        # the query finished before this restart.
                         break
-                    raise ReconciliationRequired(
-                        "completed evidence page cannot resume without internal cursor"
+                    # Page already completed with a cursor: reload it and
+                    # continue rather than treating this resolved state as an
+                    # unresolved intent.
+                    cursor_ref = self._store.current_cursor_ref(
+                        tenant_id=query.tenant_id,
+                        query_id=query.query_id,
                     )
+                    if cursor_ref is None:
+                        raise IntegrityFailure(
+                            "evidence cursor checkpoint lost after page completion"
+                        )
+                    cursor = self._store.cursor_value(
+                        tenant_id=query.tenant_id,
+                        query_id=query.query_id,
+                        cursor_ref=cursor_ref,
+                    )
+                    continue
                 page = connector.fetch_page(
                     query,
                     cursor=cursor,
@@ -687,6 +717,17 @@ class EvidenceCollector:
                     ),
                 )
                 self._require_current(query)
+                # Reject the page if its binding fields do not match the
+                # current query — a defective adapter cannot relabel pages
+                # from another query/source/page under this query's provenance.
+                if (
+                    page.query_id != query.query_id
+                    or page.source_id != query.source.source_id
+                    or page.page_number != page_number
+                ):
+                    raise ConnectorRejected(
+                        "connector page binding does not match evidence query"
+                    )
                 total_records += len(page.records)
                 total_bytes += page.response_bytes
                 if (
