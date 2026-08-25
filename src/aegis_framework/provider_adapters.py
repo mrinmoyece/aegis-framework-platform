@@ -27,7 +27,11 @@ from aegis_framework.model_gateway import (
     ProviderResult,
     SafetyAssessment,
     TextContent,
+    validate_provider_base_url,
 )
+
+_OPENAI_BASE_URL = "https://api.openai.com/v1"
+_ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 
 
 class SecretResolver(Protocol):
@@ -107,9 +111,16 @@ class OpenAIProviderAdapter(ModelProviderAdapter):
         resolver: SecretResolver,
         *,
         timeout_seconds: float = 60.0,
+        base_url: str = _OPENAI_BASE_URL,
     ) -> OpenAIProviderAdapter:
         if timeout_seconds <= 0 or timeout_seconds > 300:
             raise ValueError("OpenAI timeout bound is invalid")
+        validated_base_url = validate_provider_base_url(
+            base_url,
+            provider="OpenAI",
+            default_host="api.openai.com",
+            default_path_prefix="/v1",
+        )
 
         def factory(reference: CredentialReference) -> _OpenAIClient:
             from openai import DefaultHttpxClient, OpenAI
@@ -120,6 +131,7 @@ class OpenAIProviderAdapter(ModelProviderAdapter):
                     api_key=resolver.resolve(reference),
                     max_retries=0,
                     timeout=timeout_seconds,
+                    base_url=validated_base_url,
                     http_client=DefaultHttpxClient(trust_env=False),
                 ),
             )
@@ -220,9 +232,16 @@ class AnthropicProviderAdapter(ModelProviderAdapter):
         resolver: SecretResolver,
         *,
         timeout_seconds: float = 60.0,
+        base_url: str = _ANTHROPIC_BASE_URL,
     ) -> AnthropicProviderAdapter:
         if timeout_seconds <= 0 or timeout_seconds > 300:
             raise ValueError("Anthropic timeout bound is invalid")
+        validated_base_url = validate_provider_base_url(
+            base_url,
+            provider="Anthropic",
+            default_host="api.anthropic.com",
+            default_path_prefix="",
+        )
 
         def factory(reference: CredentialReference) -> _AnthropicClient:
             from anthropic import Anthropic, DefaultHttpxClient
@@ -233,6 +252,7 @@ class AnthropicProviderAdapter(ModelProviderAdapter):
                     api_key=resolver.resolve(reference),
                     max_retries=0,
                     timeout=timeout_seconds,
+                    base_url=validated_base_url,
                     http_client=DefaultHttpxClient(trust_env=False),
                 ),
             )

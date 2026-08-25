@@ -11,6 +11,7 @@ from enum import StrEnum
 from hashlib import sha256
 from threading import BoundedSemaphore, Lock
 from typing import Protocol, TypeVar
+from urllib.parse import urlsplit
 
 from pydantic import (
     AwareDatetime,
@@ -175,6 +176,16 @@ class ModelRequest(StrictModel):
     @classmethod
     def normalize_tools(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(sorted(set(value)))
+
+    @field_validator("tools")
+    @classmethod
+    def require_unique_tool_names(
+        cls, value: tuple[ToolDefinition, ...]
+    ) -> tuple[ToolDefinition, ...]:
+        names = [tool.name for tool in value]
+        if len(names) != len(set(names)):
+            raise ValueError("tool definitions must use unique names")
+        return value
 
     @field_validator("messages")
     @classmethod
@@ -1292,3 +1303,29 @@ def _canonical_json(value: object) -> bytes:
 
 def _digest(value: object) -> str:
     return sha256(_canonical_json(value)).hexdigest()
+
+
+def validate_provider_base_url(
+    value: str,
+    *,
+    provider: str,
+    default_host: str,
+    default_path_prefix: str,
+) -> str:
+    parsed = urlsplit(value)
+    if parsed.scheme != "https":
+        raise ValueError(f"{provider} base URL must use https")
+    if (
+        not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(f"{provider} base URL is invalid")
+    if parsed.hostname != default_host:
+        raise ValueError(f"{provider} base URL host is not allowlisted")
+    path = parsed.path.rstrip("/")
+    if path != default_path_prefix:
+        raise ValueError(f"{provider} base URL path is not allowlisted")
+    return f"https://{default_host}{default_path_prefix}"

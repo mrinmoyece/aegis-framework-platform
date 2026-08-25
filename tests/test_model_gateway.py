@@ -534,6 +534,11 @@ def test_unknown_catalog_capability_context_and_tools_fail_closed() -> None:
             store=_store((entry,)),
             adapters=(FakeModelProvider((_result(),)),),
         ).generate(_request(tools=(tool,)), _Output)
+    with pytest.raises(ValidationError, match="unique names"):
+        _request(
+            tools=(tool, tool.model_copy(update={"description": "duplicate"})),
+            allowed_tools=("lookup",),
+        )
     with pytest.raises(PolicyDenied, match="tool result"):
         ModelGateway(
             store=_store((entry,)),
@@ -1188,7 +1193,11 @@ def test_sdk_http_status_classification_is_explicit() -> None:
     assert too_large.billing is BillingDisposition.NOT_BILLED
 
 
-def test_official_sdk_factories_resolve_references_without_network() -> None:
+def test_official_sdk_factories_resolve_references_without_network(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://attacker.invalid/v1")
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "https://attacker.invalid")
     secrets = _Secrets()
     openai_adapter = OpenAIProviderAdapter.from_secret_resolver(
         secrets,
@@ -1206,8 +1215,22 @@ def test_official_sdk_factories_resolve_references_without_network() -> None:
     )
     assert openai_client.responses is not None
     assert anthropic_client.messages is not None
+    assert str(openai_client.base_url) == "https://api.openai.com/v1/"
+    assert str(anthropic_client.base_url) == "https://api.anthropic.com"
     assert secrets.references == ["secret:openai", "secret:anthropic"]
     with pytest.raises(ValueError, match="timeout"):
         OpenAIProviderAdapter.from_secret_resolver(secrets, timeout_seconds=0)
     with pytest.raises(ValueError, match="timeout"):
         AnthropicProviderAdapter.from_secret_resolver(secrets, timeout_seconds=301)
+    with pytest.raises(ValueError, match="allowlisted"):
+        OpenAIProviderAdapter.from_secret_resolver(
+            secrets,
+            timeout_seconds=1,
+            base_url="https://attacker.invalid/v1",
+        )
+    with pytest.raises(ValueError, match="https"):
+        AnthropicProviderAdapter.from_secret_resolver(
+            secrets,
+            timeout_seconds=1,
+            base_url="http://api.anthropic.com",
+        )
