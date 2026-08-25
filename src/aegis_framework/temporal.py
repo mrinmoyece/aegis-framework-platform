@@ -79,6 +79,7 @@ class TemporalActivityInput(StrictModel):
     run_id: Identifier
     operation_id: Identifier
     command_ref: Identifier | None = None
+    failure_code: Identifier | None = None
 
 
 class TemporalSignal(StrictModel):
@@ -298,19 +299,23 @@ class AegisInvestigationWorkflow:
                     cancelled = None
                 if cancelled is not None:
                     return cancelled
-            await self._record_failure(value)
+            failure_code = _activity_failure_code(exc)
+            if not await self._record_failure(value, failure_code=failure_code):
+                raise
             return TemporalWorkflowResult(
                 run_id=value.run_id,
                 status=RunStatus.FAILED,
-                failure_code=_activity_failure_code(exc),
+                failure_code=failure_code,
             )
         except ApplicationError as exc:
             self._stage = "failed"
-            await self._record_failure(value)
+            failure_code = _application_failure_code(exc)
+            if not await self._record_failure(value, failure_code=failure_code):
+                raise
             return TemporalWorkflowResult(
                 run_id=value.run_id,
                 status=RunStatus.FAILED,
-                failure_code=_application_failure_code(exc),
+                failure_code=failure_code,
             )
 
     @workflow.signal(name="resume")
@@ -402,6 +407,7 @@ class AegisInvestigationWorkflow:
         operation: str,
         *,
         command_ref: str | None = None,
+        failure_code: str | None = None,
     ) -> TemporalActivityInput:
         return TemporalActivityInput(
             tenant_ref=value.tenant_ref,
@@ -410,21 +416,30 @@ class AegisInvestigationWorkflow:
             run_id=value.run_id,
             operation_id=f"{operation}:{value.run_id}",
             command_ref=command_ref,
+            failure_code=failure_code,
         )
 
     @staticmethod
-    async def _record_failure(value: TemporalWorkflowInput) -> None:
+    async def _record_failure(
+        value: TemporalWorkflowInput, *, failure_code: str
+    ) -> bool:
         try:
-            await workflow.execute_activity(
+            result = await workflow.execute_activity(
                 "aegis.fail",
-                AegisInvestigationWorkflow._input(value, "fail"),
+                AegisInvestigationWorkflow._input(
+                    value,
+                    "fail",
+                    failure_code=failure_code,
+                ),
                 result_type=ActivityOutcome,
                 start_to_close_timeout=timedelta(seconds=30),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
+            outcome = ActivityOutcome.model_validate(result)
+            return outcome.outcome in {"recorded", "duplicate"}
         except ActivityError:
             # The application remains non-terminal for explicit operator reconciliation.
-            return
+            return False
 
 
 class TemporalActivities:

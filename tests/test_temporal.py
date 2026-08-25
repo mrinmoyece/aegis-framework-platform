@@ -5,7 +5,12 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 from temporalio.api.common.v1 import Payload
-from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
+from temporalio.common import RetryPolicy
+from temporalio.exceptions import (
+    ActivityError,
+    ApplicationError,
+    WorkflowAlreadyStartedError,
+)
 from temporalio.testing import ActivityEnvironment
 
 from aegis_framework.activity_runtime import CallbackActivityOperations
@@ -20,6 +25,7 @@ from aegis_framework.errors import IntegrityFailure, PayloadRejected, PolicyDeni
 from aegis_framework.fixtures import DEMO_TIME
 from aegis_framework.temporal import (
     ActivityOutcome,
+    AegisInvestigationWorkflow,
     BoundedPayloadCodec,
     TemporalActivities,
     TemporalActivityInput,
@@ -353,3 +359,95 @@ def test_callback_operations_cover_each_workflow_boundary() -> None:
         "recorded",
         "recorded",
     ]
+
+
+def test_workflow_failure_recording_threads_failure_code_into_fail_activity() -> None:
+    captured: dict[str, object] = {}
+
+    async def fake_execute_activity(
+        name: str,
+        value: TemporalActivityInput,
+        *,
+        result_type: type[ActivityOutcome],
+        start_to_close_timeout: object,
+        retry_policy: RetryPolicy,
+    ) -> ActivityOutcome:
+        captured["name"] = name
+        captured["value"] = value
+        captured["result_type"] = result_type
+        captured["timeout"] = start_to_close_timeout
+        captured["retry_policy"] = retry_policy
+        return ActivityOutcome(outcome="recorded")
+
+    from aegis_framework import temporal as temporal_module
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        temporal_module.workflow, "execute_activity", fake_execute_activity
+    )
+    try:
+        recorded = asyncio.run(
+            AegisInvestigationWorkflow._record_failure(
+                TemporalWorkflowInput(
+                    tenant_ref="tenant:opaque",
+                    actor_ref="actor:opaque",
+                    request_ref="request:opaque",
+                    run_id="run:opaque",
+                    workflow_id="workflow:opaque",
+                ),
+                failure_code="authorization_denied",
+            )
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert recorded is True
+    assert captured["name"] == "aegis.fail"
+    recorded_input = captured["value"]
+    assert isinstance(recorded_input, TemporalActivityInput)
+    assert recorded_input.failure_code == "authorization_denied"
+
+
+def test_workflow_failure_recording_fails_closed_when_ledger_write_fails() -> None:
+    async def fake_execute_activity(
+        name: str,
+        value: TemporalActivityInput,
+        *,
+        result_type: type[ActivityOutcome],
+        start_to_close_timeout: object,
+        retry_policy: RetryPolicy,
+    ) -> ActivityOutcome:
+        del name, value, result_type, start_to_close_timeout, retry_policy
+        raise ActivityError(
+            "ledger write failed",
+            scheduled_event_id=1,
+            started_event_id=2,
+            identity="worker:test",
+            activity_type="aegis.fail",
+            activity_id="activity:fail",
+            retry_state=None,
+        )
+
+    from aegis_framework import temporal as temporal_module
+
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.setattr(
+        temporal_module.workflow, "execute_activity", fake_execute_activity
+    )
+    try:
+        recorded = asyncio.run(
+            AegisInvestigationWorkflow._record_failure(
+                TemporalWorkflowInput(
+                    tenant_ref="tenant:opaque",
+                    actor_ref="actor:opaque",
+                    request_ref="request:opaque",
+                    run_id="run:opaque",
+                    workflow_id="workflow:opaque",
+                ),
+                failure_code="activity_failure",
+            )
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert recorded is False

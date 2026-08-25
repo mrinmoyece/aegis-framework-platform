@@ -739,6 +739,35 @@ def test_activity_failure_cannot_override_accepted_cancellation() -> None:
     assert current.status is RunStatus.CANCELLED
 
 
+def test_activity_failure_persists_specific_failure_code() -> None:
+    runtime, store, _, value = _activity_runtime()
+
+    async def execute() -> None:
+        await runtime.authorize(value)
+        outcome = await runtime.fail(
+            value.model_copy(
+                update={
+                    "failure_code": "authorization_denied",
+                    "operation_id": "fail:specific-code",
+                }
+            )
+        )
+        assert outcome.outcome == "recorded"
+
+    asyncio.run(execute())
+    current = store.get_run(tenant_id="tenant-acme", run_id=value.run_id)
+    assert current is not None
+    assert current.status is RunStatus.FAILED
+    assert current.failure_code == "authorization_denied"
+    failure_event = store.events(
+        tenant_id="tenant-acme",
+        aggregate_type="investigation",
+        aggregate_id=value.run_id,
+    )[-1]
+    assert failure_event.event_type == "investigation.failed"
+    assert failure_event.payload["failure_code"] == "authorization_denied"
+
+
 def test_signal_authorization_uses_current_signaller_not_workflow_payload() -> None:
     runtime, store, authority, value = _activity_runtime()
     identity = demo_identity(request_id="signal-current")

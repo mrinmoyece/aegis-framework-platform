@@ -375,7 +375,7 @@ class DurableActivityRuntime(ActivityOperations):
             operation_id=value.operation_id,
             actor_ref="system:temporal-worker",
             request_ref=current.request_ref,
-            failure_code="temporal_activity_failure",
+            failure_code=value.failure_code or "temporal_activity_failure",
         )
         return ActivityOutcome(outcome="recorded")
 
