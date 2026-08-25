@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from datetime import datetime
 from enum import StrEnum
@@ -278,10 +279,27 @@ def evidence_hash(
     locator: str,
     observed_at: datetime,
     facts: Mapping[str, FactValue],
+    summary: str,
+    untrusted_text: str | None = None,
 ) -> str:
-    canonical_facts = "|".join(f"{key}={facts[key]!r}" for key in sorted(facts))
-    material = (
-        f"{tenant_id}\x00{kind.value}\x00{locator}\x00"
-        f"{observed_at.isoformat()}\x00{canonical_facts}"
+    # Use JSON for an unambiguous canonical serialisation that handles all
+    # fact key/value types without delimiter-collision risk.
+    canonical_facts = json.dumps(
+        {key: facts[key] for key in sorted(facts)},
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    # Bind every field that influences safety decisions so that post-creation
+    # mutations of summary or untrusted_text invalidate the content hash.
+    material = "\x00".join(
+        [
+            tenant_id,
+            kind.value,
+            locator,
+            observed_at.isoformat(),
+            canonical_facts,
+            summary,
+            untrusted_text if untrusted_text is not None else "",
+        ]
     )
     return sha256(material.encode()).hexdigest()

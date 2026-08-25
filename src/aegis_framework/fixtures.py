@@ -218,6 +218,8 @@ def _evidence(
         locator=locator,
         observed_at=DEMO_TIME,
         facts=facts,
+        summary=summary,
+        untrusted_text=untrusted_text,
     )
     return Evidence(
         evidence_id=stable_id("evidence", tenant_id, kind.value, locator),

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from threading import Lock
 from typing import Annotated
 
 from fastapi import FastAPI, Header, HTTPException, status
@@ -23,11 +22,10 @@ from aegis_framework.errors import (
     InvestigationInProgress,
     PolicyDenied,
 )
-from aegis_framework.fixtures import DemoBundle, DemoScenario, build_demo_bundle
+from aegis_framework.fixtures import DemoScenario, build_demo_bundle
 
 
 class ApiInvestigationRequest(StrictModel):
-    scenario: DemoScenario = DemoScenario.SUCCESS
     incident_id: Identifier
     alert: CheckoutAlert
 
@@ -38,34 +36,24 @@ class HealthResponse(StrictModel):
     effects_enabled: bool
 
 
-def create_app(*, budget_units: int = 10_000) -> FastAPI:
+def create_app(
+    *,
+    scenario: DemoScenario = DemoScenario.SUCCESS,
+    budget_units: int = 10_000,
+) -> FastAPI:
     if budget_units < 5:
         raise ValueError("API demo budget must permit at least one investigation")
-    bundles: dict[DemoScenario, DemoBundle] = {}
-    bundle_lock = Lock()
+    # Build a single bundle at startup. Budget and idempotency state are shared
+    # at the app boundary so callers cannot exhaust one scenario's registry and
+    # re-enter via a different scenario with fresh authority state.
+    bundle = build_demo_bundle(scenario, use_otel=True, budget_units=budget_units)
     app = FastAPI(
         title="Aegis Framework Platform",
         version="0.1.0",
         description="Deterministic Layer 1 checkout investigation API.",
     )
-    app.state.demo_bundles = bundles
+    app.state.demo_bundle = bundle
     app.state.demo_budget_units = budget_units
-
-    def bundle_for(scenario: DemoScenario) -> DemoBundle:
-        existing = bundles.get(scenario)
-        if existing is not None:
-            return existing
-        with bundle_lock:
-            existing = bundles.get(scenario)
-            if existing is not None:
-                return existing
-            created = build_demo_bundle(
-                scenario,
-                use_otel=True,
-                budget_units=budget_units,
-            )
-            bundles[scenario] = created
-            return created
 
     @app.get("/healthz", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -108,7 +96,7 @@ def create_app(*, budget_units: int = 10_000) -> FastAPI:
                 detail="identity headers are invalid",
             ) from exc
         try:
-            return bundle_for(payload.scenario).service.investigate(identity, request)
+            return bundle.service.investigate(identity, request)
         except PolicyDenied as exc:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from enum import StrEnum
 
@@ -58,6 +59,8 @@ class DeterministicStructuredModel:
             or isinstance(value, bool)
             or not isinstance(threshold, (int, float))
             or isinstance(threshold, bool)
+            or not math.isfinite(value)
+            or not math.isfinite(threshold)
         ):
             return _abstention(task, "telemetry_signal_malformed")
         if value <= threshold:
@@ -68,7 +71,7 @@ class DeterministicStructuredModel:
             None,
         )
         cause_code = (
-            "post_deploy_regression"
+            "post_deploy_error_spike"
             if change is not None and change.facts.get("status") == "deployed"
             else "traffic_or_dependency_anomaly"
         )
@@ -134,14 +137,14 @@ class DeterministicStructuredModel:
                 "finding",
                 task.incident_id,
                 task.specialist.value,
-                "post_deploy_regression",
+                "post_deploy_error_spike",
             ),
             specialist=task.specialist,
             statement=(
                 f"Deployment {change.facts.get('version', 'unknown')} preceded the "
                 f"alert by {minutes} minutes."
             ),
-            cause_code="post_deploy_regression",
+            cause_code="post_deploy_error_spike",
             confidence=0.89,
             citations=tuple(citations),
         )

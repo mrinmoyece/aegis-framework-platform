@@ -69,6 +69,7 @@ def test_evidence_hash_and_ids_are_stable() -> None:
         "locator": "otel://one",
         "observed_at": datetime(2026, 8, 15, tzinfo=UTC),
         "facts": facts,
+        "summary": "test summary",
     }
     assert evidence_hash(**kwargs) == evidence_hash(
         **{**kwargs, "facts": {"a": 1, "b": 2}}

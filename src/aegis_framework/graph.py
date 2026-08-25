@@ -372,8 +372,23 @@ def _proposal_from_runbook(
         or runbook.facts.get("action") != "rollback_candidate"
     ):
         return None
-    service = str(change.facts.get("service", "checkout-api"))
-    version = str(change.facts.get("version", "unknown"))
+    # Require the change record to carry explicit, non-empty service and version
+    # rather than inventing a rollback target from defaults.
+    service = change.facts.get("service")
+    version = change.facts.get("version")
+    if not isinstance(service, str) or not service.strip():
+        return None
+    if not isinstance(version, str) or not version.strip():
+        return None
+    # Bind the proposal to the runbook's declared scope: the service must match
+    # the change record and the runbook condition must agree with the corroborated
+    # hypothesis cause.
+    runbook_service = runbook.facts.get("service")
+    runbook_condition = runbook.facts.get("condition")
+    if runbook_service != service:
+        return None
+    if runbook_condition != hypothesis.cause_code:
+        return None
     target = f"{service}:{version}"
     try:
         return RemediationProposal(

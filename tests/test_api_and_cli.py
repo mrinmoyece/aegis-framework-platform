@@ -26,10 +26,9 @@ def _headers(
     }
 
 
-def _payload(scenario: str = "success") -> dict[str, object]:
+def _payload() -> dict[str, object]:
     request = demo_request()
     return {
-        "scenario": scenario,
         "incident_id": request.incident_id,
         "alert": request.alert.model_dump(mode="json"),
     }

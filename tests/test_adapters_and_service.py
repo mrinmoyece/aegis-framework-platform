@@ -289,7 +289,7 @@ def test_audit_failure_does_not_wedge_idempotency() -> None:
         orchestrator=bundle.orchestrator,
         audit=_FailOnceAcceptedAudit(),
     )
-    with pytest.raises(RuntimeError, match="audit unavailable"):
+    with pytest.raises(OrchestrationFailure):
         service.investigate(identity, demo_request())
     result = service.investigate(identity, demo_request())
     assert result.status.value == "complete"

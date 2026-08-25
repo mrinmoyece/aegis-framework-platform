@@ -230,15 +230,33 @@ class InvestigationService:
                     observation, status="failed", attributes={"error_code": code}
                 )
                 raise
-            except Exception:
+            except Exception as exc:
+                code = "unexpected_failure"
                 if not finalized:
                     with suppress(IdempotencyConflict):
                         self._idempotency.fail(
                             tenant_id=identity.tenant_id,
                             request_id=identity.request_id,
-                            code="unexpected_failure",
+                            code=code,
                         )
-                raise
+                    with suppress(Exception):
+                        self._audit.append(
+                            identity=identity,
+                            event_type="investigation.failed",
+                            attributes={
+                                "request_id": identity.request_id,
+                                "error_code": code,
+                            },
+                        )
+                    with suppress(Exception):
+                        _finish_observation(
+                            observation,
+                            status="failed",
+                            attributes={"error_code": code},
+                        )
+                raise OrchestrationFailure(
+                    f"unexpected adapter error: {type(exc).__name__}"
+                ) from exc
 
     def checkpoint_count(
         self,
@@ -322,6 +340,8 @@ def _validate_evidence(
             locator=item.locator,
             observed_at=item.observed_at,
             facts=dict(item.facts),
+            summary=item.summary,
+            untrusted_text=item.untrusted_text,
         )
         if item.content_hash != expected_hash:
             raise EvidenceUnavailable("evidence content hash validation failed")
