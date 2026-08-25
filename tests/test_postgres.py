@@ -7,16 +7,18 @@ from uuid import uuid4
 
 import pytest
 from psycopg import Connection, Error
+from psycopg.pq import TransactionStatus
 from psycopg.rows import dict_row
 
 from aegis_framework.adapters import FixedClock
-from aegis_framework.errors import OrchestrationFailure
+from aegis_framework.errors import OrchestrationFailure, RepositoryUnavailable
 from aegis_framework.fixtures import DEMO_TIME, demo_identity, demo_request
 from aegis_framework.model import DeterministicStructuredModel
 from aegis_framework.postgres import (
     PostgresRepository,
     RuntimePool,
     TenantPostgresOrchestrator,
+    _reset_runtime_connection,
     open_runtime_pool,
     setup_postgres,
     tenant_transaction,
@@ -137,6 +139,74 @@ def _repository_context() -> tuple[str, RuntimePool, PostgresRepository]:
     pool = open_runtime_pool(dsn=runtime_dsn, minimum_size=1, maximum_size=12)
     repository = PostgresRepository(pool=pool, clock=FixedClock(DEMO_TIME))
     return admin_dsn, pool, repository
+
+
+class _FakeCursorResult:
+    def __init__(self, row: dict[str, object] | None) -> None:
+        self._row = row
+
+    def fetchone(self) -> dict[str, object] | None:
+        return self._row
+
+
+class _FakeConnectionInfo:
+    def __init__(self) -> None:
+        self.transaction_status = TransactionStatus.IDLE
+
+
+class _FakeConnection:
+    def __init__(
+        self,
+        *,
+        tenant_id: str | None = None,
+        current_user: str = "aegis_runtime",
+        row_security: str = "on",
+    ) -> None:
+        self.info = _FakeConnectionInfo()
+        self._tenant_id = tenant_id
+        self._current_user = current_user
+        self._row_security = row_security
+        self.rollbacks = 0
+        self.commits = 0
+
+    def execute(
+        self, query: str, parameters: tuple[object, ...] | None = None
+    ) -> _FakeCursorResult:
+        del parameters
+        if "current_setting('aegis.tenant_id'" in query:
+            return _FakeCursorResult({"tenant_id": self._tenant_id})
+        if query == "RESET aegis.tenant_id":
+            self._tenant_id = None
+            return _FakeCursorResult(None)
+        if "SELECT current_user AS current_user" in query:
+            return _FakeCursorResult(
+                {
+                    "current_user": self._current_user,
+                    "rolsuper": False,
+                    "rolbypassrls": False,
+                }
+            )
+        if query == "SHOW row_security":
+            return _FakeCursorResult({"row_security": self._row_security})
+        raise AssertionError(f"unexpected query: {query}")
+
+    def rollback(self) -> None:
+        self.rollbacks += 1
+
+    def commit(self) -> None:
+        self.commits += 1
+
+
+def test_pool_reset_detects_leaked_tenant_and_session_drift() -> None:
+    leaked = _FakeConnection(tenant_id="tenant-acme")
+    with pytest.raises(RepositoryUnavailable, match="tenant context leaked"):
+        _reset_runtime_connection(leaked)  # pyright: ignore[reportArgumentType]
+    assert leaked._tenant_id is None
+    assert leaked.commits == 1
+
+    drifted = _FakeConnection(row_security="off")
+    with pytest.raises(RepositoryUnavailable, match="secure defaults"):
+        _reset_runtime_connection(drifted)  # pyright: ignore[reportArgumentType]
 
 
 @pytest.mark.postgres

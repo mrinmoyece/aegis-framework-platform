@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aegis_framework.api import AppMode, create_app
+from aegis_framework.api import ApiRuntime, AppMode, create_app
 from aegis_framework.cli import main
-from aegis_framework.errors import OptionalDependencyMissing
+from aegis_framework.errors import IdentityUnavailable, OptionalDependencyMissing
 from aegis_framework.fixtures import demo_request
 
 _DEFAULT_BEARER = "demo-responder-token"
@@ -146,6 +146,10 @@ def test_endpoint_denial_and_validation() -> None:
         json={**_payload(), "incident_id": "bad incident id"},
     )
     assert bad_incident.status_code == 422
+    bad_tenant = client.get(
+        "/v1/tenants/bad tenant", headers=_headers(request_id="api-bad-tenant")
+    )
+    assert bad_tenant.status_code == 422
     malformed_request_id = client.post(
         "/v1/investigations",
         headers=_headers(request_id="bad request id"),
@@ -161,6 +165,28 @@ def test_endpoint_denial_and_validation() -> None:
         json=_payload(),
     )
     assert oversized_auth.status_code == 401
+
+
+def test_authorization_dependency_failures_return_503() -> None:
+    bundle = create_app(mode=AppMode.DEMO).state.runtime
+
+    class _UnavailablePolicy:
+        def authorize(self, *args: object, **kwargs: object) -> object:
+            del args, kwargs
+            raise IdentityUnavailable("policy backend offline")
+
+    runtime = ApiRuntime(
+        authenticator=bundle.authenticator,
+        governance=bundle.governance,
+        policy=_UnavailablePolicy(),
+        service_for=bundle.service_for,
+    )
+    client = TestClient(create_app(mode=AppMode.TEST, runtime=runtime))
+    response = client.get(
+        "/v1/tenants/tenant-acme", headers=_headers(request_id="api-policy-down")
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "authorization service is unavailable"
 
 
 def test_oversized_body_is_rejected_before_validation() -> None:

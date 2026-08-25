@@ -216,9 +216,21 @@ def _configure_runtime_connection(connection: DictConnection) -> None:
     connection.execute("SET statement_timeout = '10s'")
     connection.execute("SET lock_timeout = '3s'")
     connection.execute("SET idle_in_transaction_session_timeout = '15s'")
+    _assert_runtime_session_security(
+        connection,
+        failure_message="runtime database role can bypass tenant RLS",
+    )
+    connection.commit()
+
+
+def _assert_runtime_session_security(
+    connection: DictConnection,
+    *,
+    failure_message: str,
+) -> None:
     role = connection.execute(
         """
-        SELECT rolsuper, rolbypassrls
+        SELECT current_user AS current_user, rolsuper, rolbypassrls
         FROM pg_roles
         WHERE rolname = current_user
         """
@@ -226,13 +238,13 @@ def _configure_runtime_connection(connection: DictConnection) -> None:
     row_security = connection.execute("SHOW row_security").fetchone()
     if (
         role is None
+        or role["current_user"] != "aegis_runtime"
         or bool(role["rolsuper"])
         or bool(role["rolbypassrls"])
         or row_security is None
         or row_security["row_security"] != "on"
     ):
-        raise RepositoryUnavailable("runtime database role can bypass tenant RLS")
-    connection.commit()
+        raise RepositoryUnavailable(failure_message)
 
 
 def _reset_runtime_connection(connection: DictConnection) -> None:
@@ -246,6 +258,13 @@ def _reset_runtime_connection(connection: DictConnection) -> None:
         connection.execute("RESET aegis.tenant_id")
         connection.commit()
         raise RepositoryUnavailable("tenant context leaked across pool checkout")
+    try:
+        _assert_runtime_session_security(
+            connection,
+            failure_message="runtime database session drifted from secure defaults",
+        )
+    finally:
+        connection.rollback()
 
 
 @contextmanager

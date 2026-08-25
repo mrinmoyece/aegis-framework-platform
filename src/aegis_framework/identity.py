@@ -42,7 +42,7 @@ class IssuerConfiguration(StrictModel):
     issuer: Issuer
     audiences: tuple[Annotated[str, Field(min_length=1, max_length=200)], ...]
     jwks_uri: Annotated[str, Field(min_length=8, max_length=512)]
-    algorithms: tuple[Literal["RS256", "PS256", "ES256"], ...] = ("RS256",)
+    algorithms: tuple[Literal["RS256", "ES256"], ...] = ("RS256",)
     tenant_claim: str = Field(default="aegis_tenant", min_length=1, max_length=64)
     grant_version_claim: str = Field(
         default="aegis_grant_version", min_length=1, max_length=64
@@ -315,7 +315,7 @@ class JwtAuthenticator:
                 audience=list(configuration.audiences),
                 issuer=configuration.issuer,
                 options={
-                    "require": ["aud", "exp", "iat", "iss", "sub"],
+                    "require": ["aud", "exp", "iat", "iss", "nbf", "sub"],
                     "verify_aud": True,
                     "verify_exp": False,
                     "verify_iat": False,

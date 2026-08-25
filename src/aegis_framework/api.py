@@ -308,7 +308,7 @@ def create_app(
 
     @app.get("/v1/tenants/{tenant_id}", response_model=TenantRecord)
     def tenant(
-        tenant_id: Annotated[str, Path(min_length=1, max_length=128)],
+        tenant_id: Annotated[Identifier, Path()],
         identity: IdentityContext = Depends(authenticated),
     ) -> TenantRecord:
         _authorize_resource(
@@ -531,8 +531,16 @@ def _authorize_resource(
             purpose="incident-response",
             risk=RiskLevel.LOW,
         )
-    except AegisFrameworkError:
-        _not_found()
+    except (IdentityUnavailable, RepositoryUnavailable) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="authorization service is unavailable",
+        ) from exc
+    except AegisFrameworkError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="authorization failed safely",
+        ) from exc
     if not decision.allowed:
         _not_found()
 
