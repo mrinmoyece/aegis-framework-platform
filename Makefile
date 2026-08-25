@@ -1,6 +1,15 @@
 .DEFAULT_GOAL := help
 
 UV ?= uv
+VENV_BIN ?= .venv/bin
+HAS_UV := $(shell command -v $(UV) >/dev/null 2>&1 && printf yes)
+RUFF := $(if $(HAS_UV),$(UV) run ruff,$(VENV_BIN)/ruff)
+MYPY := $(if $(HAS_UV),$(UV) run mypy,$(VENV_BIN)/mypy)
+PYTEST := $(if $(HAS_UV),$(UV) run pytest,$(VENV_BIN)/pytest)
+PYTHON := $(if $(HAS_UV),$(UV) run python,$(VENV_BIN)/python)
+BANDIT := $(if $(HAS_UV),$(UV) run bandit,$(VENV_BIN)/bandit)
+PIP_AUDIT := $(if $(HAS_UV),$(UV) run pip-audit,$(VENV_BIN)/pip-audit)
+AEGIS := $(if $(HAS_UV),$(UV) run aegis-framework,$(VENV_BIN)/aegis-framework)
 
 .PHONY: help bootstrap format lint type test eval docs security demo serve measure container compose-config ci
 
@@ -25,37 +34,37 @@ bootstrap:
 	$(UV) sync --locked --all-extras
 
 format:
-	$(UV) run ruff format .
-	$(UV) run ruff check --fix .
+	$(RUFF) format .
+	$(RUFF) check --fix .
 
 lint:
-	$(UV) run ruff format --check .
-	$(UV) run ruff check .
+	$(RUFF) format --check .
+	$(RUFF) check .
 
 type:
-	$(UV) run mypy
+	$(MYPY)
 
 test:
-	$(UV) run pytest
+	$(PYTEST)
 
 eval:
-	$(UV) run aegis-framework eval --cases evals/cases.json
+	$(AEGIS) eval --cases evals/cases.json
 
 docs:
-	$(UV) run python tools/docs_check.py
+	$(PYTHON) tools/docs_check.py
 
 security:
-	$(UV) run bandit -q -r src
-	$(UV) run pip-audit --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
+	$(BANDIT) -q -r src
+	$(PIP_AUDIT) --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
 
 demo:
-	$(UV) run aegis-framework demo --scenario success
+	$(AEGIS) demo --scenario success
 
 serve:
-	$(UV) run aegis-framework serve
+	$(AEGIS) serve
 
 measure:
-	$(UV) run python tools/measure.py --write comparison/layer1-metrics.json
+	$(PYTHON) tools/measure.py --write comparison/layer1-metrics.json
 
 container:
 	docker build --pull --tag aegis-framework-platform:layer1 .

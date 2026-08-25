@@ -43,3 +43,7 @@ class IdempotencyConflict(AegisFrameworkError):
 
 class InvestigationInProgress(AegisFrameworkError):
     pass
+
+
+class OptionalDependencyMissing(AegisFrameworkError):
+    pass

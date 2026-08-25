@@ -7,6 +7,7 @@ from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
 from typing import Protocol, cast
 
+from aegis_framework.errors import OptionalDependencyMissing
 from aegis_framework.ports import Observation
 from aegis_framework.safety import (
     redact_value,
@@ -120,7 +121,14 @@ class LangfuseObservability:
 def build_langfuse_observability() -> LangfuseObservability:
     """Build the optional SDK adapter from standard Langfuse environment keys."""
 
-    from langfuse import Langfuse
+    try:
+        from langfuse import Langfuse
+    except ModuleNotFoundError as exc:
+        if exc.name != "langfuse":
+            raise
+        raise OptionalDependencyMissing(
+            "langfuse support requires the framework-observability extra"
+        ) from exc
 
     client = Langfuse(
         mask=_mask_langfuse_payload,

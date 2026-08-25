@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 from aegis_framework.api import create_app
 from aegis_framework.cli import main
+from aegis_framework.errors import OptionalDependencyMissing
 from aegis_framework.fixtures import demo_request
 
 
@@ -179,6 +180,23 @@ def test_cli_returns_failure_for_failed_eval(
     assert main(["eval", "--cases", str(path)]) == 1
     report = json.loads(capsys.readouterr().out)
     assert report["passed"] is False
+
+
+def test_cli_publish_langfuse_requires_optional_extra(
+    monkeypatch: object,
+    capsys: object,
+) -> None:
+    def fail() -> object:
+        raise OptionalDependencyMissing("langfuse support requires the extra")
+
+    monkeypatch.setattr(
+        "aegis_framework.langfuse_adapter.build_langfuse_observability",
+        fail,
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        main(["eval", "--cases", "evals/cases.json", "--publish-langfuse"])
+    assert excinfo.value.code == 2
+    assert "langfuse support requires the extra" in capsys.readouterr().err
 
 
 def test_cli_serve_passes_safe_defaults(monkeypatch: object) -> None:

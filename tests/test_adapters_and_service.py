@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import datetime
 
 import pytest
@@ -85,6 +88,8 @@ def _service_with(
     orchestrator: object,
     budget: InMemoryBudget | None = None,
     idempotency: InMemoryIdempotency | None = None,
+    audit: object | None = None,
+    observability: object | None = None,
 ) -> InvestigationService:
     clock = FixedClock(DEMO_TIME)
     return InvestigationService(
@@ -93,9 +98,9 @@ def _service_with(
         evidence=evidence,
         orchestrator=orchestrator,
         approvals=InMemoryApprovalBoundary(clock),
-        audit=HashChainAudit(clock),
+        audit=audit or HashChainAudit(clock),
         idempotency=idempotency or InMemoryIdempotency(),
-        observability=NoopObservability(),
+        observability=observability or NoopObservability(),
     )
 
 
@@ -221,6 +226,44 @@ class _FailOnceOrchestrator:
         return self._delegate.checkpoint_count(thread_ref)
 
 
+class _FailOnceAcceptedAudit:
+    def __init__(self) -> None:
+        self._failed = False
+
+    def append(
+        self,
+        *,
+        identity: object,
+        event_type: str,
+        attributes: object,
+    ) -> None:
+        del identity, attributes
+        if event_type == "investigation.accepted" and not self._failed:
+            self._failed = True
+            raise RuntimeError("audit unavailable")
+
+
+@dataclass
+class _BrokenObservation:
+    def finish(
+        self,
+        *,
+        status: str,
+        attributes: object,
+    ) -> None:
+        del status, attributes
+        raise RuntimeError("export unavailable")
+
+
+class _BrokenObservability:
+    @staticmethod
+    @contextmanager
+    def investigation(*, tenant_id: str, attributes: object) -> Iterator[object]:
+        del tenant_id, attributes
+        raise RuntimeError("observation startup failed")
+        yield _BrokenObservation()
+
+
 def test_failed_run_can_retry_without_double_charging_budget() -> None:
     bundle = build_demo_bundle()
     identity = demo_identity(request_id="retry-once")
@@ -235,6 +278,36 @@ def test_failed_run_can_retry_without_double_charging_budget() -> None:
         service.investigate(identity, demo_request())
     result = service.investigate(identity, demo_request())
     assert result.status.value == "complete"
+
+
+def test_audit_failure_does_not_wedge_idempotency() -> None:
+    bundle = build_demo_bundle()
+    identity = demo_identity(request_id="audit-retry")
+    service = _service_with(
+        policy=RolePolicy(),
+        evidence=bundle.service._evidence,
+        orchestrator=bundle.orchestrator,
+        audit=_FailOnceAcceptedAudit(),
+    )
+    with pytest.raises(RuntimeError, match="audit unavailable"):
+        service.investigate(identity, demo_request())
+    result = service.investigate(identity, demo_request())
+    assert result.status.value == "complete"
+
+
+def test_observability_failure_is_non_blocking() -> None:
+    bundle = build_demo_bundle()
+    identity = demo_identity(request_id="broken-otel")
+    service = _service_with(
+        policy=RolePolicy(),
+        evidence=bundle.service._evidence,
+        orchestrator=bundle.orchestrator,
+        observability=_BrokenObservability(),
+    )
+    result = service.investigate(identity, demo_request())
+    replay = service.investigate(identity, demo_request())
+    assert result.status.value == "complete"
+    assert replay.replayed is True
 
 
 def test_duplicate_and_conflicting_requests() -> None:

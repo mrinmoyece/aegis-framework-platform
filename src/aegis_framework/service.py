@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack, suppress
 from hashlib import sha256
 
 from aegis_framework.domain import (
@@ -19,6 +20,7 @@ from aegis_framework.errors import (
     ApprovalBoundaryFailure,
     EvidenceIsolationViolation,
     EvidenceUnavailable,
+    IdempotencyConflict,
     InvestigationInProgress,
     OrchestrationFailure,
     PolicyDenied,
@@ -31,6 +33,7 @@ from aegis_framework.ports import (
     EvidencePort,
     IdempotencyPort,
     ObservabilityPort,
+    Observation,
     OrchestratorPort,
     PolicyPort,
     RunClaimStatus,
@@ -114,49 +117,58 @@ class InvestigationService:
             identity.request_id,
             length=32,
         )
-        with self._observability.investigation(
-            tenant_id=identity.tenant_id,
-            attributes={"replayed": False},
-        ) as observation:
-            self._audit.append(
-                identity=identity,
-                event_type="investigation.accepted",
-                attributes={
-                    "request_id": identity.request_id,
-                    "attempt": claim.attempt,
-                },
-            )
-            budget = self._budget.reserve(
-                identity,
-                reservation_id=thread_ref,
-                units=_INVESTIGATION_BUDGET_UNITS,
-            )
-            if not budget.allowed:
-                result = _budget_abstention(identity, request, thread_ref)
-                self._idempotency.complete(
-                    tenant_id=identity.tenant_id,
-                    request_id=identity.request_id,
-                    result=result,
+        finalized = False
+        with ExitStack() as exit_stack:
+            try:
+                observation = exit_stack.enter_context(
+                    self._observability.investigation(
+                        tenant_id=identity.tenant_id,
+                        attributes={"replayed": False},
+                    )
                 )
+            except Exception:
+                observation = _NullObservation()
+            try:
                 self._audit.append(
                     identity=identity,
-                    event_type="investigation.abstained",
+                    event_type="investigation.accepted",
                     attributes={
                         "request_id": identity.request_id,
-                        "reason": budget.reason,
+                        "attempt": claim.attempt,
                     },
                 )
-                observation.finish(
-                    status=result.status.value,
-                    attributes={
-                        "evidence_count": 0,
-                        "finding_count": 0,
-                        "citation_count": 0,
-                    },
+                budget = self._budget.reserve(
+                    identity,
+                    reservation_id=thread_ref,
+                    units=_INVESTIGATION_BUDGET_UNITS,
                 )
-                return result
+                if not budget.allowed:
+                    result = _budget_abstention(identity, request, thread_ref)
+                    self._audit.append(
+                        identity=identity,
+                        event_type="investigation.abstained",
+                        attributes={
+                            "request_id": identity.request_id,
+                            "reason": budget.reason,
+                        },
+                    )
+                    self._idempotency.complete(
+                        tenant_id=identity.tenant_id,
+                        request_id=identity.request_id,
+                        result=result,
+                    )
+                    finalized = True
+                    _finish_observation(
+                        observation,
+                        status=result.status.value,
+                        attributes={
+                            "evidence_count": 0,
+                            "finding_count": 0,
+                            "citation_count": 0,
+                        },
+                    )
+                    return result
 
-            try:
                 collected = tuple(self._evidence.collect(identity, request))
                 _validate_evidence(identity, collected)
                 result = self._orchestrator.run(
@@ -169,11 +181,33 @@ class InvestigationService:
                 if result.proposal is not None:
                     approval = self._approvals.open_request(identity, result.proposal)
                     result = result.model_copy(update={"approval": approval})
+                self._audit.append(
+                    identity=identity,
+                    event_type=f"investigation.{result.status.value}",
+                    attributes={
+                        "request_id": identity.request_id,
+                        "evidence_count": len(collected),
+                        "citation_count": result.critic.checked_citations,
+                        "approval_required": result.approval is not None,
+                    },
+                )
                 self._idempotency.complete(
                     tenant_id=identity.tenant_id,
                     request_id=identity.request_id,
                     result=result,
                 )
+                finalized = True
+                _finish_observation(
+                    observation,
+                    status=result.status.value,
+                    attributes={
+                        "evidence_count": len(collected),
+                        "finding_count": len(result.hypotheses),
+                        "citation_count": result.critic.checked_citations,
+                        "injection_detected": result.critic.injection_contained,
+                    },
+                )
+                return result
             except (
                 ApprovalBoundaryFailure,
                 EvidenceIsolationViolation,
@@ -181,39 +215,30 @@ class InvestigationService:
                 OrchestrationFailure,
             ) as exc:
                 code = type(exc).__name__
-                self._idempotency.fail(
-                    tenant_id=identity.tenant_id,
-                    request_id=identity.request_id,
-                    code=code,
-                )
                 self._audit.append(
                     identity=identity,
                     event_type="investigation.failed",
                     attributes={"request_id": identity.request_id, "error_code": code},
                 )
-                observation.finish(status="failed", attributes={"error_code": code})
+                self._idempotency.fail(
+                    tenant_id=identity.tenant_id,
+                    request_id=identity.request_id,
+                    code=code,
+                )
+                finalized = True
+                _finish_observation(
+                    observation, status="failed", attributes={"error_code": code}
+                )
                 raise
-
-            self._audit.append(
-                identity=identity,
-                event_type=f"investigation.{result.status.value}",
-                attributes={
-                    "request_id": identity.request_id,
-                    "evidence_count": len(collected),
-                    "citation_count": result.critic.checked_citations,
-                    "approval_required": result.approval is not None,
-                },
-            )
-            observation.finish(
-                status=result.status.value,
-                attributes={
-                    "evidence_count": len(collected),
-                    "finding_count": len(result.hypotheses),
-                    "citation_count": result.critic.checked_citations,
-                    "injection_detected": result.critic.injection_contained,
-                },
-            )
-            return result
+            except Exception:
+                if not finalized:
+                    with suppress(IdempotencyConflict):
+                        self._idempotency.fail(
+                            tenant_id=identity.tenant_id,
+                            request_id=identity.request_id,
+                            code="unexpected_failure",
+                        )
+                raise
 
     def checkpoint_count(
         self,
@@ -257,6 +282,28 @@ def _budget_abstention(
         ),
         proposal=None,
     )
+
+
+class _NullObservation:
+    def finish(
+        self,
+        *,
+        status: str,
+        attributes: dict[str, str | int | bool],
+    ) -> None:
+        del status, attributes
+
+
+def _finish_observation(
+    observation: Observation | _NullObservation,
+    *,
+    status: str,
+    attributes: dict[str, str | int | bool],
+) -> None:
+    try:
+        observation.finish(status=status, attributes=attributes)
+    except Exception:
+        return
 
 
 def _validate_evidence(

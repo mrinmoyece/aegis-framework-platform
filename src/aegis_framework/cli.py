@@ -8,6 +8,7 @@ from pathlib import Path
 
 import uvicorn
 
+from aegis_framework.errors import OptionalDependencyMissing
 from aegis_framework.evals import load_cases, run_eval_suite
 from aegis_framework.fixtures import (
     DemoScenario,
@@ -50,7 +51,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
     if args.command == "demo":
         scenario = DemoScenario(args.scenario)
         bundle = build_demo_bundle(scenario)
@@ -67,13 +69,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "eval":
         report = run_eval_suite(load_cases(args.cases))
         if args.publish_langfuse:
-            from aegis_framework.langfuse_adapter import build_langfuse_observability
+            try:
+                from aegis_framework.langfuse_adapter import (
+                    build_langfuse_observability,
+                )
 
-            build_langfuse_observability().publish_evaluation(
-                total=report.total,
-                succeeded=report.succeeded,
-                passed=report.passed,
-            )
+                build_langfuse_observability().publish_evaluation(
+                    total=report.total,
+                    succeeded=report.succeeded,
+                    passed=report.passed,
+                )
+            except OptionalDependencyMissing as exc:
+                parser.exit(2, f"{parser.prog}: error: {exc}\n")
         print(report.model_dump_json(indent=2))
         return 0 if report.passed else 1
 
