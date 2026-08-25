@@ -460,8 +460,7 @@ class LangGraphInvestigator:
             evidence=tuple(
                 item
                 for item in (
-                    ModelEvidence.model_validate(raw)
-                    for raw in state["safe_evidence"]
+                    ModelEvidence.model_validate(raw) for raw in state["safe_evidence"]
                 )
                 if item.kind.value in allowed_kinds
             ),

@@ -650,7 +650,7 @@ class PostgresOrchestrationLedger:
                     FROM aegis.orchestration_artifacts
                     WHERE tenant_id = %s AND run_id = %s
                     ORDER BY ordinal, artifact_id
-                    FOR UPDATE
+                    FOR SHARE
                     """,
                     (tenant_id, run_id),
                 ).fetchall()
