@@ -263,6 +263,11 @@ def create_app(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="identity service is unavailable",
             ) from exc
+        except RepositoryUnavailable as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="identity service is unavailable",
+            ) from exc
 
     @app.get("/healthz", response_model=HealthResponse)
     def health() -> HealthResponse:

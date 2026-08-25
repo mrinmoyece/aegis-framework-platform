@@ -186,6 +186,10 @@ class _FakeConnection:
                     "rolbypassrls": False,
                 }
             )
+        if "session_rolsuper" in query:
+            return _FakeCursorResult(
+                {"session_rolsuper": False, "session_rolbypassrls": False}
+            )
         if query == "SHOW row_security":
             return _FakeCursorResult({"row_security": self._row_security})
         raise AssertionError(f"unexpected query: {query}")

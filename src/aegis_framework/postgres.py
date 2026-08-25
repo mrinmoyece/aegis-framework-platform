@@ -230,9 +230,19 @@ def _assert_runtime_session_security(
 ) -> None:
     role = connection.execute(
         """
-        SELECT current_user AS current_user, rolsuper, rolbypassrls
+        SELECT current_user AS current_user,
+               session_user AS session_user,
+               rolsuper,
+               rolbypassrls
         FROM pg_roles
         WHERE rolname = current_user
+        """
+    ).fetchone()
+    session_role = connection.execute(
+        """
+        SELECT rolsuper AS session_rolsuper, rolbypassrls AS session_rolbypassrls
+        FROM pg_roles
+        WHERE rolname = session_user
         """
     ).fetchone()
     row_security = connection.execute("SHOW row_security").fetchone()
@@ -241,6 +251,9 @@ def _assert_runtime_session_security(
         or role["current_user"] != "aegis_runtime"
         or bool(role["rolsuper"])
         or bool(role["rolbypassrls"])
+        or session_role is None
+        or bool(session_role["session_rolsuper"])
+        or bool(session_role["session_rolbypassrls"])
         or row_security is None
         or row_security["row_security"] != "on"
     ):

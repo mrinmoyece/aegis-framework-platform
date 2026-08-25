@@ -91,6 +91,18 @@ class EnterprisePolicy:
         purpose: str,
         risk: RiskLevel,
     ) -> PolicyDecision:
+        # Reject cross-tenant access before any repository query to avoid
+        # establishing a foreign tenant's RLS context.
+        if identity.tenant_id != resource_tenant_id:
+            return PolicyDecision(
+                allowed=False,
+                policy_id="deny-all:tenant-mismatch",
+                policy_revision=0,
+                purpose=purpose,
+                risk=risk,
+                reason="tenant_mismatch",
+            )
+
         policy = self._policies.current_policy(tenant_id=resource_tenant_id)
         policy_id = policy.policy_id if policy is not None else "deny-all:no-policy"
         revision = policy.revision if policy is not None else 0

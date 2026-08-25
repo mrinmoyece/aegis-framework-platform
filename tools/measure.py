@@ -122,12 +122,7 @@ def measure(runs: int) -> dict[str, object]:
             "locked_total": len(lock["package"]),
         },
         "implementation_effort_proxy": effort,
-        "qualification_counts": {
-            "deterministic_tests_passed": 100,
-            "deterministic_evals_passed": 8,
-            "postgres_integration_passed": 3,
-            "keycloak_integration_environment_gated": 1,
-        },
+        "qualification_counts": _count_tests(),
         "framework_code_removed": [
             "custom graph scheduler",
             "parallel fan-out and deterministic join engine",
@@ -204,6 +199,30 @@ def _source_loc(root: Path) -> int:
             if stripped and not stripped.startswith("#"):
                 total += 1
     return total
+
+
+def _count_tests() -> dict[str, int | None]:
+    """Run pytest in collect-only mode to count deterministic test items."""
+    pytest = shutil.which("pytest") or str(ROOT / ".venv/bin/pytest")
+    try:
+        completed = subprocess.run(  # noqa: S603
+            [pytest, "--collect-only", "-q", "--no-header", "-m", "not integration"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        collected = sum(
+            1 for line in completed.stdout.splitlines() if "::" in line
+        )
+    except Exception:
+        collected = None
+    return {
+        "deterministic_tests_collected": collected,
+        "postgres_integration_passed": None,
+        "keycloak_integration_environment_gated": None,
+    }
+
 
 
 if __name__ == "__main__":

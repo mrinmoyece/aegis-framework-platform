@@ -155,6 +155,18 @@ class BoundedJwksCache:
         self._state: _CacheState | None = None
         self._lock = Lock()
 
+    def probe(self) -> bool:
+        """Return True when the JWKS endpoint has a valid state or a fresh fetch succeeds."""  # noqa: E501
+        try:
+            with self._lock:
+                now = self._clock.now()
+                if self._state is not None and self._state.expires_at > now:
+                    return True
+                self._refresh(now)
+            return True
+        except IdentityUnavailable:
+            return False
+
     def verification_key(self, *, key_id: str, algorithm: str) -> PyJWK:
         if not key_id or len(key_id) > 128:
             raise AuthenticationFailed("token key ID is invalid")
@@ -255,7 +267,7 @@ class JwtAuthenticator:
         }
 
     def ready(self) -> bool:
-        return True
+        return all(cache.probe() for cache in self._caches.values())
 
     def authenticate(
         self,
