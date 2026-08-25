@@ -194,17 +194,17 @@ class TestConfigureRuntimeConnection:
 
 
 class TestMigrationRunner:
-    def test_default_path_exists(self) -> None:
+    def test_default_paths_are_sql(self) -> None:
         runner = MigrationRunner()
-        assert runner._path.suffix == ".sql"
+        assert all(p.suffix == ".sql" for p in runner._paths)
 
-    def test_custom_path_stored(self) -> None:
+    def test_custom_paths_stored(self) -> None:
         p = Path(".") / "custom.sql"
-        runner = MigrationRunner(path=p)
-        assert runner._path == p
+        runner = MigrationRunner(paths=(p,))
+        assert runner._paths == (p,)
 
     def test_path_not_found_raises(self) -> None:
-        runner = MigrationRunner(path=Path("/nonexistent/migration.sql"))
+        runner = MigrationRunner(paths=(Path("/nonexistent/migration.sql"),))
         conn = MagicMock()
         with pytest.raises(FileNotFoundError):
             runner.apply(conn)

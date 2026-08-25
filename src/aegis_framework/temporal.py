@@ -8,7 +8,7 @@ from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, PayloadLimitsConfig
@@ -69,7 +69,7 @@ class TemporalWorkflowInput(StrictModel):
     run_id: Identifier
     workflow_id: Identifier
     wait_for_signal: bool = False
-    wait_timeout_seconds: int = 3_600
+    wait_timeout_seconds: int = Field(default=3_600, ge=1, le=86_400)
 
 
 class TemporalActivityInput(StrictModel):
@@ -669,28 +669,41 @@ class TemporalOutboxDispatcher:
 
     async def _deliver(self, claim: DeliveryClaim) -> None:
         payload = claim.payload
+
+        def _str(key: str) -> str:
+            val = payload.get(key)
+            if not isinstance(val, str):
+                raise PayloadRejected(f"outbox payload field '{key}' must be a string")
+            return val
+
+        def _bool(key: str) -> bool:
+            val = payload.get(key)
+            if not isinstance(val, bool):
+                raise PayloadRejected(f"outbox payload field '{key}' must be a boolean")
+            return val
+
         if claim.message_type == "investigation.start":
             await self._temporal.start(
                 TemporalWorkflowInput(
-                    tenant_ref=str(payload["tenant_ref"]),
-                    actor_ref=str(payload["actor_ref"]),
-                    request_ref=str(payload["request_ref"]),
-                    run_id=str(payload["run_id"]),
-                    workflow_id=str(payload["workflow_id"]),
-                    wait_for_signal=bool(payload["wait_for_signal"]),
+                    tenant_ref=_str("tenant_ref"),
+                    actor_ref=_str("actor_ref"),
+                    request_ref=_str("request_ref"),
+                    run_id=_str("run_id"),
+                    workflow_id=_str("workflow_id"),
+                    wait_for_signal=_bool("wait_for_signal"),
                 )
             )
             return
         if claim.message_type == "investigation.resume_requested":
             await self._temporal.resume(
-                workflow_id=str(payload["workflow_id"]),
-                command_ref=str(payload["command_ref"]),
+                workflow_id=_str("workflow_id"),
+                command_ref=_str("command_ref"),
             )
             return
         if claim.message_type == "investigation.cancel_requested":
             await self._temporal.request_cancel(
-                workflow_id=str(payload["workflow_id"]),
-                command_ref=str(payload["command_ref"]),
+                workflow_id=_str("workflow_id"),
+                command_ref=_str("command_ref"),
             )
             return
         raise PayloadRejected("outbox message type is not supported")
@@ -751,7 +764,7 @@ async def connect_temporal(
     *,
     target_host: str,
     namespace: str = "default",
-    tracing: bool = True,
+    tracing: bool = False,
 ) -> Client:
     interceptors = [TracingInterceptor()] if tracing else []
     return await Client.connect(

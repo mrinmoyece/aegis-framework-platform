@@ -496,6 +496,11 @@ def create_app(
             result = durable.get(identity, run_id=run_id)
         except PolicyDenied:
             _not_found()
+        except AegisFrameworkError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable investigation failed safely",
+            ) from exc
         if result is None:
             _not_found()
         return _durable_response(result)
@@ -526,6 +531,11 @@ def create_app(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="timeline cursor is invalid",
+            ) from exc
+        except AegisFrameworkError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable investigation failed safely",
             ) from exc
 
     @app.post(
@@ -595,6 +605,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
 
     primary = bundle_for(DemoScenario.SUCCESS)
     from aegis_framework.adapters import FixedClock
+    from aegis_framework.durability import CursorCodec, DurableInvestigationService
     from aegis_framework.fixtures import DEMO_TIME
 
     durable_store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
@@ -606,6 +617,11 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         # and idempotency state are shared at the app boundary — scenario
         # selection is server-side configuration, not caller-selectable.
         service_for=lambda _scenario: primary.service,
+        durable=DurableInvestigationService(
+            policy=primary.policy,
+            store=durable_store,
+            cursor_codec=CursorCodec(b"aegis-demo-cursor-key-is-test-only-0001"),
+        ),
     )
 
 

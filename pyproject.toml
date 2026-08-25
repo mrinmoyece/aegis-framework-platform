@@ -123,7 +123,6 @@ source = ["aegis_framework"]
 omit = [
   "src/aegis_framework/durable_postgres.py",
   "src/aegis_framework/postgres.py",
-  "src/aegis_framework/temporal.py",
 ]
 
 [tool.coverage.report]
