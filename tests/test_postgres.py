@@ -251,6 +251,25 @@ def test_live_orchestration_artifacts_are_rls_isolated_and_rebuildable() -> None
             input_digest=projection.input_digest,
         )
         assert reconciliation.fence_token != first_claim.fence_token
+        with tenant_transaction(pool, tenant_id=_TENANT_ALPHA) as connection:
+            rows = connection.execute(
+                """
+                SELECT document
+                FROM aegis.orchestration_facts
+                WHERE tenant_id = %s
+                  AND run_id = %s
+                  AND task_id = %s
+                  AND fact_type = 'task.dispatch'
+                ORDER BY recorded_at, fact_id
+                """,
+                (_TENANT_ALPHA, run_id, "task:stale-worker"),
+            ).fetchall()
+        assert tuple(row["document"]["status"] for row in rows) == (
+            "started",
+            "reconciliation_required",
+        )
+        assert tuple(row["document"]["attempt"] for row in rows) == (1, 2)
+        assert str(rows[1]["document"]["fence_token"]) == reconciliation.fence_token
         with pytest.raises(IntegrityFailure, match="fence is stale"):
             ledger.complete_task(
                 tenant_id=_TENANT_ALPHA,

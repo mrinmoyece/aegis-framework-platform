@@ -697,10 +697,6 @@ class LangGraphInvestigator:
             if state.get("proposal") is not None
             else None
         )
-        if critic.decision is CriticDecision.ACCEPTED and proposal is None:
-            critic = critic.model_copy(
-                update={"reasons": ("corroborated_but_no_valid_action",)}
-            )
         verification = tuple(_artifacts(state, ArtifactKind.VERIFICATION_PLAN))
         reasons: tuple[str, ...]
         if (
@@ -725,7 +721,11 @@ class LangGraphInvestigator:
                 else OrchestrationTerminalState.ABSTAINED
             )
             status = InvestigationStatus.ABSTAINED
-            reasons = critic.reasons or ("no_authorized_proposal",)
+            reasons = (
+                ("corroborated_but_no_valid_action",)
+                if critic.decision is CriticDecision.ACCEPTED and proposal is None
+                else (critic.reasons or ("no_authorized_proposal",))
+            )
             source = tuple(_artifacts(state, ArtifactKind.CONTRADICTION)) or tuple(
                 _artifacts(state, ArtifactKind.CRITIQUE)
             )

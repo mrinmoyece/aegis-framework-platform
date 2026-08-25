@@ -200,12 +200,15 @@ class PostgresOrchestrationLedger:
                         run_id=run_id,
                         task_id=task_id,
                         fact_id=stable_id(
-                            "fact", run_id, task_id, "dispatch", length=40
+                            "fact", run_id, task_id, "dispatch", "1", length=40
                         ),
                         fact_type="task.dispatch",
                         document={
+                            "attempt": 1,
+                            "fence_token": initial_fence,
                             "input_digest": input_digest,
                             "role": role.value,
+                            "status": TaskDispatchStatus.STARTED.value,
                             "task_id": task_id,
                         },
                     )
@@ -249,6 +252,24 @@ class PostgresOrchestrationLedger:
                     WHERE tenant_id = %s AND run_id = %s AND task_id = %s
                     """,
                     (fence, attempt, now, tenant_id, run_id, task_id),
+                )
+                self._insert_fact(
+                    connection,
+                    tenant_id=tenant_id,
+                    run_id=run_id,
+                    task_id=task_id,
+                    fact_id=stable_id(
+                        "fact", run_id, task_id, "dispatch", str(attempt), length=40
+                    ),
+                    fact_type="task.dispatch",
+                    document={
+                        "attempt": attempt,
+                        "fence_token": fence,
+                        "input_digest": input_digest,
+                        "role": role.value,
+                        "status": TaskDispatchStatus.RECONCILIATION_REQUIRED.value,
+                        "task_id": task_id,
+                    },
                 )
                 return TaskDispatchClaim(
                     status=TaskDispatchStatus.RECONCILIATION_REQUIRED,
