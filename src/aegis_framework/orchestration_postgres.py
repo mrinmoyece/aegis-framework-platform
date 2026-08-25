@@ -261,7 +261,7 @@ class PostgresOrchestrationLedger:
                     fact_id=stable_id(
                         "fact", run_id, task_id, "dispatch", str(attempt), length=40
                     ),
-                    fact_type="task.dispatch",
+                    fact_type="task.fence_rotated",
                     document={
                         "attempt": attempt,
                         "fence_token": fence,
@@ -639,24 +639,46 @@ class PostgresOrchestrationLedger:
     def rebuild_projection(
         self, *, tenant_id: str, run_id: str
     ) -> OrchestrationRunProjection:
-        artifacts = self.artifacts(tenant_id=tenant_id, run_id=run_id)
-        decision = next(
-            (
-                artifact.payload.decision
-                for artifact in reversed(artifacts)
-                if isinstance(artifact.payload, CoordinatorDecisionPayload)
-            ),
-            None,
-        )
-        source_digest = _digest(
-            {
-                "artifacts": [artifact.canonical_digest for artifact in artifacts],
-                "decision": decision.value if decision is not None else None,
-            }
-        )
         now = self._clock.now()
         try:
             with tenant_transaction(self._pool, tenant_id=tenant_id) as connection:
+                # Read artifacts inside the same transaction to prevent a TOCTOU race
+                # where a new artifact is appended between reading and updating.
+                artifact_rows = connection.execute(
+                    """
+                    SELECT artifact_document
+                    FROM aegis.orchestration_artifacts
+                    WHERE tenant_id = %s AND run_id = %s
+                    ORDER BY ordinal, artifact_id
+                    FOR UPDATE
+                    """,
+                    (tenant_id, run_id),
+                ).fetchall()
+                try:
+                    artifacts = tuple(
+                        GovernanceArtifact.model_validate(row["artifact_document"])
+                        for row in artifact_rows
+                    )
+                except ValidationError as exc:
+                    raise IntegrityFailure(
+                        "stored orchestration artifact is malformed"
+                    ) from exc
+                decision = next(
+                    (
+                        artifact.payload.decision
+                        for artifact in reversed(artifacts)
+                        if isinstance(artifact.payload, CoordinatorDecisionPayload)
+                    ),
+                    None,
+                )
+                source_digest = _digest(
+                    {
+                        "artifacts": [
+                            artifact.canonical_digest for artifact in artifacts
+                        ],
+                        "decision": decision.value if decision is not None else None,
+                    }
+                )
                 connection.execute(
                     """
                     UPDATE aegis.orchestration_runs

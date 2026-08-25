@@ -498,56 +498,41 @@ def _gateway_runtime(runs: int) -> dict[str, float]:
 
 
 def _evidence_runtime(runs: int) -> dict[str, float]:
-    from datetime import timedelta
+    from aegis_framework.correlation import correlate_evidence
+    from aegis_framework.domain import Evidence, EvidenceKind, evidence_hash
 
-    from aegis_framework.evidence import (
-        DataClassification,
-        EvidenceBounds,
-        EvidenceQuery,
-        EvidenceSource,
-        EvidenceSourceKind,
-        EvidenceTimeRange,
-        SourceTrust,
-    )
-    from aegis_framework.evidence_runtime import (
-        CursorVault,
-        InMemoryEvidenceControlStore,
-    )
+    now = datetime(2026, 8, 15, tzinfo=UTC)
 
-    store = InMemoryEvidenceControlStore(
-        cursor_vault=CursorVault(b"b" * 32),
-    )
-    now = datetime(2026, 8, 15, 12, 0, 0, tzinfo=UTC)
-    source = EvidenceSource(
-        tenant_id="tenant-bench",
-        source_id="source-github",
-        kind=EvidenceSourceKind.GITHUB,
-        trust=SourceTrust.EXTERNAL_UNTRUSTED,
-        classification=DataClassification.INTERNAL,
-        region="eu-west-1",
-        policy_revision=1,
-        allowed_resources=("bench/repo/deployments",),
-        enabled=True,
-    )
-    durations: list[float] = []
-    for index in range(runs):
-        query = EvidenceQuery(
-            query_id=f"query-bench-{index}",
-            tenant_id="tenant-bench",
-            incident_id="bench-incident",
-            run_id=f"run-bench-{index}",
-            source=source,
-            window=EvidenceTimeRange(
-                start=now - timedelta(minutes=30),
-                end=now,
+    def record(index: int, offset_seconds: int) -> Evidence:
+        observed_at = now + timedelta(seconds=offset_seconds)
+        locator = f"source://evidence-{index}"
+        facts = {"service": "checkout-api", "status": "error"}
+        summary = "Checkout failure observed."
+        return Evidence(
+            evidence_id=f"evidence-{index}",
+            tenant_id="tenant-acme",
+            kind=EvidenceKind.TELEMETRY,
+            source="benchmark",
+            locator=locator,
+            observed_at=observed_at,
+            summary=summary,
+            facts=facts,
+            content_hash=evidence_hash(
+                tenant_id="tenant-acme",
+                kind=EvidenceKind.TELEMETRY,
+                locator=locator,
+                observed_at=observed_at,
+                summary=summary,
+                facts=facts,
             ),
-            resource="bench/repo/deployments",
-            parameters={},
-            bounds=EvidenceBounds(),
-            created_at=now,
         )
+
+    evidence = (record(1, 0), record(2, 10), record(3, 20))
+    correlate_evidence(evidence, reference_time=now)
+    durations: list[float] = []
+    for _ in range(runs):
         started = time.perf_counter_ns()
-        store.request(query, operation_id=f"op-bench-{index}")
+        correlate_evidence(evidence, reference_time=now)
         durations.append((time.perf_counter_ns() - started) / 1_000_000)
     ordered = sorted(durations)
     return {
