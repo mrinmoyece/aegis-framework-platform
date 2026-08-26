@@ -119,6 +119,7 @@ class InvestigationService:
         )
         finalized = False
         with ExitStack() as exit_stack:
+            observation: Observation | _NullObservation
             try:
                 observation = exit_stack.enter_context(
                     self._observability.investigation(
