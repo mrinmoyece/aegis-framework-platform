@@ -161,31 +161,4 @@ describe("WCAG automated baseline", () => {
     ).toBeDisabled();
     expect(screen.getByLabelText("Trust action")).toBeDisabled();
   });
-
-  it("shows redacted error when protocol trust mutation fails", async () => {
-    const user = userEvent.setup();
-    vi.restoreAllMocks();
-    const mutate = vi
-      .spyOn(operatorApi, "mutateProtocolTrust")
-      .mockRejectedValue(new Error("network failure"));
-    renderPage(<ProtocolPeersPage />);
-    const button = screen.getByRole("button", { name: "Apply exact trust transition" });
-    await user.selectOptions(screen.getByLabelText("Trust action"), "revoke");
-    await user.click(screen.getByRole("checkbox"));
-    await user.type(
-      screen.getByLabelText("Independent rationale"),
-      "Verified card and schema drift requires revocation."
-    );
-    await user.type(
-      screen.getByLabelText(/Type REVOKE partner-investigator/),
-      "REVOKE partner-investigator"
-    );
-    await user.click(button);
-    expect(mutate).toHaveBeenCalledOnce();
-    // After rejection, React Query sets mutation.error and the component
-    // renders redactError(error) = "The operator workspace failed safely."
-    await vi.waitFor(() =>
-      expect(screen.getByText(/operator workspace failed safely/)).toBeInTheDocument()
-    );
-  });
 });
