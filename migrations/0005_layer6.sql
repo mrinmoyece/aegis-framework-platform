@@ -175,19 +175,11 @@ $$;
 
 GRANT SELECT, INSERT, UPDATE ON aegis.orchestration_runs,
     aegis.orchestration_tasks TO aegis_runtime;
-GRANT SELECT, INSERT, UPDATE ON aegis.orchestration_runs,
-    aegis.orchestration_tasks TO aegis_app;
 GRANT SELECT, INSERT ON aegis.orchestration_facts,
     aegis.orchestration_artifacts,
     aegis.orchestration_projection_rebuilds TO aegis_runtime;
-GRANT SELECT, INSERT ON aegis.orchestration_facts,
-    aegis.orchestration_artifacts,
-    aegis.orchestration_projection_rebuilds TO aegis_app;
 REVOKE UPDATE, DELETE, TRUNCATE ON aegis.orchestration_facts,
     aegis.orchestration_artifacts,
     aegis.orchestration_projection_rebuilds FROM aegis_runtime;
-REVOKE UPDATE, DELETE, TRUNCATE ON aegis.orchestration_facts,
-    aegis.orchestration_artifacts,
-    aegis.orchestration_projection_rebuilds FROM aegis_app;
 
 COMMIT;
