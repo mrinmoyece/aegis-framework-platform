@@ -212,9 +212,7 @@ def _count_tests() -> dict[str, int | None]:
             text=True,
             timeout=60,
         )
-        collected = sum(
-            1 for line in completed.stdout.splitlines() if "::" in line
-        )
+        collected = sum(1 for line in completed.stdout.splitlines() if "::" in line)
     except Exception:
         collected = None
     return {
@@ -222,7 +220,6 @@ def _count_tests() -> dict[str, int | None]:
         "postgres_integration_passed": None,
         "keycloak_integration_environment_gated": None,
     }
-
 
 
 if __name__ == "__main__":

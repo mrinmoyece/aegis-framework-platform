@@ -132,9 +132,7 @@ class TestAssertRuntimeSessionSecurity:
     def test_raises_when_session_rolbypassrls(self) -> None:
         conn = _mock_connection(session_rolbypassrls=True)
         with pytest.raises(RepositoryUnavailable):
-            _assert_runtime_session_security(
-                conn, failure_message="session bypassrls"
-            )
+            _assert_runtime_session_security(conn, failure_message="session bypassrls")
 
     def test_raises_when_row_security_off(self) -> None:
         conn = _mock_connection(row_security="off")
