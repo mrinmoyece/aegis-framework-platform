@@ -1,0 +1,246 @@
+{
+  "comparison_basis": {
+    "custom_layer3": {
+      "branch": "mrinmoyece-aegis-durable-ledger",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 4,
+        "locked_total": null
+      },
+      "implementation_effort_proxy": {
+        "additions": 3901,
+        "changed_files": 42,
+        "commits": 1,
+        "deletions": 176
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "87cefe58adbf62e6a419d38e57e0928581b7003c",
+      "source_loc": {
+        "production": 3765,
+        "tests": 2239,
+        "total": 6004
+      },
+      "test_functions": 77
+    },
+    "custom_layer4": {
+      "branch": "mrinmoyece-aegis-worker-runtime",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 6,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer3": {
+        "additions": 6301,
+        "changed_files": 47,
+        "commits": 1,
+        "deletions": 198
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "171fa485819334a892684544c0a993a6e2fc4ace",
+      "source_loc": {
+        "production": 7452,
+        "tests": 3687,
+        "total": 11139
+      },
+      "test_functions": 99
+    },
+    "custom_layer5": {
+      "branch": "mrinmoyece-aegis-model-gateway",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 9
+      },
+      "incremental_effort_from_layer4": {
+        "additions": 6568,
+        "changed_files": 55,
+        "commits": 1,
+        "deletions": 109
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6",
+      "source_loc": {
+        "production": 11079,
+        "tests": 5479,
+        "total": 16558
+      },
+      "test_functions": 141
+    },
+    "custom_layer6": {
+      "branch": "mrinmoyece-aegis-evidence-connectors",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 5,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer5": {
+        "additions": 10954,
+        "changed_files": 50,
+        "commits": 1,
+        "deletions": 123
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "7a685bc52772e1c92467baba58a1c668646e9bf7",
+      "source_loc": {
+        "production": 17119,
+        "tests": 8780,
+        "total": 25899
+      },
+      "test_functions": 204
+    },
+    "effort_definition": "Git additions/deletions and changed files from each prior layer",
+    "equivalent_evidence_scenario": "three tenant-bound cited records correlated in process with stable timeline ordering, shared-fact links, no network, and no causal claim",
+    "equivalent_gateway_scenario": "tenant-scoped structured fake-provider call with explicit catalog, pre-call reservation, deterministic route, normalized usage/cost settlement, no network, and no production effect",
+    "foundation_sha": "754e536d10b9643b40cac2f7b6c0d1de870fd630",
+    "loc_definition": "non-blank, non-comment physical Python lines"
+  },
+  "custom_comparison": {
+    "layer3_services": [
+      "PostgreSQL"
+    ],
+    "layer4_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer5_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer6_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer6_tradeoff": "HTTPX, PyYAML, and the official Kubernetes client remove transport, syntax, and Kubernetes object decoding only. They do not remove tenant, provenance, SSRF, pagination, ledger, or quarantine controls",
+    "runtime_comparison_status": "Equivalent network-free fake gateway scenarios ran on the same machine; figures are local implementation latency, not provider or distributed throughput",
+    "temporal_tradeoff": "Temporal removes scheduler, timers, signal history, retry/backoff, and crash recovery code but adds a second operational control plane"
+  },
+  "dependencies": {
+    "direct_development": 8,
+    "direct_optional": 7,
+    "direct_runtime": 12,
+    "locked_total": 131
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "Darwin",
+    "python": "3.14.7"
+  },
+  "equivalent_evidence_benchmark": {
+    "custom_layer6": {
+      "median_ms": 0.015,
+      "p95_ms": 0.015,
+      "sha": "7a685bc52772e1c92467baba58a1c668646e9bf7"
+    },
+    "framework_layer5": {
+      "median_ms": 0.048,
+      "p95_ms": 0.049
+    },
+    "limitations": "Different Pydantic/dataclass contracts; excludes PostgreSQL, Temporal, Redis, connector networks, ingestion, and process boundaries",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-three-record-non-causal-correlation"
+  },
+  "equivalent_gateway_benchmark": {
+    "custom_layer5": {
+      "median_ms": 0.166,
+      "p95_ms": 0.206,
+      "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6"
+    },
+    "framework_layer4": {
+      "median_ms": 1.33,
+      "p95_ms": 4.328
+    },
+    "limitations": "Different internal sync/async APIs; no PostgreSQL, Temporal, Redis, provider network, serialization, or process boundary was included",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-fake-reserve-route-settle"
+  },
+  "framework_code_removed": [
+    "custom graph scheduler",
+    "parallel fan-out and deterministic join engine",
+    "checkpoint serialization and state-history plumbing",
+    "HTTP routing and OpenAPI generation",
+    "JWT signature and registered-claim cryptography",
+    "PostgreSQL connection-pool lifecycle",
+    "cross-process workflow scheduling and replay",
+    "durable timers and signal delivery",
+    "activity retry/backoff and worker crash recovery",
+    "OpenAI and Anthropic wire protocol and SDK exception transport",
+    "HTTP connection pooling and streaming response mechanics",
+    "Kubernetes API object decoding and list transport",
+    "safe YAML syntax parsing"
+  ],
+  "implementation_effort_proxy": {
+    "additions": 8910,
+    "changed_files": 54,
+    "commits": 1,
+    "deletions": 120
+  },
+  "layer": 5,
+  "lock_in_and_escape": {
+    "fastapi": "typed request/response models at the delivery adapter",
+    "httpx": "HttpTransport plus neutral connector records and pages",
+    "kubernetes": "KubernetesApi protocol plus neutral connector records",
+    "langfuse": "ObservabilityPort plus OpenTelemetry",
+    "langgraph": "OrchestratorPort plus JSON-compatible domain state",
+    "openai_anthropic": "ModelProviderAdapter plus neutral ModelRequest/ProviderResult",
+    "psycopg_postgresql": "repository ports plus application-owned SQL migrations",
+    "pyjwt": "AuthenticatorPort plus standard OIDC/JWT claims and JWK documents",
+    "pyyaml": "canonical JSON/text boundary after safe syntax parsing",
+    "temporal": "opaque typed payloads plus application outbox, ActivityOperations, and application-owned ledger/projections"
+  },
+  "measured_at": "2026-08-15T23:42:19.332190+00:00",
+  "qualification_counts": {
+    "deterministic_evals_passed": 26,
+    "deterministic_tests_passed": 215,
+    "keycloak_integration_environment_gated": 1,
+    "postgres_integration_passed": 6,
+    "temporal_integration_passed": 3
+  },
+  "remaining_custom_controls": [
+    "issuer registry and bounded JWKS rotation policy",
+    "authoritative principal and tenant resolution",
+    "immutable RBAC, purpose, risk, and policy evaluation",
+    "quota reservation and retry ownership",
+    "forced RLS schema and transaction tenant context",
+    "tenant-scoped checkpoint ownership",
+    "secret-reference boundary",
+    "redacted hash-chained durable audit",
+    "API anti-enumeration and readiness failure policy",
+    "event envelope and dual integrity chains",
+    "transactional inbox/outbox and idempotency",
+    "projection rebuild and redacted cursor API",
+    "activity authorization and retry ownership",
+    "stale-result, poison-payload, and DLQ policy",
+    "tenant model policy/catalog and price versions",
+    "worst-case model token/cost reservations",
+    "model routing, fallback, circuit, rate and concurrency policy",
+    "immutable provider call and ambiguous-billing facts",
+    "strict structured output, tools and citation controls",
+    "source/resource allowlists and tenant-bound secret references",
+    "SSRF, DNS, redirect, private-address and response bounds",
+    "evidence canonicalization, provenance, redaction and quarantine",
+    "durable page intent, cursor encryption and ambiguous-outcome handling",
+    "deterministic non-causal correlation and extended citation validation"
+  ],
+  "required_stateful_services": [
+    "PostgreSQL",
+    "Temporal Server"
+  ],
+  "runtime": {
+    "median_ms": 1.986,
+    "network": false,
+    "p95_ms": 2.644,
+    "runs": 200,
+    "scenario": "deterministic-success"
+  },
+  "schema_version": 5,
+  "source_loc": {
+    "production": 16419,
+    "tests": 7643,
+    "total": 24062
+  }
+}

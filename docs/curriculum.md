@@ -1,4 +1,4 @@
-# Layer 4 curriculum
+# Layer 5 curriculum
 
 ## Learning outcomes
 
@@ -27,6 +27,13 @@ After this layer, an engineer should be able to:
 21. assign SDK, gateway and Temporal retry ownership without multiplication;
 22. contain malformed/hostile output with schema, tool and citation allowlists;
 23. distinguish immutable usage facts from derived provider health and framework traces.
+24. design tenant/source/query/page/provenance/citation/bundle contracts and digests;
+25. enforce SSRF, DNS, redirect, response, pagination and secret-reference boundaries;
+26. record connector page intent/result without overlapping Temporal/SDK retries;
+27. canonicalize, scan, redact, deduplicate and quarantine untrusted documents;
+28. correlate timelines/conflicts deterministically without causal claims;
+29. rebuild forced-RLS evidence projections and expose redacted status/cursor APIs;
+30. critically compare narrow official clients with broad loader/connector frameworks.
 
 ## Suggested sequence
 
@@ -49,6 +56,13 @@ After this layer, an engineer should be able to:
 | Routing and resilience | `ModelGateway` | Trigger fallback, circuit, timeout and cancellation | Why is ambiguous billing not retried by default? |
 | Provider adapters | `provider_adapters.py` | Verify both SDKs use zero retries and fake clients | What remains vendor-specific? |
 | Model ledger | migration 0003, `model_postgres.py` | Race reservations and rebuild projections | Which fact owns usage/cost? |
+| Evidence contracts | ADR 010, `evidence.py` | Tamper source/query/provenance/citation digests | Which fields bind a citation? |
+| Connector security | `connector_adapters.py` | Probe DNS/private IP/redirect/MIME/size/rate limit | Which library control is insufficient? |
+| Durable pagination | `evidence_temporal.py`, `evidence_runtime.py` | Crash after page intent and reconcile | Why may an Activity retry not repeat I/O? |
+| Safe ingestion | `ingestion.py` | Submit injection, token, malformed YAML and ZIP bomb | Which records reach graph state? |
+| Correlation | `correlation.py`, `graph.py` | Reverse input and add conflicts/stale sources | Why is proximity never cause? |
+| Evidence persistence/API | migration 0004, `evidence_postgres.py`, `api.py` | Rebuild and cross-tenant query/cursor reads | Which ledger facts rebuild status? |
+| Framework comparison | `framework-selection.md`, Layer 5 metrics | Compare custom Layer 6 LOC/deps/runtime | What code did frameworks actually remove? |
 
 ## Practical exercises
 
@@ -72,6 +86,10 @@ After this layer, an engineer should be able to:
 12. Crash after model call intent, prove the cost is reported ambiguous, and reconcile it.
 13. Revoke model policy during a fake provider call and prove the billed output is stale.
 14. Replace the fake provider adapter without changing graph/domain/ledger contracts.
+15. Add a fake paginated source and prove cursor/query/tenant binding.
+16. Rotate a source credential revision during a page call and prove stale rejection.
+17. Add a scanner hook and prove blocking findings create quarantine metadata only.
+18. Add contradictory evidence in reverse order and prove identical non-causal output.
 
 ## Assessment rubric
 

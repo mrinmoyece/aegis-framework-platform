@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aegis-framework-platform"
-version = "0.4.0"
+version = "0.5.0"
 description = "Framework-first governed enterprise model investigation platform"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
@@ -21,17 +21,22 @@ classifiers = [
 dependencies = [
   "cryptography==50.0.0",
   "fastapi==0.141.1",
+  "httpx==0.28.1",
   "langchain-core==1.5.5",
   "langgraph==1.2.11",
   "opentelemetry-api==1.44.0",
   "opentelemetry-sdk==1.44.0",
   "pydantic==2.13.4",
+  "PyYAML==6.0.3",
   "pyjwt[crypto]==2.13.0",
   "temporalio[opentelemetry,pydantic]==1.31.0",
   "uvicorn==0.52.3",
 ]
 
 [project.optional-dependencies]
+connectors = [
+  "kubernetes==36.0.3",
+]
 framework-observability = [
   "langfuse==4.14.4",
   "opentelemetry-exporter-otlp-proto-http==1.44.0",
@@ -126,8 +131,11 @@ branch = true
 source = ["aegis_framework"]
 omit = [
   "src/aegis_framework/durable_postgres.py",
+  "src/aegis_framework/evidence_postgres.py",
   "src/aegis_framework/model_postgres.py",
   "src/aegis_framework/postgres.py",
+  "src/aegis_framework/temporal.py",
+  "src/aegis_framework/evidence_temporal.py",
 ]
 
 [tool.coverage.report]

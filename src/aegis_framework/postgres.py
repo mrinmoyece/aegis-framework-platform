@@ -52,6 +52,7 @@ _MIGRATIONS = (
     _ROOT / "migrations/0001_layer2.sql",
     _ROOT / "migrations/0002_layer3.sql",
     _ROOT / "migrations/0003_layer4.sql",
+    _ROOT / "migrations/0004_layer5.sql",
 )
 _CHECKPOINT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 
@@ -368,6 +369,12 @@ class PostgresRepository:
                         AND to_regclass(
                             'aegis.provider_health_projection'
                         ) IS NOT NULL
+                        AND to_regclass('aegis.evidence_sources') IS NOT NULL
+                        AND to_regclass('aegis.evidence_queries') IS NOT NULL
+                        AND to_regclass('aegis.evidence_cursors') IS NOT NULL
+                        AND to_regclass('aegis.evidence_metadata') IS NOT NULL
+                        AND to_regclass('aegis.evidence_quarantine') IS NOT NULL
+                        AND to_regclass('aegis.evidence_bundles') IS NOT NULL
                         AND (
                             SELECT relrowsecurity AND relforcerowsecurity
                             FROM pg_class
@@ -389,7 +396,13 @@ class PostgresRepository:
                                 'aegis.model_reservation_settlements'::regclass,
                                 'aegis.model_call_events'::regclass,
                                 'aegis.model_usage_projection'::regclass,
-                                'aegis.provider_health_projection'::regclass
+                                'aegis.provider_health_projection'::regclass,
+                                'aegis.evidence_sources'::regclass,
+                                'aegis.evidence_queries'::regclass,
+                                'aegis.evidence_cursors'::regclass,
+                                'aegis.evidence_metadata'::regclass,
+                                'aegis.evidence_quarantine'::regclass,
+                                'aegis.evidence_bundles'::regclass
                             )
                         ) AS ready
                     """

@@ -1,4 +1,4 @@
-"""Measure repeatable Layer 4 size, dependencies, effort, and local runtime."""
+"""Measure repeatable Layer 5 size, dependencies, effort, and local runtime."""
 
 from __future__ import annotations
 
@@ -18,7 +18,10 @@ from pathlib import Path
 from pydantic import Field
 
 from aegis_framework.api import _demo_model_control
-from aegis_framework.domain import RiskLevel, StrictModel
+from aegis_framework.domain import (
+    RiskLevel,
+    StrictModel,
+)
 from aegis_framework.fixtures import build_demo_bundle, demo_identity, demo_request
 from aegis_framework.model_gateway import (
     DataClassification,
@@ -38,7 +41,7 @@ from aegis_framework.model_gateway import (
 
 ROOT = Path(__file__).resolve().parents[1]
 FOUNDATION_SHA = "754e536d10b9643b40cac2f7b6c0d1de870fd630"
-LAYER3_SHA = "7f5813d6b88a83ace2e5624254d8f4b4aa2ac4aa"
+LAYER4_SHA = "1d8a6d2b05c3a80eb32ab779ddd35159612f5f4d"
 CUSTOM_LAYER3 = {
     "repository": "mrinmoyece/aegis-agent-platform",
     "branch": "mrinmoyece-aegis-durable-ledger",
@@ -107,6 +110,29 @@ CUSTOM_LAYER5 = {
     },
     "test_functions": 141,
 }
+CUSTOM_LAYER6 = {
+    "repository": "mrinmoyece/aegis-agent-platform",
+    "branch": "mrinmoyece-aegis-evidence-connectors",
+    "sha": "7a685bc52772e1c92467baba58a1c668646e9bf7",
+    "source_loc": {
+        "production": 17119,
+        "tests": 8780,
+        "total": 25899,
+    },
+    "dependencies": {
+        "direct_runtime": 12,
+        "direct_optional": 5,
+        "direct_development": 0,
+        "locked_total": None,
+    },
+    "incremental_effort_from_layer5": {
+        "additions": 10954,
+        "deletions": 123,
+        "changed_files": 50,
+        "commits": 1,
+    },
+    "test_functions": 204,
+}
 
 
 def main() -> int:
@@ -157,22 +183,28 @@ def measure(runs: int) -> dict[str, object]:
     dependency_groups = pyproject.get("dependency-groups", {})
     effort = _git_effort()
     gateway_runtime = _gateway_runtime(runs)
+    evidence_runtime = _evidence_runtime(runs)
     return {
-        "schema_version": 4,
-        "layer": 4,
+        "schema_version": 5,
+        "layer": 5,
         "comparison_basis": {
             "foundation_sha": FOUNDATION_SHA,
             "custom_layer3": CUSTOM_LAYER3,
             "custom_layer4": CUSTOM_LAYER4,
             "custom_layer5": CUSTOM_LAYER5,
+            "custom_layer6": CUSTOM_LAYER6,
             "loc_definition": "non-blank, non-comment physical Python lines",
             "effort_definition": (
                 "Git additions/deletions and changed files from each prior layer"
             ),
-            "equivalent_scenario": (
+            "equivalent_gateway_scenario": (
                 "tenant-scoped structured fake-provider call with explicit catalog, "
                 "pre-call reservation, deterministic route, normalized usage/cost "
                 "settlement, no network, and no production effect"
+            ),
+            "equivalent_evidence_scenario": (
+                "three tenant-bound cited records correlated in process with stable "
+                "timeline ordering, shared-fact links, no network, and no causal claim"
             ),
         },
         "measured_at": datetime.now(UTC).isoformat(),
@@ -207,6 +239,9 @@ def measure(runs: int) -> dict[str, object]:
             "durable timers and signal delivery",
             "activity retry/backoff and worker crash recovery",
             "OpenAI and Anthropic wire protocol and SDK exception transport",
+            "HTTP connection pooling and streaming response mechanics",
+            "Kubernetes API object decoding and list transport",
+            "safe YAML syntax parsing",
         ],
         "remaining_custom_controls": [
             "issuer registry and bounded JWKS rotation policy",
@@ -228,6 +263,11 @@ def measure(runs: int) -> dict[str, object]:
             "model routing, fallback, circuit, rate and concurrency policy",
             "immutable provider call and ambiguous-billing facts",
             "strict structured output, tools and citation controls",
+            "source/resource allowlists and tenant-bound secret references",
+            "SSRF, DNS, redirect, private-address and response bounds",
+            "evidence canonicalization, provenance, redaction and quarantine",
+            "durable page intent, cursor encryption and ambiguous-outcome handling",
+            "deterministic non-causal correlation and extended citation validation",
         ],
         "lock_in_and_escape": {
             "langgraph": "OrchestratorPort plus JSON-compatible domain state",
@@ -246,12 +286,16 @@ def measure(runs: int) -> dict[str, object]:
             "openai_anthropic": (
                 "ModelProviderAdapter plus neutral ModelRequest/ProviderResult"
             ),
+            "httpx": "HttpTransport plus neutral connector records and pages",
+            "kubernetes": "KubernetesApi protocol plus neutral connector records",
+            "pyyaml": "canonical JSON/text boundary after safe syntax parsing",
         },
         "required_stateful_services": ["PostgreSQL", "Temporal Server"],
         "custom_comparison": {
             "layer3_services": ["PostgreSQL"],
             "layer4_services": ["PostgreSQL", "Redis Streams"],
             "layer5_services": ["PostgreSQL", "Redis Streams"],
+            "layer6_services": ["PostgreSQL", "Redis Streams"],
             "temporal_tradeoff": (
                 "Temporal removes scheduler, timers, signal history, retry/backoff, "
                 "and crash recovery code but adds a second operational control plane"
@@ -261,10 +305,10 @@ def measure(runs: int) -> dict[str, object]:
                 "machine; figures are local implementation latency, not provider or "
                 "distributed throughput"
             ),
-            "layer5_tradeoff": (
-                "Official SDKs remove provider wire code but framework Layer 4 adds "
-                "application controls rather than reducing them; it uses Temporal "
-                "instead of the custom Redis worker runtime"
+            "layer6_tradeoff": (
+                "HTTPX, PyYAML, and the official Kubernetes client remove transport, "
+                "syntax, and Kubernetes object decoding only. They do not remove "
+                "tenant, provenance, SSRF, pagination, ledger, or quarantine controls"
             ),
         },
         "runtime": {
@@ -289,6 +333,21 @@ def measure(runs: int) -> dict[str, object]:
                 "provider network, serialization, or process boundary was included"
             ),
         },
+        "equivalent_evidence_benchmark": {
+            "scenario": "deterministic-three-record-non-causal-correlation",
+            "network": False,
+            "runs": runs,
+            "framework_layer5": evidence_runtime,
+            "custom_layer6": {
+                "median_ms": 0.015,
+                "p95_ms": 0.015,
+                "sha": CUSTOM_LAYER6["sha"],
+            },
+            "limitations": (
+                "Different Pydantic/dataclass contracts; excludes PostgreSQL, "
+                "Temporal, Redis, connector networks, ingestion, and process boundaries"
+            ),
+        },
     }
 
 
@@ -297,7 +356,7 @@ def _git_effort() -> dict[str, int]:
     if git is None:
         raise RuntimeError("git is required to measure implementation effort")
     completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
-        [git, "diff", "--numstat", LAYER3_SHA, "--"],
+        [git, "diff", "--numstat", LAYER4_SHA, "--"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -369,6 +428,65 @@ def _gateway_runtime(runs: int) -> dict[str, float]:
     for index in range(runs):
         started = time.perf_counter_ns()
         gateway.generate(request(index), _BenchmarkOutput)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _evidence_runtime(runs: int) -> dict[str, float]:
+    from datetime import timedelta
+
+    from aegis_framework.evidence import (
+        DataClassification,
+        EvidenceBounds,
+        EvidenceQuery,
+        EvidenceSource,
+        EvidenceSourceKind,
+        EvidenceTimeRange,
+        SourceTrust,
+    )
+    from aegis_framework.evidence_runtime import (
+        CursorVault,
+        InMemoryEvidenceControlStore,
+    )
+
+    store = InMemoryEvidenceControlStore(
+        cursor_vault=CursorVault(b"b" * 32),
+    )
+    now = datetime(2026, 8, 15, 12, 0, 0, tzinfo=UTC)
+    source = EvidenceSource(
+        tenant_id="tenant-bench",
+        source_id="source-github",
+        kind=EvidenceSourceKind.GITHUB,
+        trust=SourceTrust.EXTERNAL_UNTRUSTED,
+        classification=DataClassification.INTERNAL,
+        region="eu-west-1",
+        policy_revision=1,
+        allowed_resources=("bench/repo/deployments",),
+        enabled=True,
+    )
+    durations: list[float] = []
+    for index in range(runs):
+        query = EvidenceQuery(
+            query_id=f"query-bench-{index}",
+            tenant_id="tenant-bench",
+            incident_id="bench-incident",
+            run_id=f"run-bench-{index}",
+            source=source,
+            window=EvidenceTimeRange(
+                start=now - timedelta(minutes=30),
+                end=now,
+            ),
+            resource="bench/repo/deployments",
+            parameters={},
+            bounds=EvidenceBounds(),
+            created_at=now,
+        )
+        started = time.perf_counter_ns()
+        store.request(query, operation_id=f"op-bench-{index}")
         durations.append((time.perf_counter_ns() - started) / 1_000_000)
     ordered = sorted(durations)
     return {

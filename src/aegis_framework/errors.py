@@ -29,6 +29,22 @@ class EvidenceUnavailable(AegisFrameworkError):
     pass
 
 
+class ConnectorDisabled(AegisFrameworkError):
+    pass
+
+
+class ConnectorRejected(AegisFrameworkError):
+    pass
+
+
+class ConnectorRateLimited(AegisFrameworkError):
+    pass
+
+
+class ReconciliationRequired(AegisFrameworkError):
+    pass
+
+
 class ModelProviderError(AegisFrameworkError):
     pass
 

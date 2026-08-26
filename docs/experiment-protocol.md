@@ -55,6 +55,12 @@ compared layer.
 34. timeout/cancellation and explicit billing ambiguity;
 35. duplicate call suppression and policy revocation during I/O;
 36. model usage/catalog/health RLS and projection rebuild.
+37. connector page/cursor/retry/crash and reconciliation behavior;
+38. SSRF/DNS/private-IP/redirect and malformed/oversized/MIME response rejection;
+39. secret/PII/injection scanning, redaction, quarantine and duplicate handling;
+40. source policy/credential revocation, cancellation and stale-result exclusion;
+41. deterministic correlation order, conflict, freshness, missing source and citation;
+42. evidence forced-RLS isolation and application-event projection rebuild.
 
 Inputs, expected status, citation rules, and authority boundaries must match. A
 framework feature cannot be credited if the custom implementation is tested against
@@ -78,6 +84,9 @@ Capture on a clean checkout:
   port/escape hatch for every selected framework.
 - model gateway equivalent scenario against custom Aegis Layer 5, including provider
   dependency/operational cost and whether framework use increased code.
+- evidence correlation equivalent scenario against custom Aegis Layer 6
+  `7a685bc52772e1c92467baba58a1c668646e9bf7`, including connector/parser dependencies,
+  retained security controls, operational cost and whether framework use removed code.
 
 Record OS, architecture, Python, framework versions, CPU/memory limits, network
 policy, and run count. Do not compare local Apple Silicon numbers with cloud x86

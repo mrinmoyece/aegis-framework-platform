@@ -118,5 +118,30 @@
     "case_id": "model-tenant-isolation",
     "kind": "model-tenant-isolation",
     "expected_reason": "tenant_model_policy_isolation"
+  },
+  {
+    "case_id": "evidence-pagination",
+    "kind": "evidence-pagination",
+    "expected_reason": "durable_cursor_checkpoint"
+  },
+  {
+    "case_id": "evidence-poisoning",
+    "kind": "evidence-poisoning",
+    "expected_reason": "untrusted_content_quarantine"
+  },
+  {
+    "case_id": "evidence-policy-revocation",
+    "kind": "evidence-policy-revocation",
+    "expected_reason": "stale_connector_result_rejected"
+  },
+  {
+    "case_id": "evidence-correlation",
+    "kind": "evidence-correlation",
+    "expected_reason": "deterministic_non_causal_correlation"
+  },
+  {
+    "case_id": "evidence-ssrf",
+    "kind": "evidence-ssrf",
+    "expected_reason": "private_destination_rejected"
   }
 ]

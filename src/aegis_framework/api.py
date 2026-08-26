@@ -58,6 +58,8 @@ from aegis_framework.errors import (
     PolicyDenied,
     RepositoryUnavailable,
 )
+from aegis_framework.evidence import EvidenceCursorView, EvidenceQueryView
+from aegis_framework.evidence_runtime import EvidenceStatusPort
 from aegis_framework.fixtures import DemoBundle, DemoScenario, build_demo_bundle
 from aegis_framework.identity import UnavailableAuthenticator
 from aegis_framework.model_gateway import (
@@ -119,6 +121,7 @@ class DurableRunResponse(StrictModel):
 class HealthResponse(StrictModel):
     status: str
     identity_mode: AppMode
+    network_connectors_enabled: bool
     network_models_enabled: bool
     effects_enabled: bool
 
@@ -227,6 +230,7 @@ class ApiRuntime:
     service_for: Callable[[DemoScenario], InvestigationService]
     durable: DurableInvestigationService | None = None
     model_control: ModelControlStore | None = None
+    evidence_control: EvidenceStatusPort | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -288,8 +292,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.4.0",
-        description="Authenticated durable Layer 4 model investigation API.",
+        version="0.5.0",
+        description="Authenticated durable Layer 5 evidence investigation API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -338,6 +342,7 @@ def create_app(
         return HealthResponse(
             status="ok",
             identity_mode=mode,
+            network_connectors_enabled=False,
             network_models_enabled=False,
             effects_enabled=False,
         )
@@ -489,6 +494,52 @@ def create_app(
             resource_tenant_id=identity.tenant_id,
         )
         return tuple(control.health(tenant_id=identity.tenant_id))
+
+    @app.get(
+        "/v1/evidence/queries/{query_id}",
+        response_model=EvidenceQueryView,
+    )
+    def evidence_query_status(
+        query_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> EvidenceQueryView:
+        control = _require_evidence_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.EVIDENCE_QUERY_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        result = control.status(
+            tenant_id=identity.tenant_id,
+            query_id=query_id,
+        )
+        if result is None:
+            _not_found()
+        return result
+
+    @app.get(
+        "/v1/evidence/queries/{query_id}/cursor",
+        response_model=EvidenceCursorView,
+    )
+    def evidence_cursor_status(
+        query_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> EvidenceCursorView:
+        control = _require_evidence_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.EVIDENCE_CURSOR_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        result = control.cursor_status(
+            tenant_id=identity.tenant_id,
+            query_id=query_id,
+        )
+        if result is None:
+            _not_found()
+        return result
 
     @app.post(
         "/v1/investigations",
@@ -686,6 +737,15 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
     from aegis_framework.fixtures import DEMO_TIME
 
     durable_store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
+    from aegis_framework.evidence_runtime import (
+        CursorVault,
+        InMemoryEvidenceControlStore,
+    )
+
+    evidence_control = InMemoryEvidenceControlStore(
+        cursor_vault=CursorVault(b"aegis-demo-evidence-cursor-key-1"),
+        clock=FixedClock(DEMO_TIME).now,
+    )
     model_control = _demo_model_control()
     return ApiRuntime(
         authenticator=primary.authenticator,
@@ -701,6 +761,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
             cursor_codec=CursorCodec(b"aegis-demo-cursor-key-is-test-only-0001"),
         ),
         model_control=model_control,
+        evidence_control=evidence_control,
     )
 
 
@@ -884,6 +945,15 @@ def _require_model_control(runtime: ApiRuntime) -> ModelControlStore:
             detail="model operations are unavailable",
         )
     return runtime.model_control
+
+
+def _require_evidence_control(runtime: ApiRuntime) -> EvidenceStatusPort:
+    if runtime.evidence_control is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="evidence control is not configured",
+        )
+    return runtime.evidence_control
 
 
 def _authorize_resource(

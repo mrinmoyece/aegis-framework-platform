@@ -1,4 +1,4 @@
-# Layer 4 limitations
+# Layer 5 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -61,5 +61,41 @@
 - PostgreSQL model reservation/reconciliation integration is environment-gated. It does
   not qualify HA, multi-region budget order, price updates during long runs, or high-volume
   ledger partitioning.
+- Dynatrace, GitHub App, Kubernetes, and runbook adapters are production-shaped but
+  disabled by default and tested only with deterministic transports/SDK doubles. No live
+  account, scope, token rotation, regional endpoint, latency, rate-limit, pagination, or
+  provider-version behavior is qualified.
+- HTTPX origin/DNS/IP checks reduce SSRF risk but cannot eliminate DNS rebinding between
+  resolution and connection. Production requires deny-by-default egress, approved DNS,
+  TLS inspection policy where applicable, and no environment proxy inheritance.
+- GitHub has no official Python SDK and Dynatrace has no general official Python REST
+  SDK. Direct HTTPX means Aegis retains endpoint/shape maintenance. The official
+  Kubernetes client adds a large requests/urllib3/WebSocket/OAuth dependency subtree and
+  must track cluster/client compatibility.
+- GitHub installation-token caching across workers, Dynatrace OAuth client-credential
+  flows, private enterprise origins/CAs, Kubernetes watch/relist, webhook verification,
+  and distributed connector rate limiting are not implemented.
+- Cursor values are AES-GCM encrypted in application storage, but production KMS key
+  rotation, envelope encryption, cryptographic erasure, and cross-region key availability
+  are not qualified.
+- The default parser accepts UTF-8 text/Markdown, JSON, safe YAML, and bounded ZIP only.
+  PDF, DOCX, XML, HTML, images, OCR, macros, active content, and broad loader frameworks
+  are intentionally absent. Parsing runs in-process; a resource-isolated parser service
+  is required before admitting complex formats.
+- Secret/PII/injection scanners are deterministic hooks, not proof of complete detection.
+  Quarantine storage, reviewer workflow, retention deletion, legal hold, and encrypted
+  raw-object lifecycle remain operational work.
+- Evidence metadata and bundles have forced-RLS schema and deterministic projection
+  rebuild. Capacity, partitioning, object storage, WORM witnessing, PITR/restore,
+  retention/erasure execution, and high-volume cursor cleanup are unproven.
+- Temporal evidence workflow code carries only opaque references and is environment-gated.
+  It does not prove live connector reconciliation. A crash after a read can remain
+  permanently ambiguous when the source has no stable request/audit identifier.
+- Deterministic correlation links time/shared facts and preserves conflict but cannot
+  prove causality, clock correctness, semantic equivalence, or source truth. Missing or
+  stale required sources cause abstention; operators must not reinterpret proximity as
+  cause.
+- Multi-agent expansion beyond the existing two-specialist graph, approvals/effects,
+  sandboxing, memory/RAG, UI, MCP/A2A, and deployment remain explicitly deferred.
 
 These are explicit non-production boundaries, not implied capabilities.

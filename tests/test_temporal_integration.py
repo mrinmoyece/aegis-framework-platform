@@ -18,6 +18,16 @@ from aegis_framework.activity_runtime import (
 from aegis_framework.adapters import FixedClock, InMemoryBudget
 from aegis_framework.durability import InMemoryDurability, RunStatus
 from aegis_framework.errors import RepositoryUnavailable
+from aegis_framework.evidence import QueryStatus
+from aegis_framework.evidence_temporal import (
+    AegisEvidenceQueryWorkflow,
+    EvidenceActivityInput,
+    EvidenceActivityOperations,
+    EvidenceActivityOutcome,
+    EvidenceWorkflowInput,
+    EvidenceWorkflowResult,
+    TemporalEvidenceActivities,
+)
 from aegis_framework.fixtures import (
     DEMO_TIME,
     build_demo_bundle,
@@ -38,6 +48,7 @@ from aegis_framework.temporal import (
 )
 
 _TASK_QUEUE = "aegis-integration-v1"
+_EVIDENCE_TASK_QUEUE = "aegis-evidence-integration-v1"
 
 
 class _RetryOnceOperations(CallbackActivityOperations):
@@ -51,6 +62,40 @@ class _RetryOnceOperations(CallbackActivityOperations):
             if self.retry_attempts == 1:
                 raise RepositoryUnavailable("synthetic activity outage")
         return ActivityOutcome(outcome="evidence_ready")
+
+
+class _EvidenceOperations(EvidenceActivityOperations):
+    def __init__(self) -> None:
+        self.pages: list[int] = []
+        self.cancelled = False
+
+    async def authorize(self, value: EvidenceActivityInput) -> EvidenceActivityOutcome:
+        del value
+        return EvidenceActivityOutcome(outcome="authorized")
+
+    async def fetch_page(self, value: EvidenceActivityInput) -> EvidenceActivityOutcome:
+        self.pages.append(value.page_number)
+        return EvidenceActivityOutcome(
+            outcome="page_complete",
+            has_next_page=value.page_number == 1,
+            cursor_ref=("cursor:opaque" if value.page_number == 1 else None),
+        )
+
+    async def complete(self, value: EvidenceActivityInput) -> EvidenceActivityOutcome:
+        del value
+        return EvidenceActivityOutcome(
+            outcome="query_complete",
+            bundle_ref="bundle:opaque",
+        )
+
+    async def cancel(self, value: EvidenceActivityInput) -> EvidenceActivityOutcome:
+        del value
+        self.cancelled = True
+        return EvidenceActivityOutcome(outcome="cancelled")
+
+    async def reconcile(self, value: EvidenceActivityInput) -> EvidenceActivityOutcome:
+        del value
+        return EvidenceActivityOutcome(outcome="query_complete")
 
 
 def _outcomes() -> dict[str, ActivityOutcome]:
@@ -233,6 +278,47 @@ def test_temporal_completion_signal_timeout_and_replay() -> None:
                 data_converter=temporal_data_converter(),
             ).replay_workflow(history)
             assert replayed.replay_failure is None
+        finally:
+            if environment is not None:
+                await environment.shutdown()
+
+    asyncio.run(execute())
+
+
+@pytest.mark.temporal
+def test_temporal_evidence_pagination_uses_opaque_references() -> None:
+    async def execute() -> None:
+        client, environment = await _client()
+        operations = _EvidenceOperations()
+        activities = TemporalEvidenceActivities(operations)
+        worker = Worker(
+            client,
+            task_queue=_EVIDENCE_TASK_QUEUE,
+            workflows=[AegisEvidenceQueryWorkflow],
+            activities=list(activities.registered()),
+        )
+        value = EvidenceWorkflowInput(
+            tenant_ref="tenant:opaque",
+            actor_ref="actor:opaque",
+            request_ref="request:opaque",
+            run_id="run:evidence",
+            query_ref="query:opaque",
+            workflow_id="workflow:evidence",
+            maximum_pages=2,
+        )
+        try:
+            async with worker:
+                completed = await client.execute_workflow(
+                    AegisEvidenceQueryWorkflow.run,
+                    value,
+                    id=f"workflow:evidence:{uuid4().hex}",
+                    task_queue=_EVIDENCE_TASK_QUEUE,
+                    execution_timeout=timedelta(minutes=2),
+                )
+                assert isinstance(completed, EvidenceWorkflowResult)
+                assert completed.status is QueryStatus.COMPLETED
+                assert completed.bundle_ref == "bundle:opaque"
+                assert operations.pages == [1, 2]
         finally:
             if environment is not None:
                 await environment.shutdown()

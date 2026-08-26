@@ -1,4 +1,4 @@
-# Tutorial: trace one durable model-backed investigation without trusting frameworks
+# Tutorial: trace one durable evidence-backed investigation without trusting frameworks
 
 ## 1. Run the deterministic delivery adapter
 
@@ -191,7 +191,41 @@ current model policy/catalog
 Malformed output receives only the policy repair bound. Timeout/crash ambiguity blocks
 silent duplicate calls. No model output can create identity, policy, approval, or effect.
 
-## 11. Run all release gates
+## 11. Trace the evidence plane
+
+1. Start at `evidence.py`. Source, query, cursor, provenance, normalized record,
+   citation, and bundle are frozen strict contracts with canonical digests.
+2. Follow `connector_adapters.py`. Origins/resources come from current configured
+   sources, not evidence/model content. Redirects/proxies are disabled; DNS/IP, bytes,
+   MIME and shapes are checked before mapping.
+3. Follow `evidence_runtime.py`. Query/page intent is durable before I/O. Cursors are
+   tenant/query-bound AES-GCM values. A crash window becomes
+   `reconciliation_required`, not an invisible retry.
+4. Follow `ingestion.py`. JSON/safe YAML/text/bounded ZIP is canonicalized, scanned,
+   redacted or quarantined, classified, hashed and tenant/incident deduplicated.
+5. Follow `correlation.py` into `graph.py`. Timeline and links are deterministic,
+   conflicts/missing/stale sources are explicit, and links remain non-causal. LangGraph
+   receives allowlisted facts plus provenance-bound citations.
+6. Inspect `migrations/0004_layer5.sql` and evidence query/cursor routes. PostgreSQL
+   forces tenant RLS; API output contains status/count/page/expiry only.
+
+The five evidence evals exercise two-page continuation, injection quarantine,
+source-policy revocation, deterministic non-causal correlation, and private-address
+rejection without credentials or network.
+
+## 12. Add a source safely
+
+Implement `EvidenceConnector` and return `ConnectorPage`. Keep vendor imports in an
+adapter. Add exact source/resource allowlists, tenant secret reference/version,
+cancellation, page/record/byte/time bounds, deterministic fakes, durable intent/result,
+scanner/provenance tests and current-policy checks. Do not add a loader, RAG framework,
+retry library, arbitrary URL, raw query language, webhook, watch, or write API unless a
+separate ADR proves its security and ownership.
+
+Read the [connector runbook](connector-runbook.md). It describes production-shaped
+enablement and reconciliation without claiming live qualification.
+
+## 13. Run all release gates
 
 ```bash
 make ci

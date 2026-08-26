@@ -1,4 +1,4 @@
-# Layer 4 failure modes
+# Layer 5 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -40,6 +40,23 @@
 | Unsupported tool/citation | Exact tool allowlist and citation triple validation reject output | Application safety | unit/eval |
 | Policy revoked/cancel during call | Usage is settled but stale result is rejected | Current policy + ledger | unit/eval |
 | Usage/health projection loss | Rebuild from immutable reservations/call events | PostgreSQL application ledger | integration |
+| Connector disabled/unconfigured | Deny before secret resolution/network | Current source policy | unit/eval |
+| Connector URL/resource injection | Ignore caller/model URL; exact configured origin/resource allowlist | Application source registry | unit/security |
+| DNS/private-IP/redirect attempt | Reject before transport or credential forwarding | Application transport + egress | unit/eval |
+| Connector timeout/SDK exception | Explicit failure; SDK retry disabled | Temporal Activity/application intent | unit |
+| Rate limit | Explicit rate-limited failure/count; no hidden client retry | Application/Temporal | unit |
+| Malformed/MIME/oversized response | Reject/quarantine within byte/schema bounds | Connector/ingestion | unit |
+| Cursor loop/expiry/substitution | Bound pages; bind/encrypt cursor; expired Kubernetes cursor requires relist | Application cursor projection | unit |
+| Crash after page intent | Mark reconciliation required; do not repeat ambiguous read | Application ledger | unit/PostgreSQL |
+| Cancellation during page | Check before call and result commit; reject stale result | Current application cancellation | unit/Temporal boundary |
+| Source policy/credential rotated | Recheck source digest/version; reject stale page | Current source registry | unit/eval |
+| Secret/PII/injection detected | Redact or quarantine; never project quarantined text | Ingestion policy | unit/eval |
+| Archive/document bomb | Reject active/traversal/type/member/ratio/byte/depth overflow | Ingestion policy | unit |
+| Duplicate content | Tenant/incident digest marks duplicate without duplicate model context | Evidence metadata | unit |
+| Conflicting evidence | Preserve deterministic conflict and abstain where required | Correlation reducer | unit/eval |
+| Missing/stale telemetry/change | Critic abstains; missing runbook prevents proposal | Correlation + critic | unit |
+| Evidence projection loss | Verify ledger, deterministic rebuild, record rebuild fact | Application ledger/PostgreSQL | unit/integration |
+| Cursor/status cross-tenant read | Current authorization plus forced RLS/404 | Policy/PostgreSQL | API/integration |
 
 ## Retry rules
 

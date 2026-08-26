@@ -8,10 +8,10 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
-**Layer 4 investigates through a governed model gateway. It still cannot approve, execute,
-or verify a production effect.**
+**Layer 5 investigates through durable secure evidence connectors and a governed model
+gateway. It still cannot approve, execute, or verify a production effect.**
 
-## Delivered Layer 4
+## Delivered Layer 5
 
 - additive strict application events with aggregate sequence, commit-order tenant
   cursor, expected-version concurrency, aggregate/tenant hash chains, legacy upcast,
@@ -41,6 +41,17 @@ or verify a production effect.**
 - deterministic fake plus official OpenAI 3.1.0 and Anthropic 0.122.0 adapters; all tests
   use fake clients and no network/credentials;
 - authorized redacted catalog, usage, and derived-health APIs under forced PostgreSQL RLS.
+- immutable evidence source/query/page/cursor/provenance/citation/bundle contracts;
+- disabled-by-default Dynatrace/GitHub HTTPX, official Kubernetes, and trusted-runbook
+  adapters with exact allowlists, tenant secret references, SSRF/DNS/redirect,
+  pagination, timeout, rate-limit, response and cancellation controls;
+- application-ledger page intent/result, encrypted cursor checkpoints, opaque Temporal
+  pagination, stale policy/credential rejection and explicit reconciliation ambiguity;
+- bounded JSON/safe-YAML/text/ZIP canonicalization, hashing, deduplication, scanning,
+  redaction, classification, quarantine and retention references;
+- deterministic non-LLM timeline/link/conflict/freshness/missing-source correlation with
+  non-causal links and provenance-bound graph/model citations;
+- forced-RLS evidence projections/rebuild and authorized redacted query/cursor APIs.
 
 ## Ownership
 
@@ -50,6 +61,7 @@ or verify a production effect.**
 | Temporal | Cross-process schedule, Activities, timers, signals, replay/recovery | Tenant grants, policy, audit, API status, effects |
 | LangGraph | Cognitive nodes, fan-out/join, reducers, graph checkpoints | Workflow lifecycle, authorization, audit, effects |
 | Official provider SDKs | OpenAI/Anthropic wire protocol and decoding | Model policy, routing, budget, pricing, usage, safety, retry truth |
+| Connector libraries | HTTPX transport, Kubernetes decoding, PyYAML syntax | Tenant/source policy, SSRF, secrets, provenance, pagination truth, quarantine |
 
 A framework history, checkpoint, trace, prompt, completion, message, or tool result is
 never an authorization, tenant grant, quota receipt, approval, audit record, fencing
@@ -118,7 +130,7 @@ make integration
 AEGIS_TEST_TEMPORAL_ADDRESS=127.0.0.1:57233 make temporal-integration
 ```
 
-The five PostgreSQL tests prove forced RLS/pool reset, immutable audit/events, quota/model
+The six PostgreSQL tests prove forced RLS/pool reset, immutable audit/events, quota/model
 races, checkpoint isolation, ledger/outbox atomicity, projection rebuild, and tenant
 isolation. The Temporal test proves no-worker recovery, Activity retry, duplicate
 signal, cancellation signal, timer timeout, completion, and deterministic replay.
@@ -143,14 +155,16 @@ never the repository or workflow history.
 | Telemetry | OpenTelemetry 1.44.0 | Fixed names/allowlisted attributes |
 | Optional model trace/eval | Langfuse 4.14.4 | Counts/status only |
 | Provider adapters | OpenAI 3.1.0 + Anthropic 0.122.0 | `ModelProviderAdapter`; retries disabled |
+| Evidence adapters | HTTPX 0.28.1 + Kubernetes 36.0.3 + PyYAML 6.0.3 | Neutral ports; disabled by default |
 
 ## Qualification status
 
-- 163 deterministic tests pass at greater than 90% meaningful branch coverage;
-- 21 deterministic evals cover cognitive and model gateway safety, durable recovery,
+- 215 deterministic tests pass at 90.11% meaningful branch coverage;
+- 26 deterministic evals cover cognitive/model safety, durable recovery,
   routing, budgets, malformed output, fallback/circuit, timeout/cancellation, duplicate
-  and ambiguous billing, revocation, and tenant isolation;
-- five PostgreSQL and two Temporal integration tests pass locally;
+  and ambiguous billing, revocation, tenant isolation, connector pagination, poisoning,
+  source revocation, non-causal correlation and SSRF;
+- six PostgreSQL and three Temporal integration tests pass locally;
 - one Keycloak compatibility test remains environment-gated;
 - tests/evals use no live credentials, real models, or cloud services.
 
@@ -159,32 +173,33 @@ these as production evidence.
 
 ## Framework comparison
 
-`comparison/layer4-metrics.json` pins custom Aegis Layer 5 at `7c22d38`. Framework Layer 4
-has 12,136 production LOC versus custom Layer 5's 11,079: frameworks did not reduce the
-enterprise control code and increase production LOC by 1,057. Total source is 17,599
-versus 16,558. An equivalent 50-run in-process fake gateway benchmark measured 0.348 ms
-median/0.510 ms p95 here versus 0.166/0.206 ms custom;
-it excludes databases, worker systems, networks, and process boundaries. Official SDKs
-remove provider wire code only; policy, budget, ledger, resilience, safety, and evals
-remain application-owned.
+`comparison/layer5-metrics.json` pins custom Aegis Layer 6 at `7a685bc` and records LOC,
+dependencies, incremental effort, retained controls, operational cost and escape paths.
+An equivalent three-record correlation benchmark measured 0.048 ms median for Framework
+Layer 5 versus 0.015 ms custom. It excludes ingestion, databases, worker systems,
+networks, serialization and process boundaries. The conclusion is deliberately critical:
+connector libraries remove wire/object/syntax mechanics but little enterprise control
+code.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
 | `make lint` / `make type` / `make test` | Strict deterministic gates |
-| `make eval` | Twenty-one deterministic evals |
+| `make eval` | Twenty-six deterministic evals |
 | `make integration` | Configured PostgreSQL/Keycloak tests |
 | `make temporal-integration` | Configured Temporal workflow/replay test |
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 4 comparison metrics |
+| `make measure` | Refresh Layer 5 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
-[ADR 007](docs/adr/007-temporal-durable-workflow.md), [ADR 009](docs/adr/009-provider-neutral-model-gateway.md),
-[runbook](docs/runbook.md), [threat model](docs/threat-model.md), and
+[ADR 007](docs/adr/007-temporal-durable-workflow.md),
+[ADR 010](docs/adr/010-secure-evidence-connectors.md),
+[connector runbook](docs/connector-runbook.md), [runbook](docs/runbook.md),
+[threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).
 
 Licensed under the [MIT License](LICENSE).

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from datetime import datetime
 from threading import Lock
 from typing import cast
 
@@ -14,8 +15,10 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import ValidationError
 
 from aegis_framework.checkpointing import strict_checkpoint_serializer
+from aegis_framework.correlation import correlate_evidence
 from aegis_framework.domain import (
     Citation,
+    CorrelationContext,
     CriticDecision,
     CriticVerdict,
     Evidence,
@@ -78,11 +81,17 @@ class LangGraphInvestigator:
     def _coordinator(state: InvestigationState) -> dict[str, object]:
         evidence = tuple(Evidence.model_validate(item) for item in state["evidence"])
         safe_evidence, injection_detected = prepare_model_evidence(evidence)
+        reference_time = datetime.fromisoformat(state["correlation_reference"])
+        correlation = correlate_evidence(
+            evidence,
+            reference_time=reference_time,
+        )
         return {
             "safe_evidence": tuple(
                 item.model_dump(mode="json") for item in safe_evidence
             ),
             "injection_detected": injection_detected,
+            "correlation": correlation.model_dump(mode="json"),
         }
 
     def _telemetry_specialist(self, state: InvestigationState) -> dict[str, object]:
@@ -104,6 +113,7 @@ class LangGraphInvestigator:
             evidence=tuple(
                 ModelEvidence.model_validate(item) for item in state["safe_evidence"]
             ),
+            correlation=CorrelationContext.model_validate(state["correlation"]),
         )
         try:
             raw_finding = self._model.analyze(task)
@@ -154,6 +164,45 @@ class LangGraphInvestigator:
                     reasons=("citation_validation_failed",),
                     checked_citations=checked_citations,
                     contradictions=invalid,
+                ).model_dump(mode="json"),
+                "proposal": None,
+            }
+
+        correlation = CorrelationContext.model_validate(state["correlation"])
+        required_for_hypothesis = {EvidenceKind.TELEMETRY, EvidenceKind.CHANGE}
+        if correlation.conflicts:
+            return {
+                "hypotheses": (),
+                "critic": CriticVerdict(
+                    decision=CriticDecision.ABSTAINED,
+                    reasons=("deterministic_evidence_conflict",),
+                    checked_citations=checked_citations,
+                    contradictions=tuple(
+                        conflict.conflict_id for conflict in correlation.conflicts
+                    ),
+                ).model_dump(mode="json"),
+                "proposal": None,
+            }
+        if required_for_hypothesis.intersection(correlation.missing_sources):
+            return {
+                "hypotheses": (),
+                "critic": CriticVerdict(
+                    decision=CriticDecision.ABSTAINED,
+                    reasons=(
+                        "insufficient_corroboration",
+                        "required_evidence_source_missing",
+                    ),
+                    checked_citations=checked_citations,
+                ).model_dump(mode="json"),
+                "proposal": None,
+            }
+        if required_for_hypothesis.intersection(correlation.stale_sources):
+            return {
+                "hypotheses": (),
+                "critic": CriticVerdict(
+                    decision=CriticDecision.ABSTAINED,
+                    reasons=("required_evidence_stale",),
+                    checked_citations=checked_citations,
                 ).model_dump(mode="json"),
                 "proposal": None,
             }
@@ -273,6 +322,7 @@ class LangGraphInvestigator:
             "incident_id": request.incident_id,
             "request_id": request_id,
             "thread_ref": thread_ref,
+            "correlation_reference": request.alert.observed_at.isoformat(),
             "evidence": tuple(
                 item.model_dump(mode="json")
                 for item in sorted(evidence, key=lambda item: item.evidence_id)

@@ -187,7 +187,25 @@ class Evidence(StrictModel):
     summary: Annotated[str, Field(min_length=1, max_length=512)]
     facts: Annotated[dict[str, BoundedFactValue], Field(min_length=1, max_length=32)]
     content_hash: Sha256Digest
-    untrusted_text: Annotated[str | None, Field(max_length=2_000)] = None
+    untrusted_text: Annotated[str | None, Field(max_length=65_536)] = None
+    provenance_digest: Sha256Digest | None = None
+    source_id: Identifier | None = None
+    query_id: Identifier | None = None
+    page_number: int | None = Field(default=None, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def bind_extended_provenance(self) -> Evidence:
+        values = (
+            self.provenance_digest,
+            self.source_id,
+            self.query_id,
+            self.page_number,
+        )
+        if any(value is not None for value in values) and any(
+            value is None for value in values
+        ):
+            raise ValueError("extended evidence provenance must be complete")
+        return self
 
 
 class ModelEvidence(StrictModel):
@@ -196,12 +214,90 @@ class ModelEvidence(StrictModel):
     locator: Annotated[str, Field(min_length=1, max_length=512)]
     content_hash: Sha256Digest
     facts: Annotated[dict[str, BoundedFactValue], Field(min_length=1, max_length=32)]
+    provenance_digest: Sha256Digest | None = None
+    source_id: Identifier | None = None
+    query_id: Identifier | None = None
+    page_number: int | None = Field(default=None, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def bind_extended_provenance(self) -> ModelEvidence:
+        values = (
+            self.provenance_digest,
+            self.source_id,
+            self.query_id,
+            self.page_number,
+        )
+        if any(value is not None for value in values) and any(
+            value is None for value in values
+        ):
+            raise ValueError("model evidence provenance must be complete")
+        return self
 
 
 class Citation(StrictModel):
     evidence_id: Identifier
     locator: Annotated[str, Field(min_length=1, max_length=512)]
     content_hash: Sha256Digest
+    provenance_digest: Sha256Digest | None = None
+    source_id: Identifier | None = None
+    query_id: Identifier | None = None
+    page_number: int | None = Field(default=None, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def bind_extended_provenance(self) -> Citation:
+        values = (
+            self.provenance_digest,
+            self.source_id,
+            self.query_id,
+            self.page_number,
+        )
+        if any(value is not None for value in values) and any(
+            value is None for value in values
+        ):
+            raise ValueError("citation provenance must be complete")
+        return self
+
+
+class CorrelationStatus(StrEnum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    CONFLICTED = "conflicted"
+    STALE = "stale"
+
+
+class TimelineEvidenceEvent(StrictModel):
+    event_id: Identifier
+    occurred_at: AwareDatetime
+    kind: EvidenceKind
+    statement: Annotated[str, Field(min_length=1, max_length=512)]
+    citations: Annotated[tuple[Citation, ...], Field(min_length=1, max_length=16)]
+
+
+class EvidenceLink(StrictModel):
+    link_id: Identifier
+    relation: Literal["temporal_proximity", "shared_fact"]
+    left_evidence_id: Identifier
+    right_evidence_id: Identifier
+    fact_key: Identifier | None = None
+    distance_seconds: int | None = Field(default=None, ge=0, le=604_800)
+    causal: Literal[False] = False
+
+
+class EvidenceConflict(StrictModel):
+    conflict_id: Identifier
+    fact_key: Identifier
+    values: Annotated[tuple[FactText, ...], Field(min_length=2, max_length=16)]
+    citations: Annotated[tuple[Citation, ...], Field(min_length=2, max_length=32)]
+
+
+class CorrelationContext(StrictModel):
+    status: CorrelationStatus
+    timeline: Annotated[tuple[TimelineEvidenceEvent, ...], Field(max_length=1_000)]
+    links: Annotated[tuple[EvidenceLink, ...], Field(max_length=2_000)]
+    conflicts: Annotated[tuple[EvidenceConflict, ...], Field(max_length=1_000)]
+    missing_sources: Annotated[tuple[EvidenceKind, ...], Field(max_length=16)]
+    stale_sources: Annotated[tuple[EvidenceKind, ...], Field(max_length=16)]
+    causal_claims_supported: Literal[False] = False
 
 
 class SpecialistTask(StrictModel):
@@ -210,6 +306,7 @@ class SpecialistTask(StrictModel):
     incident_id: Identifier
     specialist: Specialist
     evidence: tuple[ModelEvidence, ...]
+    correlation: CorrelationContext | None = None
 
 
 class SpecialistFinding(StrictModel):
@@ -345,8 +442,10 @@ class InvestigationState(TypedDict, total=False):
     incident_id: str
     request_id: str
     thread_ref: str
+    correlation_reference: str
     evidence: tuple[StateRecord, ...]
     safe_evidence: tuple[StateRecord, ...]
+    correlation: StateRecord
     findings: Annotated[list[StateRecord], merge_findings]
     node_errors: Annotated[list[StateRecord], merge_node_errors]
     injection_detected: bool
