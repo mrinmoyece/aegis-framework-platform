@@ -363,3 +363,67 @@
     No. It emits a future verification plan with
     `production_verification_performed=false`. There is no approval or effect edge,
     fencing token, executor, reconciler or receipt.
+
+## Layer 7 approvals and controlled effects
+
+77. **Why is LangGraph not used for human approval?**
+    A checkpoint or interrupt is cognitive framework state, not a current authenticated
+    human decision, SoD/quorum record, expiry timer, tenant audit fact or authorization.
+    LangGraph may propose only; the application approval service owns decisions.
+
+78. **What exact scope does approval bind?**
+    Tenant/run/incident, plan and every action digest, target fingerprint, risk/blast
+    radius, pre/postconditions, dry-run/retry/idempotency/compensation, citations, critic
+    status and current policy/role/quota snapshot.
+
+79. **Why do policy or role changes invalidate approval?**
+    A prior human accepted a specific policy context. Reusing it after authority or risk
+    changed silently expands the decision beyond its immutable rationale.
+
+80. **What does Temporal remove from the approval lifecycle?**
+    Custom durable wait/poller, timer, signal history/deduplication, Activity scheduling,
+    retry/backoff, heartbeat, cancellation delivery, crash recovery and replay mechanics.
+
+81. **What approval/effect controls remain custom after Temporal?**
+    Identity/policy, SoD/quorum, exact digests, RLS/audit, quota, idempotency, fencing,
+    target allowlists, dry-run, reconciliation, verification, rollback and redaction.
+
+82. **Why does a signal contain only a command reference?**
+    Signal history is replayable framework input. The Activity reloads the persisted
+    decision and current signaller/policy instead of trusting signal fields.
+
+83. **Where is exactly-once effect execution guaranteed?**
+    Nowhere. Activities and external APIs are at-least-once. Stable tenant keys,
+    observe-before-retry, atomic claims, fencing, read-after-write and reconciliation
+    reduce duplicates and make ambiguity explicit.
+
+84. **What can fencing prevent and not prevent?**
+    It rejects stale application claims/results. It cannot retract an external request
+    already delivered by a stale worker, so reconciliation is still required.
+
+85. **Why persist requested intent before the external call?**
+    A crash afterward leaves an inspectable ambiguity window. Persisting only the result
+    would make “never called” indistinguishable from “called but result lost.”
+
+86. **Why is provider/API acceptance not verification?**
+    Acceptance proves request handling, not restored checkout behavior. Verification must
+    use fresh evidence observed after the receipt and satisfy immutable postconditions.
+
+87. **Why is rollout restart the only Kubernetes action?**
+    It directly addresses the checkout incident while permitting an exact fixed-shape
+    Deployment patch. A generic patch, shell or `kubectl` surface would allow model/caller
+    escalation beyond the approved action.
+
+88. **Does rollout restart have a rollback?**
+    No intrinsic inverse. The official adapter rejects generic compensation. Rolling back
+    an image revision requires another fixed action contract and approval.
+
+89. **How is approval enumeration prevented?**
+    Current authorization and forced tenant RLS precede reads; missing, unauthorized and
+    cross-tenant resources all return the same `404`, and views redact actors/rationale.
+
+90. **How is Temporal replaced?**
+    Consume the same application outbox and opaque command references, implement
+    `RemediationActivityOperations`, preserve application facts/`ActionPort`, and pass
+    wait/timer/signal/retry/heartbeat/cancel/crash/replay equivalence. Temporal history
+    need not be migrated into approval truth.

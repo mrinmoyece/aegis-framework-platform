@@ -1,4 +1,4 @@
-# Layer 6 threat model
+# Layer 7 threat model
 
 ## Assets and trust boundaries
 
@@ -67,6 +67,23 @@ trusted to provide their documented mechanics, not enterprise authority.
 | Checkpoint from old graph/input | Tenant/run/thread, graph version and canonical input digest compatibility check | Upgrade qualification defect |
 | Framework checkpoint treated as artifact truth | Artifact/status APIs read application ledger projection only | Operator misuse outside app |
 | Automatic graph trace leaks full state | Automatic capture disabled; fixed graph/node/model spans export allowlisted counts/status only | Exporter configuration drift |
+| Model/graph approves or executes | No approval/effect schema or edge; application service alone opens approval and calls `ActionPort` | Application wiring defect |
+| Approval scope substitution | Canonical plan/action/approval/policy/target digests reloaded immediately before effect | Digest implementation defect |
+| Self or workload approval | Current human principal, SoD and configurable no-self policy | Identity repository compromise |
+| Quorum reuse/sybil approvers | Distinct actor references and one immutable decision per approver | Compromised distinct human accounts |
+| Stale role/policy approval | Current policy/role/quota snapshot equality invalidates prior decision | Revocation-store latency |
+| Forged/replayed decision signal | Persist decision first; signal carries opaque command ref; command/digest dedupe | Authorized command flooding |
+| Approval enumeration | Current authorization, tenant RLS and uniform `404` | Timing side channel |
+| Expired/revoked approval executes | Application state and current expiry/revocation rechecked before every effect Activity | Clock/configuration defect |
+| Target changes after approval | Exact fingerprint, UID and resourceVersion precondition | Provider identity defect |
+| Arbitrary command/patch injection | Closed action enum and fixed Kubernetes Deployment patch; no shell/URL/body input | Official-client/adapter defect |
+| Duplicate effect | Tenant idempotency key, observe-before-retry, atomic claim and receipt conflict checks | Provider ignores request marker |
+| Stale worker performs effect | Attempt claim token plus current fence/digests; stale completion rejected | Worker acts after external call but before rejection |
+| Crash/timeout after effect | Persist intent first, record ambiguity, block blind retry, observe/reconcile | Provider cannot expose sufficient state |
+| API acceptance treated as recovery | Fresh post-effect evidence and deterministic postconditions required | Evidence source lag/false result |
+| Malicious/failed rollback | Separate compensation contract, current policy, intent/fence/receipt and verification | Some actions have no safe inverse |
+| Temporal history treated as approval/audit | APIs and effect Activities load only application facts | Operator misuse outside application |
+| Approval rationale leaks | Redacted API/OTel; rationale stays immutable under RLS | DBA/operator boundary |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.
@@ -100,9 +117,9 @@ threats remain applicable.
 Temporal mTLS/authentication, production namespace/task-queue isolation, HA/failover,
 server schema upgrades, worker version routing, backup/restore, multi-cluster
 replication, load limits, and disaster recovery are not proven. PostgreSQL HA/PITR,
-external event witnessing, retention/erasure execution, live connector/model
-qualification, DNS-rebinding egress enforcement, parser sandboxing, approvals, effects,
-fencing, external reconciliation, UI, MCP/A2A, and deployment are also unproven.
+external event witnessing, retention/erasure execution, live connector/model/Kubernetes
+qualification, DNS-rebinding egress enforcement, parser/general execution sandboxing,
+external reconciliation evidence, UI, MCP/A2A, and deployment are also unproven.
 Official adapters are present, but live credentials, regional data
 handling, model/version qualification, tokenizer accuracy, pricing feed freshness,
 provider retention/abuse policy, and load/failover are unproven.

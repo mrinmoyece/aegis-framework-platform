@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -94,6 +95,7 @@ _LAYER3_MIGRATION = Path("migrations/0002_layer3.sql")
 _LAYER4_MIGRATION = Path("migrations/0003_layer4.sql")
 _LAYER5_MIGRATION = Path("migrations/0004_layer5.sql")
 _LAYER6_MIGRATION = Path("migrations/0005_layer6.sql")
+_LAYER7_MIGRATION = Path("migrations/0006_layer7.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -192,6 +194,197 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "UNIQUE (tenant_id, run_id, ordinal)" in layer6
     assert "FORCE ROW LEVEL SECURITY" in layer6
     assert "PASSWORD" not in layer6
+    layer7 = _LAYER7_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "remediation_plans",
+        "action_policies",
+        "effect_quotas",
+        "effect_quota_reservations",
+        "action_approvals",
+        "approval_decisions",
+        "remediation_facts",
+        "effect_attempts",
+        "effect_receipts",
+        "verification_records",
+        "remediation_projections",
+        "remediation_projection_rebuilds",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer7
+    assert "approval_decisions_immutable" in layer7
+    assert "effect_receipts_immutable" in layer7
+    assert "claim_token text" in layer7
+    assert "fence_token text NOT NULL" in layer7
+    assert "UNIQUE (tenant_id, idempotency_key)" in layer7
+    assert "FORCE ROW LEVEL SECURITY" in layer7
+    assert "PASSWORD" not in layer7
+
+
+@pytest.mark.postgres
+def test_live_remediation_tables_force_rls_immutability_and_atomic_claims() -> None:
+    admin_dsn, pool, _repository = _repository_context()
+    suffix = uuid4().hex
+    plan_id = f"plan:{suffix}"
+    approval_id = f"approval:{suffix}"
+    operation_id = f"operation:{suffix}"
+    try:
+        with tenant_transaction(pool, tenant_id=_TENANT_ALPHA) as connection:
+            connection.execute(
+                """
+                INSERT INTO aegis.remediation_plans (
+                    tenant_id, plan_id, run_id, incident_id, schema_version,
+                    plan_digest, target_fingerprint, risk, blast_radius,
+                    policy_digest, plan_document, created_at, expires_at
+                )
+                VALUES (
+                    %s, %s, %s, %s, 1, %s, %s, 'high', 'one-service',
+                    %s, %s, %s, %s
+                )
+                """,
+                (
+                    _TENANT_ALPHA,
+                    plan_id,
+                    f"run:{suffix}",
+                    f"incident:{suffix}",
+                    "a" * 64,
+                    "b" * 64,
+                    "c" * 64,
+                    Jsonb({"schema_version": 1}),
+                    DEMO_TIME,
+                    DEMO_TIME.replace(year=2027),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO aegis.action_approvals (
+                    tenant_id, approval_id, plan_id, approval_digest,
+                    plan_digest, target_fingerprint, policy_digest, quorum,
+                    requested_by_ref, approval_document, requested_at, expires_at
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, 2,
+                    %s, %s, %s, %s
+                )
+                """,
+                (
+                    _TENANT_ALPHA,
+                    approval_id,
+                    plan_id,
+                    "d" * 64,
+                    "a" * 64,
+                    "b" * 64,
+                    "c" * 64,
+                    f"actor:{suffix}",
+                    Jsonb({"schema_version": 1}),
+                    DEMO_TIME,
+                    DEMO_TIME.replace(year=2027),
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO aegis.approval_decisions (
+                    tenant_id, decision_id, command_id, approval_id,
+                    approver_ref, approver_role, disposition, plan_digest,
+                    approval_digest, policy_digest, role_revision, rationale,
+                    decision_digest, decision_document, decided_at
+                )
+                VALUES (
+                    %s, %s, %s, %s, %s, 'incident-commander', 'grant',
+                    %s, %s, %s, 1, %s, %s, %s, %s
+                )
+                """,
+                (
+                    _TENANT_ALPHA,
+                    f"decision:{suffix}",
+                    f"command:{suffix}",
+                    approval_id,
+                    f"approver:{suffix}",
+                    "a" * 64,
+                    "d" * 64,
+                    "c" * 64,
+                    "Independent exact-scope integration approval.",
+                    "e" * 64,
+                    Jsonb({"schema_version": 1}),
+                    DEMO_TIME,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO aegis.effect_attempts (
+                    tenant_id, plan_id, action_id, operation_id, attempt,
+                    idempotency_key, action_digest, plan_digest,
+                    approval_digest, policy_digest, target_fingerprint,
+                    fence_token, status, requested_at, updated_at
+                )
+                VALUES (
+                    %s, %s, 'restart-checkout', %s, 1, %s,
+                    %s, %s, %s, %s, %s, %s, 'requested', %s, %s
+                )
+                """,
+                (
+                    _TENANT_ALPHA,
+                    plan_id,
+                    operation_id,
+                    f"idempotency:{suffix}",
+                    "f" * 64,
+                    "a" * 64,
+                    "d" * 64,
+                    "c" * 64,
+                    "b" * 64,
+                    f"fence:{suffix}",
+                    DEMO_TIME,
+                    DEMO_TIME,
+                ),
+            )
+            first_claim = connection.execute(
+                """
+                UPDATE aegis.effect_attempts
+                SET status = 'claimed', claim_token = %s, claim_until = %s,
+                    worker_ref = 'worker:one'
+                WHERE tenant_id = %s AND operation_id = %s
+                  AND status = 'requested'
+                """,
+                (
+                    f"claim:{suffix}",
+                    DEMO_TIME + timedelta(minutes=5),
+                    _TENANT_ALPHA,
+                    operation_id,
+                ),
+            )
+            second_claim = connection.execute(
+                """
+                UPDATE aegis.effect_attempts
+                SET claim_token = 'claim:stale'
+                WHERE tenant_id = %s AND operation_id = %s
+                  AND status = 'requested'
+                """,
+                (_TENANT_ALPHA, operation_id),
+            )
+            assert first_claim.rowcount == 1
+            assert second_claim.rowcount == 0
+        with tenant_transaction(pool, tenant_id=_TENANT_BETA) as connection:
+            hidden = connection.execute(
+                """
+                SELECT count(*) AS count
+                FROM aegis.approval_decisions
+                WHERE approval_id = %s
+                """,
+                (approval_id,),
+            ).fetchone()
+            assert hidden == {"count": 0}
+        with (
+            Connection.connect(admin_dsn, autocommit=True) as admin,
+            pytest.raises(Error, match="immutable"),
+        ):
+            admin.execute(
+                """
+                UPDATE aegis.approval_decisions
+                SET rationale = 'tampered'
+                WHERE tenant_id = %s AND approval_id = %s
+                """,
+                (_TENANT_ALPHA, approval_id),
+            )
+    finally:
+        pool.close()
 
 
 @pytest.mark.postgres

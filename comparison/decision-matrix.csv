@@ -14,5 +14,6 @@ Framework tracing,Temporal OTel + Langfuse 4.14.4,"trace propagation/UI","redact
 Portable telemetry,OpenTelemetry 1.44.0,"span/export protocols","allowlists; sampling; SLO","semantic convention churn",OTel API/OTLP
 Local identity,Keycloak 26.7.1 optional,"OIDC issuer/JWKS/token service","realm/client/grants/production operations","Keycloak operations",OIDC plus AuthenticatorPort
 Queue alternative,Redis/Valkey rejected,None,"would duplicate Temporal workflow ownership","additional service/license",Do not add without separate measured need
-Effects,No framework selected,None,"approval; fencing; idempotency; credentials; verification; reconciliation",External APIs,EffectPort
+Approval/effect workflow,Temporal SDK 1.31.0,"approval poller; durable timer; signal history; Activity scheduling/retry/heartbeat/cancellation; crash replay","exact digests; current policy; SoD/quorum; audit; idempotency; fencing; reconciliation; verification; rollback","workflow history; signals; deterministic APIs; task queues",RemediationActivityOperations plus application facts
+Kubernetes action,Kubernetes client 36.0.3,"wire/object decoding; HTTP request mechanics","exact target; RBAC; dry-run; intent/receipt; fencing; verification","Kubernetes API/client version",ActionPort plus fixed neutral contracts
 Audit,PostgreSQL application schema,"transaction durability","redaction; immutability; hash chain; witness; retention","PostgreSQL trigger/JSONB",AuditPort and canonical export

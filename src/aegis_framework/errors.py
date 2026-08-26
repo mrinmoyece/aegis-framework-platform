@@ -61,6 +61,30 @@ class EffectsDisabled(AegisFrameworkError):
     pass
 
 
+class ApprovalDenied(AegisFrameworkError):
+    pass
+
+
+class ApprovalExpired(AegisFrameworkError):
+    pass
+
+
+class ApprovalRevoked(AegisFrameworkError):
+    pass
+
+
+class EffectConflict(AegisFrameworkError):
+    pass
+
+
+class EffectAmbiguous(AegisFrameworkError):
+    pass
+
+
+class VerificationFailed(AegisFrameworkError):
+    pass
+
+
 class IdempotencyConflict(AegisFrameworkError):
     pass
 

@@ -168,5 +168,35 @@
     "case_id": "orchestration-projection-rebuild",
     "kind": "orchestration-projection-rebuild",
     "expected_reason": "artifact_projection_rebuild"
+  },
+  {
+    "case_id": "remediation-success",
+    "kind": "remediation-success",
+    "expected_reason": "exact_scope_verified"
+  },
+  {
+    "case_id": "remediation-denial",
+    "kind": "remediation-denial",
+    "expected_reason": "human_denial_terminal"
+  },
+  {
+    "case_id": "remediation-expiry",
+    "kind": "remediation-expiry",
+    "expected_reason": "approval_timer_expired"
+  },
+  {
+    "case_id": "remediation-ambiguity",
+    "kind": "remediation-ambiguity",
+    "expected_reason": "reconciled_before_verification"
+  },
+  {
+    "case_id": "remediation-verification-failure",
+    "kind": "remediation-verification-failure",
+    "expected_reason": "api_acceptance_not_recovery"
+  },
+  {
+    "case_id": "remediation-rollback",
+    "kind": "remediation-rollback",
+    "expected_reason": "compensation_is_separate_fact"
   }
 ]

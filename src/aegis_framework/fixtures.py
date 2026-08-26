@@ -75,6 +75,7 @@ def demo_identity(
 ) -> IdentityContext:
     permissions_by_role = {
         "incident-responder": (
+            "approval:request",
             "investigation:read",
             "investigation:run",
             "evidence:cursor:read",
@@ -85,6 +86,8 @@ def demo_identity(
             "orchestration:artifact:read",
             "policy:read",
             "quota:read",
+            "remediation:propose",
+            "remediation:read",
             "tenant:read",
         ),
         "incident-viewer": (
@@ -97,9 +100,12 @@ def demo_identity(
             "orchestration:artifact:read",
             "policy:read",
             "quota:read",
+            "remediation:read",
             "tenant:read",
         ),
         "tenant-admin": (
+            "approval:decide",
+            "approval:revoke",
             "audit:read",
             "evidence:cursor:read",
             "evidence:query:read",
@@ -111,7 +117,20 @@ def demo_identity(
             "policy:write",
             "quota:read",
             "quota:write",
+            "remediation:read",
             "tenant:read",
+        ),
+        "incident-commander": (
+            "approval:decide",
+            "approval:revoke",
+            "effect:read",
+            "remediation:read",
+        ),
+        "change-approver": (
+            "approval:decide",
+            "approval:revoke",
+            "effect:read",
+            "remediation:read",
         ),
     }
     grants = tuple(
@@ -119,7 +138,7 @@ def demo_identity(
             role=role,
             purpose="incident-response",
             permissions=permissions_by_role.get(role, ()),
-            risk_ceiling=RiskLevel.MEDIUM,
+            risk_ceiling=RiskLevel.HIGH,
             expires_at=DEMO_TIME + timedelta(hours=1),
         )
         for role in sorted(set(roles))
@@ -198,6 +217,9 @@ def build_demo_bundle(
             revision=1,
             allowed_actions=(
                 "audit:read",
+                "approval:decide",
+                "approval:request",
+                "approval:revoke",
                 "evidence:cursor:read",
                 "evidence:query:read",
                 "investigation:read",
@@ -210,10 +232,12 @@ def build_demo_bundle(
                 "policy:write",
                 "quota:read",
                 "quota:write",
+                "remediation:propose",
+                "remediation:read",
                 "tenant:read",
             ),
             allowed_purposes=("incident-response",),
-            max_risk=RiskLevel.MEDIUM,
+            max_risk=RiskLevel.HIGH,
             version=1,
         )
         for tenant_id in ("tenant-acme", "tenant-beta")
@@ -270,6 +294,14 @@ def build_demo_bundle(
                 "demo-responder-token": demo_identity(),
                 "demo-viewer-token": demo_identity(roles=("incident-viewer",)),
                 "demo-admin-token": demo_identity(roles=("tenant-admin",)),
+                "demo-commander-token": demo_identity(
+                    subject_id="commander-bob",
+                    roles=("incident-commander",),
+                ),
+                "demo-change-approver-token": demo_identity(
+                    subject_id="approver-carol",
+                    roles=("change-approver",),
+                ),
                 "demo-beta-token": demo_identity(
                     tenant_id="tenant-beta",
                     subject_id="responder-bob",

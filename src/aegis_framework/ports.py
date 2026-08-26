@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager
 from datetime import datetime
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import Field
 
@@ -25,6 +25,13 @@ from aegis_framework.domain import (
     StrictModel,
 )
 
+if TYPE_CHECKING:
+    from aegis_framework.remediation import (
+        ActionIntent,
+        ActionObservation,
+        ActionReceipt,
+    )
+
 
 class Action(StrEnum):
     INVESTIGATION_RUN = "investigation:run"
@@ -41,7 +48,13 @@ class Action(StrEnum):
     EVIDENCE_QUERY_READ = "evidence:query:read"
     EVIDENCE_CURSOR_READ = "evidence:cursor:read"
     ORCHESTRATION_ARTIFACT_READ = "orchestration:artifact:read"
+    REMEDIATION_PROPOSE = "remediation:propose"
+    REMEDIATION_READ = "remediation:read"
+    APPROVAL_REQUEST = "approval:request"
+    APPROVAL_DECIDE = "approval:decide"
+    APPROVAL_REVOKE = "approval:revoke"
     EFFECT_EXECUTE = "effect:execute"
+    EFFECT_READ = "effect:read"
 
 
 class PolicyDecision(StrictModel):
@@ -142,6 +155,18 @@ class EffectPort(Protocol):
     ) -> EffectReceipt: ...
 
 
+class ActionPort(Protocol):
+    """Provider-neutral controlled action boundary."""
+
+    def dry_run(self, intent: ActionIntent) -> ActionReceipt: ...
+
+    def observe(self, intent: ActionIntent) -> ActionObservation: ...
+
+    def execute(self, intent: ActionIntent) -> ActionReceipt: ...
+
+    def compensate(self, intent: ActionIntent) -> ActionReceipt: ...
+
+
 class AuditPort(Protocol):
     def append(
         self,
@@ -206,6 +231,15 @@ class GraphObservabilityPort(Protocol):
     ) -> AbstractContextManager[Observation]: ...
 
     def model_call(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+
+class RemediationObservabilityPort(Protocol):
+    def remediation(
         self,
         *,
         tenant_id: str,

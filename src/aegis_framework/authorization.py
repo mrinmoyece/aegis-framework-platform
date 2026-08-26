@@ -29,6 +29,10 @@ class RoleCatalog:
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
                 Action.ORCHESTRATION_ARTIFACT_READ,
+                Action.REMEDIATION_PROPOSE,
+                Action.REMEDIATION_READ,
+                Action.APPROVAL_REQUEST,
+                Action.EFFECT_READ,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -41,6 +45,8 @@ class RoleCatalog:
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
                 Action.ORCHESTRATION_ARTIFACT_READ,
+                Action.REMEDIATION_READ,
+                Action.EFFECT_READ,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -58,6 +64,10 @@ class RoleCatalog:
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
                 Action.ORCHESTRATION_ARTIFACT_READ,
+                Action.REMEDIATION_READ,
+                Action.APPROVAL_DECIDE,
+                Action.APPROVAL_REVOKE,
+                Action.EFFECT_READ,
             }
         ),
         "tenant-auditor": frozenset(
@@ -70,6 +80,8 @@ class RoleCatalog:
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
                 Action.ORCHESTRATION_ARTIFACT_READ,
+                Action.REMEDIATION_READ,
+                Action.EFFECT_READ,
             }
         ),
         "workload-investigator": frozenset(
@@ -81,6 +93,29 @@ class RoleCatalog:
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
                 Action.QUOTA_READ,
+            }
+        ),
+        "incident-commander": frozenset(
+            {
+                Action.REMEDIATION_READ,
+                Action.APPROVAL_DECIDE,
+                Action.APPROVAL_REVOKE,
+                Action.EFFECT_READ,
+            }
+        ),
+        "change-approver": frozenset(
+            {
+                Action.REMEDIATION_READ,
+                Action.APPROVAL_DECIDE,
+                Action.APPROVAL_REVOKE,
+                Action.EFFECT_READ,
+            }
+        ),
+        "effect-worker": frozenset(
+            {
+                Action.REMEDIATION_READ,
+                Action.EFFECT_EXECUTE,
+                Action.EFFECT_READ,
             }
         ),
     }

@@ -11,6 +11,10 @@ from aegis_framework.api import ApiRuntime, AppMode, create_app
 from aegis_framework.cli import main
 from aegis_framework.errors import IdentityUnavailable, OptionalDependencyMissing
 from aegis_framework.fixtures import demo_request
+from aegis_framework.remediation_demo import (
+    RemediationDemoScenario,
+    build_remediation_api_demo,
+)
 
 _DEFAULT_BEARER = "demo-responder-token"
 
@@ -121,6 +125,120 @@ def test_model_operations_routes_are_authorized_and_redacted() -> None:
     health = client.get("/v1/models/health", headers=headers)
     assert health.status_code == 200
     assert health.json()[0]["status"] == "unknown"
+
+
+def test_approval_api_is_authenticated_redacted_and_exact_scope() -> None:
+    client = TestClient(create_app(mode=AppMode.DEMO))
+    approval_id = build_remediation_api_demo().approval_id
+    responder = _headers(request_id="approval-read")
+    pending = client.get(f"/v1/approvals/{approval_id}", headers=responder)
+    assert pending.status_code == 200
+    view = pending.json()
+    assert view["status"] == "approval_pending"
+    assert view["quorum"] == 2
+    assert "tenant" not in pending.text
+    assert "approver" not in pending.text
+    assert "rationale" not in pending.text
+    assert (
+        client.get(
+            f"/v1/approvals/{approval_id}",
+            headers=_headers(
+                request_id="approval-cross-tenant",
+                identity_fixture="demo-beta-token",
+            ),
+        ).status_code
+        == 404
+    )
+    first = client.post(
+        f"/v1/approvals/{approval_id}/decisions",
+        headers=_headers(
+            request_id="approval-first",
+            identity_fixture="demo-commander-token",
+        ),
+        json={
+            "command_id": "api-approval-first",
+            "disposition": "grant",
+            "rationale": "Independent exact-scope approval from incident command.",
+            "expected_version": view["version"],
+            "plan_digest": view["plan_digest"],
+            "approval_digest": view["approval_digest"],
+        },
+    )
+    assert first.status_code == 200
+    assert first.json()["status"] == "approval_pending"
+    second = client.post(
+        f"/v1/approvals/{approval_id}/decisions",
+        headers=_headers(
+            request_id="approval-second",
+            identity_fixture="demo-change-approver-token",
+        ),
+        json={
+            "command_id": "api-approval-second",
+            "disposition": "grant",
+            "rationale": "Independent change approval confirms the immutable digests.",
+            "expected_version": first.json()["version"],
+            "plan_digest": view["plan_digest"],
+            "approval_digest": view["approval_digest"],
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["status"] == "approved"
+    assert second.json()["grants"] == 2
+    stale = client.post(
+        f"/v1/approvals/{approval_id}/decisions",
+        headers=_headers(
+            request_id="approval-stale",
+            identity_fixture="demo-admin-token",
+        ),
+        json={
+            "command_id": "api-approval-stale",
+            "disposition": "grant",
+            "rationale": "This stale decision must not mutate the approval.",
+            "expected_version": 3,
+            "plan_digest": view["plan_digest"],
+            "approval_digest": view["approval_digest"],
+        },
+    )
+    assert stale.status_code in {404, 409}
+
+    denied_client = TestClient(create_app(mode=AppMode.DEMO))
+    denied_view = denied_client.get(
+        f"/v1/approvals/{approval_id}",
+        headers=_headers(request_id="approval-denial-read"),
+    ).json()
+    denied = denied_client.post(
+        f"/v1/approvals/{approval_id}/decisions",
+        headers=_headers(
+            request_id="approval-denial",
+            identity_fixture="demo-commander-token",
+        ),
+        json={
+            "command_id": "api-approval-denial",
+            "disposition": "deny",
+            "rationale": "Current operating conditions make this exact action unsafe.",
+            "expected_version": denied_view["version"],
+            "plan_digest": denied_view["plan_digest"],
+            "approval_digest": denied_view["approval_digest"],
+        },
+    )
+    assert denied.status_code == 200
+    terminal_race = denied_client.post(
+        f"/v1/approvals/{approval_id}/decisions",
+        headers=_headers(
+            request_id="approval-terminal-race",
+            identity_fixture="demo-change-approver-token",
+        ),
+        json={
+            "command_id": "api-approval-after-denial",
+            "disposition": "grant",
+            "rationale": "This raced grant must not escape terminal denial.",
+            "expected_version": denied.json()["version"],
+            "plan_digest": denied_view["plan_digest"],
+            "approval_digest": denied_view["approval_digest"],
+        },
+    )
+    assert terminal_race.status_code == 409
+    assert terminal_race.json()["detail"] == "approval is already terminal"
 
 
 def test_production_identity_and_readiness_fail_closed() -> None:
@@ -296,6 +414,12 @@ def test_cli_demo_and_evals(capsys: object) -> None:
     assert main(["eval", "--cases", "evals/cases.json"]) == 0
     report = json.loads(capsys.readouterr().out)
     assert report["passed"] is True
+    for scenario in RemediationDemoScenario:
+        assert main(["remediation-demo", "--scenario", scenario.value]) == 0
+        remediation = json.loads(capsys.readouterr().out)
+        assert remediation["scenario"] == scenario.value
+        assert remediation["authority"] == "application-ledger"
+        assert remediation["agent_authority"] == "proposal-only"
 
 
 def test_cli_returns_failure_for_failed_eval(

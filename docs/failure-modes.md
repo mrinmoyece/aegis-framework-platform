@@ -1,4 +1,4 @@
-# Layer 6 failure modes
+# Layer 7 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -66,6 +66,26 @@
 | Specialist/provider exception | Convert at node boundary to named abstention; worker remains alive | Graph adapter | unit |
 | Critic rejection/low confidence | Deterministic abstain/escalate; no proposal/effect path | Application critic gate | unit/eval |
 | Artifact projection loss | Rebuild from immutable orchestration facts/artifacts under tenant RLS | Application ledger | unit/PostgreSQL |
+| Missing/disabled action policy | Deny before approval/effect | Application policy | unit/eval |
+| Maintenance window closes | Current policy recheck invalidates approval | Application policy | unit |
+| Plan/action/target digest changed | Reject decision/effect and require new approval | Application contracts | unit/eval |
+| Self/workload/wrong-role approval | Deny without recording grant | Approval service | unit/API |
+| Duplicate approver | Unique approver decision rejects quorum reuse | Application/PostgreSQL | unit/integration |
+| Concurrent decision/version race | Expected version permits one append | Application ledger | unit/PostgreSQL |
+| Approval decision replay changed | Command ID/digest conflict | Application ledger | unit/API |
+| Approval expiry/revocation | Add terminal fact; effect recheck rejects | Application ledger/policy | unit/Temporal |
+| Forged approval signal | Reload opaque command and immutable decision | Application authority | unit/Temporal |
+| Dry-run rejection | Record fail-closed outcome; no live request | Action adapter/application | unit |
+| Kubernetes target UID/resourceVersion changed | Reject before patch | Fixed adapter | unit |
+| Worker crash before effect | Requested intent remains claimable under current fence | PostgreSQL/Temporal | integration |
+| Worker crash after effect | Mark/retain ambiguity; observe before retry | Application reconciler | unit/Temporal |
+| Duplicate effect Activity | Observe + stable tenant key returns duplicate receipt | Action adapter/application | unit |
+| Stale attempt/fence completion | Compare-and-set rejects receipt | PostgreSQL claim | integration |
+| Reconciliation inconclusive | Escalate; no success or blind retry | Application ledger | unit/Temporal |
+| Verification evidence not fresh | `verification_failed`; no recovered claim | Verification service | unit |
+| Postcondition fails | Roll back only if exact compensation exists, else escalate | Application service | unit |
+| Rollback fails/ambiguous | Escalate and preserve both receipts | Application ledger | unit |
+| Temporal remediation history loss | Reissue from application intent/reference or escalate | Application ledger | documented |
 
 ## Retry rules
 
@@ -74,6 +94,12 @@ LangGraph owns graph checkpoints but not a second retry loop. Connector/provider
 must be disabled. Bounded repair/fallback is application gateway work within the Activity
 attempt and uses distinct durable attempt IDs. No framework retry converts an
 at-least-once external operation into exactly-once behavior.
+
+For effects, Temporal alone retries the Activity. The provider SDK/client has no retry
+loop. Before a retry, application code observes the exact target. Ambiguous intent blocks
+automatic replay until reconciliation. Stable tenant idempotency keys suppress duplicate
+provider work where supported; fencing rejects stale application results but cannot undo
+an already delivered external request.
 
 ## Operator rules
 

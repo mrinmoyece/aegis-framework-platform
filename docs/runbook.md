@@ -1,4 +1,4 @@
-# Layer 6 local operations runbook
+# Layer 7 local operations runbook
 
 Evidence connector enablement, source-specific operations, cursor recovery and
 reconciliation are in the [connector runbook](connector-runbook.md). Connector code is
@@ -12,7 +12,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 through Layer 6 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 7 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -86,6 +86,11 @@ validate each canonical digest/provenance transition, rebuild the run/task/artif
 projection, record `projection.rebuilt`, and compare the final decision. Never rebuild
 artifact truth from a LangGraph checkpoint or trace.
 
+For remediation, verify `remediation_facts` sequence/previous-digest integrity, fold
+with `reduce_remediation`, compare exact plan/approval/effect/verification digests,
+record an immutable rebuild row, then swap the projection. Never rebuild approval or
+effect truth from Temporal history, a LangGraph checkpoint, Kubernetes events or traces.
+
 ## Specialist graph recovery
 
 1. Confirm current application run state and cancellation before reading a checkpoint.
@@ -155,6 +160,16 @@ Persist `cancel_requested` before signalling Temporal. If an Activity later retu
 the aggregate state machine rejects its stale result. External Temporal termination is
 an emergency operational action and does not itself create an application cancellation
 fact.
+
+Cancellation after an external effect cannot undo it. Reconcile and verify the exact
+target, then use only the approved compensation contract or escalate.
+
+## Approval and effect incidents
+
+Use the [approval/effect runbook](approval-effect-runbook.md) for SoD/quorum decisions,
+expiry/revocation, stale fences, ambiguous effects, reconciliation, independent
+verification and rollback. Destructive defaults remain disabled; operators may not turn
+a graph proposal, Temporal state or API acceptance into authorization.
 
 ## Shutdown
 

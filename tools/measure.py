@@ -1,4 +1,4 @@
-"""Measure repeatable Layer 6 size, dependencies, effort, and local runtime."""
+"""Measure repeatable Layer 7 size, dependencies, effort, and local runtime."""
 
 from __future__ import annotations
 
@@ -38,10 +38,14 @@ from aegis_framework.model_gateway import (
     StructuredOutputDefinition,
     TextContent,
 )
+from aegis_framework.remediation_demo import (
+    RemediationDemoScenario,
+    run_remediation_demo,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 FOUNDATION_SHA = "754e536d10b9643b40cac2f7b6c0d1de870fd630"
-LAYER5_SHA = "a3f01e5709b0f32644909d55636a310d26eb9789"
+LAYER6_SHA = "9a920b99e1f2eff34890e076cdd94bb3cdd034f3"
 CUSTOM_LAYER3 = {
     "repository": "mrinmoyece/aegis-agent-platform",
     "branch": "mrinmoyece-aegis-durable-ledger",
@@ -156,6 +160,29 @@ CUSTOM_LAYER7 = {
     },
     "test_functions": 221,
 }
+CUSTOM_LAYER8 = {
+    "repository": "mrinmoyece/aegis-agent-platform",
+    "branch": "mrinmoyece-aegis-remediation-approvals",
+    "sha": "0ce9368d60f3b2fce7b805d7d7699d585f13cef2",
+    "source_loc": {
+        "production": 28056,
+        "tests": 14031,
+        "total": 42087,
+    },
+    "dependencies": {
+        "direct_runtime": 12,
+        "direct_optional": 6,
+        "direct_development": 0,
+        "locked_total": None,
+    },
+    "incremental_effort_from_layer7": {
+        "additions": 12030,
+        "deletions": 162,
+        "changed_files": 48,
+        "commits": 1,
+    },
+    "test_functions": 275,
+}
 
 
 def main() -> int:
@@ -207,9 +234,10 @@ def measure(runs: int) -> dict[str, object]:
     effort = _git_effort()
     gateway_runtime = _gateway_runtime(runs)
     evidence_runtime = _evidence_runtime(runs)
+    remediation_runtime = _remediation_runtime(runs)
     return {
-        "schema_version": 6,
-        "layer": 6,
+        "schema_version": 7,
+        "layer": 7,
         "comparison_basis": {
             "foundation_sha": FOUNDATION_SHA,
             "custom_layer3": CUSTOM_LAYER3,
@@ -217,6 +245,7 @@ def measure(runs: int) -> dict[str, object]:
             "custom_layer5": CUSTOM_LAYER5,
             "custom_layer6": CUSTOM_LAYER6,
             "custom_layer7": CUSTOM_LAYER7,
+            "custom_layer8": CUSTOM_LAYER8,
             "loc_definition": "non-blank, non-comment physical Python lines",
             "effort_definition": (
                 "Git additions/deletions and changed files from each prior layer"
@@ -234,6 +263,12 @@ def measure(runs: int) -> dict[str, object]:
                 "fixed-role checkout specialist fan-out/fan-in through critic, "
                 "proposal-only planner and verification-plan gate using deterministic "
                 "models, in-memory application facts, no network or production effect"
+            ),
+            "equivalent_remediation_scenario": (
+                "high-risk checkout Kubernetes rollout-restart with exact immutable "
+                "plan/action/target/policy digests, two distinct human approvals, "
+                "dry-run, stable idempotency, deterministic fake effect and fresh "
+                "verification; in-memory, no network or production credentials"
             ),
         },
         "measured_at": datetime.now(UTC).isoformat(),
@@ -273,6 +308,9 @@ def measure(runs: int) -> dict[str, object]:
             "safe YAML syntax parsing",
             "fixed specialist DAG scheduling and synchronized fan-in",
             "graph checkpoint serialization and replay traversal",
+            "approval wait poller and durable timer state",
+            "approval/effect signal history and workflow crash recovery",
+            "effect Activity scheduling, retry/backoff, heartbeat and cancellation",
         ],
         "remaining_custom_controls": [
             "issuer registry and bounded JWKS rotation policy",
@@ -302,6 +340,12 @@ def measure(runs: int) -> dict[str, object]:
             "fixed role capability and artifact transition policy",
             "immutable orchestration dispatch/artifact/decision facts",
             "graph-version and checkpoint compatibility gates",
+            "exact remediation/action/approval/effect/verification contracts",
+            "current action policy and approval invalidation",
+            "human SoD, quorum, expiry and revocation",
+            "effect quota reservation, idempotency, claims and fencing",
+            "ambiguous effect reconciliation and fresh verification",
+            "compensation policy and immutable effect audit",
         ],
         "lock_in_and_escape": {
             "langgraph": "OrchestratorPort plus JSON-compatible domain state",
@@ -331,6 +375,7 @@ def measure(runs: int) -> dict[str, object]:
             "layer5_services": ["PostgreSQL", "Redis Streams"],
             "layer6_services": ["PostgreSQL", "Redis Streams"],
             "layer7_services": ["PostgreSQL", "Redis Streams"],
+            "layer8_services": ["PostgreSQL", "Redis Streams"],
             "temporal_tradeoff": (
                 "Temporal removes scheduler, timers, signal history, retry/backoff, "
                 "and crash recovery code but adds a second operational control plane"
@@ -349,6 +394,13 @@ def measure(runs: int) -> dict[str, object]:
                 "LangGraph removes custom DAG scheduler, synchronized fan-in, reducers "
                 "and checkpoint traversal, but application role policy, artifact "
                 "transitions, fencing, facts, RLS, citations and final gates remain"
+            ),
+            "layer8_tradeoff": (
+                "Custom Layer 8 implements its own asynchronous remediation lifecycle "
+                "over PostgreSQL and Redis delivery. Framework Layer 7 delegates "
+                "durable waits, timers, signals, Activity retry/heartbeat/cancellation "
+                "and replay to Temporal, but retains nearly all approval/effect "
+                "security controls"
             ),
         },
         "runtime": {
@@ -409,6 +461,24 @@ def measure(runs: int) -> dict[str, object]:
                 "boundary is included"
             ),
         },
+        "equivalent_remediation_benchmark": {
+            "scenario": "deterministic-exact-scope-checkout-rollout-restart",
+            "network": False,
+            "runs": runs,
+            "framework_layer7": remediation_runtime,
+            "custom_layer8": {
+                "median_ms": 5.983,
+                "p95_ms": 7.21,
+                "sha": CUSTOM_LAYER8["sha"],
+            },
+            "limitations": (
+                "Both execute deterministic in-memory high-risk approval/effect paths. "
+                "Custom is async and includes its event repository/lease machinery; "
+                "framework is sync and includes strict Pydantic contracts/pure ledger. "
+                "Neither benchmark includes PostgreSQL, Temporal, Redis, Kubernetes, "
+                "network, serialization or process boundaries"
+            ),
+        },
     }
 
 
@@ -417,7 +487,7 @@ def _git_effort() -> dict[str, int]:
     if git is None:
         raise RuntimeError("git is required to measure implementation effort")
     completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
-        [git, "diff", "--numstat", LAYER5_SHA, "--"],
+        [git, "diff", "--numstat", LAYER6_SHA, "--"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -431,6 +501,18 @@ def _git_effort() -> dict[str, int]:
         if added.isdigit() and deleted.isdigit():
             additions += int(added)
             deletions += int(deleted)
+            changed_files += 1
+    untracked = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
+        [git, "ls-files", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for relative in untracked.stdout.splitlines():
+        path = ROOT / relative
+        if path.is_file():
+            additions += len(path.read_bytes().splitlines())
             changed_files += 1
     return {
         "additions": additions,
@@ -533,6 +615,22 @@ def _evidence_runtime(runs: int) -> dict[str, float]:
     for _ in range(runs):
         started = time.perf_counter_ns()
         correlate_evidence(evidence, reference_time=now)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _remediation_runtime(runs: int) -> dict[str, float]:
+    run_remediation_demo(RemediationDemoScenario.SUCCESS)
+    durations: list[float] = []
+    for _ in range(runs):
+        started = time.perf_counter_ns()
+        result = run_remediation_demo(RemediationDemoScenario.SUCCESS)
+        if result.status.value != "verified":
+            raise RuntimeError("remediation measurement did not verify")
         durations.append((time.perf_counter_ns() - started) / 1_000_000)
     ordered = sorted(durations)
     return {

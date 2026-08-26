@@ -93,6 +93,11 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "role",
         "artifact_count",
         "critic_decision",
+        "action_kind",
+        "approval_status",
+        "effect_outcome",
+        "verification_status",
+        "rollback",
     }
 )
 _SAFE_AUDIT_KEYS = frozenset(

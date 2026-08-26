@@ -21,7 +21,11 @@ from aegis_framework.durability import (
     InMemoryDurability,
     OutboxDraft,
 )
-from aegis_framework.errors import IntegrityFailure, PayloadRejected, PolicyDenied
+from aegis_framework.errors import (
+    IntegrityFailure,
+    PayloadRejected,
+    PolicyDenied,
+)
 from aegis_framework.fixtures import DEMO_TIME
 from aegis_framework.temporal import (
     ActivityOutcome,

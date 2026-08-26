@@ -60,6 +60,17 @@ def test_noop_observability_has_no_side_effects() -> None:
             )
             is None
         )
+    with NoopObservability().remediation(
+        tenant_id="tenant-acme",
+        attributes={"action_kind": "kubernetes_rollout_restart"},
+    ) as observation:
+        assert (
+            observation.finish(
+                status="verified",
+                attributes={"rollback": False},
+            )
+            is None
+        )
 
 
 def test_service_can_emit_otel_without_exporter() -> None:
@@ -69,3 +80,38 @@ def test_service_can_emit_otel_without_exporter() -> None:
         demo_request(),
     )
     assert result.status.value == "complete"
+
+
+def test_remediation_span_exports_only_fixed_bounded_attributes() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    observability = OpenTelemetryObservability(
+        provider.get_tracer("aegis-framework-remediation-tests")
+    )
+    with observability.remediation(
+        tenant_id="tenant-sensitive",
+        attributes={
+            "action_kind": "kubernetes_rollout_restart",
+            "approval_status": "approved",
+            "plan_id": "never-export",
+            "rationale": "never-export",
+        },
+    ) as observation:
+        observation.finish(
+            status="verified",
+            attributes={
+                "effect_outcome": "succeeded",
+                "verification_status": "verified",
+                "rollback": False,
+                "target": "never-export",
+            },
+        )
+    span = exporter.get_finished_spans()[0]
+    assert span.name == "aegis.remediation.activity"
+    attributes = dict(span.attributes)
+    assert attributes["aegis.operation"] == "remediation_activity"
+    assert attributes["aegis.action_kind"] == "kubernetes_rollout_restart"
+    assert attributes["aegis.effect_outcome"] == "succeeded"
+    assert "tenant-sensitive" not in repr(attributes)
+    assert "never-export" not in repr(attributes)

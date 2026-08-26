@@ -1,4 +1,4 @@
-# Layer 6 curriculum
+# Layer 7 curriculum
 
 ## Learning outcomes
 
@@ -40,6 +40,14 @@ After this layer, an engineer should be able to:
 34. bind checkpoint replay to tenant/run/input/graph version and rebuild from ledger facts;
 35. assign Temporal, LangGraph, gateway and application-ledger retry ownership;
 36. compare Framework Layer 6 candidly with custom Aegis Layer 7.
+37. design immutable exact-scope plan/action/approval/effect/verification contracts;
+38. implement current-policy invalidation, SoD, distinct-human quorum and anti-enumeration;
+39. explain why Temporal signals/history are mechanics rather than approval/audit truth;
+40. assign at-least-once effect retry, idempotency, claim and fencing ownership;
+41. reconcile ambiguous external outcomes with observe-before-retry and read-after-write;
+42. require fresh independent evidence/postconditions instead of API acceptance;
+43. constrain a Kubernetes official-client adapter to one exact operation without shell;
+44. compare Temporal Layer 7 candidly with custom Aegis Layer 8.
 
 ## Suggested sequence
 
@@ -72,6 +80,13 @@ After this layer, an engineer should be able to:
 | Governed artifacts | ADR 011, `orchestration.py` | Forge role, transition, provenance and digest | Which artifact fields can grant authority? |
 | Specialist graph | `graph.py` | Reverse branch completion and inject node failure | What does LangGraph remove versus retain? |
 | Replay and ledger | migration 0005, orchestration repository | Lose/tamper checkpoint then rebuild projection | Which state is disposable? |
+| Exact contracts | `remediation.py`, ADR 012 | Change one digest/target/policy revision | Why must approval be reopened? |
+| Human approval | approval API/service | Race two decisions; try self/workload/replay | Which fact satisfies quorum? |
+| Temporal remediation | `remediation_temporal.py` | Wait, expire, signal, cancel and replay | What does Temporal simplify? |
+| Controlled action | `action_adapters.py` | Attempt arbitrary patch/shell/target change | Why is the client not authority? |
+| Ambiguity and fencing | effect service/repository | Crash after request; submit stale result | What can fencing not undo? |
+| Verification/rollback | verification contracts/runbook | Fail postcondition and compensate | Why is API acceptance insufficient? |
+| Layer 7 persistence | migration 0006 | Probe RLS, immutable decision and atomic claim | Which rows are mutable mechanics? |
 
 ## Practical exercises
 
@@ -103,6 +118,14 @@ After this layer, an engineer should be able to:
 20. Leave task dispatch intent unresolved and prove retry does not duplicate the model call.
 21. Change graph version/input digest under an existing thread and prove replay fails closed.
 22. Rebuild the artifact projection without reading LangGraph state.
+23. Forge a plan/action/approval digest and prove the effect adapter is never called.
+24. Race high-risk grants, reuse one approver and attempt self/workload approval.
+25. Expire and revoke approval while the Temporal workflow waits.
+26. Crash before and after a fake effect; prove intent, ambiguity and reconciliation.
+27. Return a stale worker fence and prove PostgreSQL rejects completion.
+28. Make provider API acceptance succeed while postconditions fail; prove no recovery claim.
+29. Attempt shell/arbitrary Kubernetes patch input and show no contract field accepts it.
+30. Delete a remediation projection and rebuild only from immutable application facts.
 
 ## Assessment rubric
 
