@@ -34,6 +34,15 @@ from aegis_framework.fixtures import (
     demo_identity,
     demo_request,
 )
+from aegis_framework.remediation_temporal import (
+    AegisRemediationWorkflow,
+    RemediationActivityInput,
+    RemediationActivityOutcome,
+    RemediationSignal,
+    RemediationWorkflowInput,
+    RemediationWorkflowResult,
+    TemporalRemediationActivities,
+)
 from aegis_framework.temporal import (
     ActivityOutcome,
     AegisInvestigationWorkflow,
@@ -49,6 +58,7 @@ from aegis_framework.temporal import (
 
 _TASK_QUEUE = "aegis-integration-v1"
 _EVIDENCE_TASK_QUEUE = "aegis-evidence-integration-v1"
+_REMEDIATION_TASK_QUEUE = "aegis-remediation-integration-v1"
 
 
 class _RetryOnceOperations(CallbackActivityOperations):
@@ -96,6 +106,109 @@ class _EvidenceOperations(EvidenceActivityOperations):
     async def reconcile(self, value: EvidenceActivityInput) -> EvidenceActivityOutcome:
         del value
         return EvidenceActivityOutcome(outcome="query_complete")
+
+
+class _RemediationOperations:
+    def __init__(
+        self,
+        *,
+        ambiguous: bool = False,
+        approval_outcomes: dict[str, str] | None = None,
+    ) -> None:
+        self.ambiguous = ambiguous
+        self.approval_outcomes = approval_outcomes or {}
+        self.calls: list[str] = []
+
+    async def request_approval(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("request_approval")
+        return RemediationActivityOutcome(outcome="pending")
+
+    async def load_approval_decision(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        assert value.command_ref is not None
+        self.calls.append("load_approval_decision")
+        return RemediationActivityOutcome(
+            outcome=self.approval_outcomes.get(value.command_ref, "granted")
+        )
+
+    async def preflight(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("preflight")
+        return RemediationActivityOutcome(outcome="preflight_succeeded")
+
+    async def execute(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("execute")
+        return RemediationActivityOutcome(
+            outcome=("effect_ambiguous" if self.ambiguous else "effect_succeeded"),
+            result_ref="effect:opaque",
+        )
+
+    async def reconcile(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        assert value.command_ref is not None
+        self.calls.append("reconcile")
+        return RemediationActivityOutcome(
+            outcome="reconciled",
+            result_ref="effect:opaque",
+        )
+
+    async def verify(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("verify")
+        return RemediationActivityOutcome(
+            outcome="verified",
+            result_ref="verification:opaque",
+        )
+
+    async def rollback(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("rollback")
+        return RemediationActivityOutcome(outcome="rolled_back")
+
+    async def cancel(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        assert value.command_ref is not None
+        self.calls.append("cancel")
+        return RemediationActivityOutcome(outcome="cancelled")
+
+    async def expire(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("expire")
+        return RemediationActivityOutcome(outcome="expired")
+
+    async def escalate(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        self.calls.append("escalate")
+        return RemediationActivityOutcome(outcome="escalated")
 
 
 def _outcomes() -> dict[str, ActivityOutcome]:
@@ -152,6 +265,20 @@ def _input(
         workflow_id=f"workflow:{suffix}",
         wait_for_signal=wait_for_signal,
         wait_timeout_seconds=wait_timeout_seconds,
+    )
+
+
+def _remediation_input(suffix: str) -> RemediationWorkflowInput:
+    return RemediationWorkflowInput(
+        tenant_ref="tenant:opaque",
+        actor_ref="actor:opaque",
+        request_ref=f"request:{suffix}",
+        run_id=f"run:{suffix}",
+        plan_ref=f"plan:{suffix}",
+        action_ref=f"action:{suffix}",
+        workflow_id=f"workflow:{suffix}",
+        approval_timeout_seconds=120,
+        reconciliation_timeout_seconds=120,
     )
 
 
@@ -377,6 +504,141 @@ def test_temporal_end_to_end_application_outbox_and_projection() -> None:
             )
             assert projection is not None
             assert projection.status is RunStatus.COMPLETED
+        finally:
+            if environment is not None:
+                await environment.shutdown()
+
+    asyncio.run(execute())
+
+
+@pytest.mark.temporal
+def test_temporal_remediation_wait_signal_reconcile_cancel_and_replay() -> None:
+    async def execute() -> None:
+        client, environment = await _client()
+        success_operations = _RemediationOperations()
+        success_activities = TemporalRemediationActivities(success_operations)
+        worker = Worker(
+            client,
+            task_queue=_REMEDIATION_TASK_QUEUE,
+            workflows=[AegisRemediationWorkflow],
+            activities=list(success_activities.registered()),
+        )
+        try:
+            async with worker:
+                success = await client.start_workflow(
+                    AegisRemediationWorkflow.run,
+                    _remediation_input("success"),
+                    id=f"workflow:remediation:success:{uuid4().hex}",
+                    task_queue=_REMEDIATION_TASK_QUEUE,
+                    execution_timeout=timedelta(minutes=2),
+                )
+                await success.signal(
+                    AegisRemediationWorkflow.approval_decision,
+                    RemediationSignal(command_ref="command:approval"),
+                )
+                await success.signal(
+                    AegisRemediationWorkflow.approval_decision,
+                    RemediationSignal(command_ref="command:approval"),
+                )
+                completed = await success.result()
+                assert isinstance(completed, RemediationWorkflowResult)
+                assert completed.status == "verified"
+                assert success_operations.calls == [
+                    "request_approval",
+                    "load_approval_decision",
+                    "preflight",
+                    "execute",
+                    "verify",
+                ]
+
+                pending_operations = _RemediationOperations(
+                    approval_outcomes={
+                        "command:approval:pending": "pending",
+                        "command:approval:grant": "granted",
+                    }
+                )
+                pending_activities = TemporalRemediationActivities(pending_operations)
+                pending_queue = "aegis-remediation-pending-v1"
+                pending_worker = Worker(
+                    client,
+                    task_queue=pending_queue,
+                    workflows=[AegisRemediationWorkflow],
+                    activities=list(pending_activities.registered()),
+                )
+                async with pending_worker:
+                    pending = await client.start_workflow(
+                        AegisRemediationWorkflow.run,
+                        _remediation_input("pending"),
+                        id=f"workflow:remediation:pending:{uuid4().hex}",
+                        task_queue=pending_queue,
+                        execution_timeout=timedelta(minutes=2),
+                    )
+                    await pending.signal(
+                        AegisRemediationWorkflow.approval_decision,
+                        RemediationSignal(command_ref="command:approval:pending"),
+                    )
+                    await pending.signal(
+                        AegisRemediationWorkflow.approval_decision,
+                        RemediationSignal(command_ref="command:approval:grant"),
+                    )
+                    pending_result = await pending.result()
+                    assert pending_result.status == "verified"
+                    assert pending_operations.calls == [
+                        "request_approval",
+                        "load_approval_decision",
+                        "load_approval_decision",
+                        "preflight",
+                        "execute",
+                        "verify",
+                    ]
+
+                cancelled = await client.start_workflow(
+                    AegisRemediationWorkflow.run,
+                    _remediation_input("cancel"),
+                    id=f"workflow:remediation:cancel:{uuid4().hex}",
+                    task_queue=_REMEDIATION_TASK_QUEUE,
+                    execution_timeout=timedelta(minutes=2),
+                )
+                await cancelled.signal(
+                    AegisRemediationWorkflow.request_cancel,
+                    RemediationSignal(command_ref="command:cancel"),
+                )
+                assert (await cancelled.result()).status == "cancelled"
+
+            ambiguous_operations = _RemediationOperations(ambiguous=True)
+            ambiguous_activities = TemporalRemediationActivities(ambiguous_operations)
+            ambiguous_queue = "aegis-remediation-ambiguous-v1"
+            ambiguous_worker = Worker(
+                client,
+                task_queue=ambiguous_queue,
+                workflows=[AegisRemediationWorkflow],
+                activities=list(ambiguous_activities.registered()),
+            )
+            async with ambiguous_worker:
+                ambiguous = await client.start_workflow(
+                    AegisRemediationWorkflow.run,
+                    _remediation_input("ambiguous"),
+                    id=f"workflow:remediation:ambiguous:{uuid4().hex}",
+                    task_queue=ambiguous_queue,
+                    execution_timeout=timedelta(minutes=2),
+                )
+                await ambiguous.signal(
+                    AegisRemediationWorkflow.approval_decision,
+                    RemediationSignal(command_ref="command:approval"),
+                )
+                await ambiguous.signal(
+                    AegisRemediationWorkflow.reconcile_effect,
+                    RemediationSignal(command_ref="command:reconcile"),
+                )
+                assert (await ambiguous.result()).status == "verified"
+                assert "reconcile" in ambiguous_operations.calls
+
+            history = await success.fetch_history()
+            replayed = await Replayer(
+                workflows=[AegisRemediationWorkflow],
+                data_converter=temporal_data_converter(),
+            ).replay_workflow(history)
+            assert replayed.replay_failure is None
         finally:
             if environment is not None:
                 await environment.shutdown()

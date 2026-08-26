@@ -1,17 +1,105 @@
-# Layer 6 governed specialist orchestration architecture
+# Layer 7 approval-gated remediation architecture
 
 ## Product boundary
 
-Layer 6 accepts a tenant-authorized investigation command, records immutable
+Layer 7 accepts a tenant-authorized investigation command, records immutable
 application intent, schedules a crash-resilient lifecycle, runs the existing bounded
 connector pagination and one bounded LangGraph specialist investigation, optionally
 waits for a signal, and publishes application-owned evidence, artifact, status, and
 timeline projections.
 
-It still cannot approve, execute, or verify a production change. Production-shaped
-Dynatrace, GitHub App, Kubernetes, and runbook adapters are disabled by default; live
-provider qualification and credential brokering remain deferred, as do controlled
-effects/approvals, sandboxing, memory/RAG, UI/BFF, MCP/A2A, and deployment.
+It can now open an exact-scope approval and coordinate one fixed controlled action,
+reconciliation, independent verification and compensation. Production-shaped adapters
+remain disabled by default and unqualified against live credentials/clusters. General
+sandboxing, memory/RAG, UI/BFF, MCP/A2A, deployment and live qualification remain
+deferred.
+
+## Layer 7 remediation lifecycle
+
+LangGraph still ends at a cited proposal and verification plan. Application code converts
+an accepted proposal into immutable `RemediationPlan` and `ActionDefinition` contracts.
+No graph edge, checkpoint, interrupt, model result or verification-agent claim can create
+an approval decision or call `ActionPort`.
+
+The application contract binds tenant/run/incident, proposer, exact target fingerprint,
+risk/blast radius, pre/postconditions, mandatory dry-run, timeout/retry owner,
+idempotency key, compensation, evidence citations, critic status, current policy/role/
+quota snapshot, action digests and plan digest. Any plan, action, target, policy, role or
+digest change invalidates approval.
+
+```mermaid
+flowchart LR
+  G[LangGraph cited proposal] --> P[Immutable application plan]
+  P --> CP[Current deny-by-default policy]
+  CP --> AR[Exact approval request]
+  AR --> TW[Temporal durable wait/timer]
+  H1[Human approver 1] --> C1[Persist command]
+  H2[Distinct approver 2] --> C2[Persist command]
+  C1 --> TW
+  C2 --> TW
+  TW --> RA[Reload identity/policy/digests]
+  RA --> DR[Preflight and dry-run]
+  DR --> EI[Persist effect intent]
+  EI --> AP[ActionPort]
+  AP --> RR[Receipt or ambiguity]
+  RR --> RC[Observe/reconcile]
+  RC --> VE[Fresh independent verification]
+  VE --> OK[Verified]
+  VE --> RB[Bound rollback or escalation]
+```
+
+Temporal provides durable waits, timers, signals, cancellation delivery, Activity
+heartbeat/retry, replay and worker recovery. Signals carry opaque command references
+reloaded from PostgreSQL. `workflow.patched("aegis-remediation-lifecycle-v1")` versions
+history. PostgreSQL remains approval/audit/effect truth.
+
+## Approval and separation of duties
+
+The authenticated service requires a current human principal, current purpose-bound
+grant, configured approver role, bounded rationale, non-expired exact digests and
+optimistic aggregate version. High-risk policy requires two distinct approvers. Self
+approval is denied when configured. One approver may contribute once; command IDs and
+decision digests prevent forged/changed replay. Denial, expiry and revocation are
+additive terminal facts. Unauthorized and cross-tenant reads return the same `404`.
+
+## Effects, idempotency and reconciliation
+
+`ActionPort` is provider-neutral. The deterministic fake exercises duplicate, ambiguous,
+verification and rollback paths. The only production-shaped adapter uses the official
+Kubernetes client to patch the pod-template annotations of one exact Deployment. It
+requires a configured cluster, namespace, name, UID, resourceVersion and fingerprint,
+performs server dry-run first, and exposes no shell, arbitrary command, kubeconfig exec
+plugin, object kind or caller/model patch.
+
+Effects are at-least-once. A stable tenant/idempotency key, attempt fence and atomic claim
+reject duplicates, conflicts and stale workers. The application observes before retry,
+persists intent before I/O, records success/failure/ambiguity afterward and reads after
+write. An ambiguous timeout blocks blind retry. Reconciliation must prove applied/not
+applied state or escalate; no exactly-once claim is made.
+
+Verification occurs after the receipt using fresh cited evidence and immutable
+postconditions. API/provider acceptance is not recovery. Compensation is a separately
+bound action; a rollout restart has no intrinsic inverse, so the Kubernetes adapter
+rejects generic rollback.
+
+## Layer 7 PostgreSQL ownership
+
+Migration `0006_layer7.sql` adds forced-RLS plans, action policies, quotas/reservations,
+approval requests and immutable decisions, remediation facts, effect attempts/claims,
+immutable receipts, verification records, projections and immutable rebuild records.
+`PostgresRemediationStore` performs tenant transactions, exact replay checks, expected
+version appends, pure replay, fenced claims and compare-and-set claim completion.
+
+The application ledger records proposal, policy decision, approval requested/granted/
+denied/expired/revoked, preflight/dry-run, execution requested/started/succeeded/failed/
+ambiguous, reconciliation, rollback, cancellation, verification and escalation facts.
+Temporal history and Kubernetes events are operational evidence only.
+
+Manual OpenTelemetry/optional Langfuse observation uses fixed
+`aegis.remediation.activity` spans and allowlisted low-cardinality action kind, approval
+status, effect outcome, verification status and rollback flags. It exports no tenant,
+actor, request, plan/action ID, digest, rationale, target, evidence, credential or
+receipt. The application ledger owns decisions, usage and effects.
 
 ## Layer 6 specialist graph
 

@@ -16,6 +16,10 @@ from aegis_framework.fixtures import (
     demo_identity,
     demo_request,
 )
+from aegis_framework.remediation_demo import (
+    RemediationDemoScenario,
+    run_remediation_demo,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,6 +35,16 @@ def build_parser() -> argparse.ArgumentParser:
     demo.add_argument("--tenant-id", default="tenant-acme")
     demo.add_argument("--subject-id", default="responder-alice")
     demo.add_argument("--request-id", default="request-cli-001")
+
+    remediation = subparsers.add_parser(
+        "remediation-demo",
+        help="run a redacted deterministic approval/effect scenario",
+    )
+    remediation.add_argument(
+        "--scenario",
+        choices=[scenario.value for scenario in RemediationDemoScenario],
+        default=RemediationDemoScenario.SUCCESS.value,
+    )
 
     evaluate = subparsers.add_parser("eval", help="run deterministic eval cases")
     evaluate.add_argument(
@@ -83,6 +97,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 parser.exit(2, f"{parser.prog}: error: {exc}\n")
         print(report.model_dump_json(indent=2))
         return 0 if report.passed else 1
+    if args.command == "remediation-demo":
+        remediation_result = run_remediation_demo(
+            RemediationDemoScenario(args.scenario)
+        )
+        print(remediation_result.model_dump_json(indent=2))
+        return 0
 
     uvicorn.run(
         "aegis_framework.api:app",

@@ -1,4 +1,4 @@
-# Layer 6 qualification status
+# Layer 7 qualification status
 
 ## Delivered
 
@@ -52,29 +52,43 @@
   deterministic rebuild and authorized redacted cursor reads;
 - one Temporal-owned bounded graph Activity with no graph/provider retry overlap;
 - fixed-name redacted graph-node and model observations.
+- immutable exact-scope remediation/action/approval/effect/verification contracts and
+  canonical digests with citations, policy snapshots and compensation bindings;
+- deny-by-default allowlist/window/risk/blast/quota/evidence/critic/digest policy;
+- authenticated SoD/quorum approval service and redacted anti-enumerating API;
+- Temporal durable approval wait, timer, opaque signals, effect/reconciliation/
+  verification/rollback Activities, heartbeat/cancellation and replay version marker;
+- provider-neutral `ActionPort`, deterministic fake and fixed-shape disabled Kubernetes
+  Deployment rollout-restart official-client adapter;
+- at-least-once idempotency, observe-before-retry, ambiguity, reconciliation, fencing,
+  read-after-write, fresh verification, rollback and escalation;
+- forced-RLS Layer 7 plans/policies/quotas/approvals/immutable decisions/facts/receipts/
+  verification/rebuild tables and atomic effect claims;
+- redacted CLI demonstrations for success, denial, expiry, ambiguity/reconciliation,
+  verification failure and rollback.
 
 ## Qualification snapshot
 
-- 226 deterministic tests pass with 90.01% meaningful branch coverage;
-- 31 deterministic evals pass, including pagination, poisoning, source revocation,
+- 256 deterministic tests pass with at least 90% meaningful branch coverage;
+- 37 deterministic evals pass, including pagination, poisoning, source revocation,
   deterministic non-causal correlation and private-destination rejection;
-- eight local PostgreSQL integration tests cover forced RLS/tenant isolation,
+- nine local PostgreSQL integration tests cover forced RLS/tenant isolation,
   immutable audit/events/model/evidence/orchestration facts, quota/model races,
   checkpoint isolation, dedicated-pool concurrency, crash ambiguity/reconciliation
   and deterministic rebuild;
-- three local Temporal integration tests cover no-worker recovery, Activity retry,
+- four local Temporal integration tests cover no-worker recovery, Activity retry,
   duplicate signal, cancellation, timeout, replay, opaque evidence pagination, and the
   real application outbox/Activity/projection path;
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer5-metrics.json`.
+`comparison/layer7-metrics.json`.
 
 ## Not proven
 
 Production Temporal HA/upgrade/failover, PostgreSQL HA/PITR/restore, multi-region order,
 load/capacity, WORM witnessing, retention/erasure execution, live IdP rotation, live
 connector/model credentials and provider qualification, production DNS/egress,
-complex-document parser isolation,
-approvals/effects/fencing/reconciliation, sandbox tools, memory/RAG, UI/BFF, MCP/A2A,
-and deployment admission remain unproven.
+complex-document parser isolation, live Kubernetes credentials/RBAC/admission,
+independent production verification, general sandbox tools, memory/RAG, UI/BFF,
+MCP/A2A and deployment admission remain unproven.

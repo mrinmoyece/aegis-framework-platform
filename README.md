@@ -8,10 +8,11 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
-**Layer 6 adds governed fixed-role specialist orchestration and typed reasoning
-artifacts. It still cannot approve, execute, or verify a production effect.**
+**Layer 7 adds exact-scope human approval, controlled effects, reconciliation,
+verification, and rollback while keeping application policy/audit/effect authority
+outside Temporal and LangGraph.**
 
-## Delivered Layer 6
+## Delivered Layer 7
 
 - additive strict application events with aggregate sequence, commit-order tenant
   cursor, expected-version concurrency, aggregate/tenant hash chains, legacy upcast,
@@ -66,14 +67,36 @@ artifacts. It still cannot approve, execute, or verify a production effect.**
   graph Activity and owns cross-process retry/cancellation;
 - authorized redacted artifact cursor API plus fixed-name OTel/Langfuse graph-node and
   model spans that export counts/status only.
+- immutable versioned remediation plan/action/approval/effect/verification contracts
+  binding exact plan/action digests, tenant/run/target fingerprint, risk/blast radius,
+  pre/postconditions, dry-run, retry/timeouts, idempotency, compensation, citations and
+  current policy snapshot;
+- additive application-ledger facts and pure replay across proposal, approval,
+  preflight, execution, ambiguity/reconciliation, cancellation, verification and
+  rollback; Temporal history is never audit truth;
+- deny-by-default current action policy for exact targets, maintenance windows,
+  risk/blast thresholds, quotas, evidence/critic gates, role/purpose and immutable
+  digests; policy/role/plan changes invalidate approval;
+- authenticated redacted approval API with SoD, distinct humans, two-person high-risk
+  quorum, expiry/revocation, optimistic concurrency, replay protection and
+  anti-enumeration;
+- `aegis.remediation.v1` Temporal workflow for long approval waits, timers, opaque
+  signals, Activity heartbeat/cancellation/retry, crash recovery, ambiguity and
+  reconciliation, verification and compensation;
+- provider-neutral `ActionPort`, deterministic fake, and one disabled-by-default
+  fixed-shape official Kubernetes Deployment rollout-restart adapter with exact UID,
+  resourceVersion and target binding—no shell or arbitrary command/patch surface;
+- forced-RLS PostgreSQL plans, policies, quotas, approvals, immutable decisions/facts/
+  receipts/verifications, fenced atomic effect claims and projection rebuild records.
 
 ## Ownership
 
 | Owner | Responsibility | Not authoritative for |
 |---|---|---|
 | PostgreSQL application ledger | Events, idempotency, inbox/outbox, run/timeline/audit facts | Framework scheduling/checkpoints |
-| Temporal | Cross-process schedule, Activities, timers, signals, replay/recovery | Tenant grants, policy, audit, API status, effects |
-| LangGraph | Fixed cognitive topology, fan-out/join, reducers, routing, graph checkpoints | Roles/capabilities, artifacts, dispatch/result facts, authorization, audit, effects |
+| Temporal | Cross-process schedule, approval waits, Activities, timers, signals, retry/replay/recovery | Tenant grants, policy, approval truth, audit, effect receipts |
+| LangGraph | Fixed cognitive topology, fan-out/join, reducers, routing, graph checkpoints | Roles/capabilities, approval, authorization, audit, effects |
+| Action adapter | One exact provider operation and observation | Policy, approval, fencing, idempotency, audit, verification |
 | Official provider SDKs | OpenAI/Anthropic wire protocol and decoding | Model policy, routing, budget, pricing, usage, safety, retry truth |
 | Connector libraries | HTTPX transport, Kubernetes decoding, PyYAML syntax | Tenant/source policy, SSRF, secrets, provenance, pagination truth, quarantine |
 
@@ -90,6 +113,9 @@ make bootstrap
 make ci
 make eval
 docker compose config --quiet
+uv run aegis-framework remediation-demo --scenario success
+uv run aegis-framework remediation-demo --scenario ambiguity
+uv run aegis-framework remediation-demo --scenario rollback
 ```
 
 Run the deterministic API:
@@ -173,12 +199,12 @@ never the repository or workflow history.
 
 ## Qualification status
 
-- 226 deterministic tests pass at 90.01% meaningful branch coverage;
-- 31 deterministic evals cover cognitive/model safety, durable recovery,
+- 256 deterministic tests pass at 90%+ meaningful branch coverage;
+- 37 deterministic evals cover cognitive/model safety, durable recovery,
   routing, budgets, malformed output, fallback/circuit, timeout/cancellation, duplicate
   and ambiguous billing, revocation, tenant isolation, connector pagination, poisoning,
   source revocation, non-causal correlation and SSRF;
-- eight PostgreSQL and three Temporal integration tests pass locally;
+- nine PostgreSQL and four Temporal integration tests pass locally;
 - one Keycloak compatibility test remains environment-gated;
 - tests/evals use no live credentials, real models, or cloud services.
 
@@ -187,7 +213,7 @@ these as production evidence.
 
 ## Framework comparison
 
-`comparison/layer6-metrics.json` pins custom Aegis Layer 7 at `dce0054` and records LOC,
+`comparison/layer7-metrics.json` pins custom Aegis Layer 8 and records LOC,
 dependencies, incremental effort, retained controls, operational cost and escape paths.
 The 200-run in-memory specialist benchmark measured the framework path separately from
 the custom async event-repository path; it is not a service benchmark and excludes
@@ -206,14 +232,16 @@ governance, tenant controls, artifact facts, citations, or recovery policy.
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 6 comparison metrics |
+| `make measure` | Refresh Layer 7 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
 [ADR 007](docs/adr/007-temporal-durable-workflow.md),
 [ADR 010](docs/adr/010-secure-evidence-connectors.md),
 [ADR 011](docs/adr/011-governed-specialist-orchestration.md),
+[ADR 012](docs/adr/012-temporal-approval-and-effects.md),
 [connector runbook](docs/connector-runbook.md), [runbook](docs/runbook.md),
+[approval/effect runbook](docs/approval-effect-runbook.md),
 [threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).
 

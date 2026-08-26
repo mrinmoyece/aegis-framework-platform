@@ -55,6 +55,7 @@ _MIGRATIONS = (
     _ROOT / "migrations/0003_layer4.sql",
     _ROOT / "migrations/0004_layer5.sql",
     _ROOT / "migrations/0005_layer6.sql",
+    _ROOT / "migrations/0006_layer7.sql",
 )
 _CHECKPOINT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 

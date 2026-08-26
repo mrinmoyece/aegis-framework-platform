@@ -1,4 +1,4 @@
-# Layer 6 authority and retry ownership
+# Layer 7 authority and retry ownership
 
 ## Ownership matrix
 
@@ -30,7 +30,11 @@
 | Reasoning artifact/decision | Immutable application artifact fact/projection | Graph state may hold a copy | Application ledger rebuild |
 | API status/timeline | Rebuildable application projection | Temporal query is convenience only | Event replay |
 | Audit | Application PostgreSQL audit/ledger | No | Application database |
-| Approval/effect/fencing/receipt | Not implemented in Layer 3 | Never | Future application layer |
+| Remediation plan/action digest | Immutable application contract | Opaque reference only | PostgreSQL plan |
+| Approval request/decision/quorum | Application approval service + immutable decisions | Command reference/status only | PostgreSQL approval facts |
+| Effect intent/idempotency/fence | Application ledger and atomic claim | Activity operation reference | PostgreSQL effect attempt |
+| External operation mechanics | `ActionPort` adapter | Provider receipt is untrusted input | Observe/reconcile through provider API |
+| Effect receipt/verification/rollback | Immutable application facts | Result reference only | PostgreSQL replay + fresh evidence |
 
 ## Retry matrix
 
@@ -47,6 +51,11 @@
 | Provider SDK | None | `max_retries=0`; one network intent per durable attempt ID |
 | Structured repair/fallback | Application gateway | Policy bound; no ambiguous-billing fallback by default |
 | Signal | Temporal may redeliver | Workflow command-reference set + application inbox |
+| Approval signal | Temporal may redeliver | Persisted decision command + workflow reference set |
+| Effect Activity | Temporal | Three attempts; observe-before-retry + stable tenant key + fence |
+| Kubernetes client | None | One fixed request per claimed attempt; no client retry |
+| Ambiguous effect | Operator/application reconciler | Observe exact target; retry only after proof |
+| Verification | Application | Fresh evidence after receipt; no API-acceptance shortcut |
 | Projection | Application replay | Cursor/hash checkpoint; deterministic reducer |
 
 ## Non-negotiable call order
@@ -71,6 +80,16 @@
     the current run/task fence.
 14. Validate role, artifact transition, provenance, citation, confidence, graph version,
     and input digest before recording the final application artifact/decision facts.
+15. Convert only an accepted cited proposal into an immutable exact-scope plan; the graph
+    cannot open or decide approval.
+16. Recheck current allowlists, maintenance window, risk/blast thresholds, quota,
+    evidence/critic status and plan/action/target/policy/role digests.
+17. Persist approval commands before signalling; require current human SoD/quorum and
+    reject self, duplicate, stale, expired, revoked or forged decisions.
+18. Reserve effect quota and persist effect intent before I/O; dry-run and observe exact
+    target, then execute under the current claim/fence.
+19. Persist receipt or ambiguity, reconcile by observation, and verify with fresh cited
+    evidence. Rollback requires its own exact compensation contract.
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.

@@ -275,3 +275,55 @@ saver schema/serialization, error behavior and upgrade testing. Escape is explic
 retain/rebuild from application orchestration facts and neutral artifact JSON, discard
 framework checkpoints, replace `OrchestratorPort`, and pass the same deterministic
 fan-out/order/replay/version/tenant/cancellation/critic suite.
+
+## Framework Layer 7 versus custom Aegis Layer 8
+
+The custom target is
+`mrinmoyece/aegis-agent-platform@0ce9368d60f3b2fce7b805d7d7699d585f13cef2`
+on `mrinmoyece-aegis-remediation-approvals`, one commit above custom Layer 7
+`dce0054`. Measured with the same non-blank/non-comment Python rule, custom Layer 8 has
+28,056 production LOC, 14,031 test LOC, 42,087 total LOC and 275 test functions. Its
+increment is 12,030 additions, 162 deletions across 48 files. Framework Layer 7 has
+24,193 production LOC, 10,600 test LOC and 34,793 total LOC; its Layer 7 increment is
+recorded in `comparison/layer7-metrics.json`.
+
+Both implement immutable exact-scope plan/action/approval/effect/verification contracts,
+deny-by-default action policy, two-person high-risk SoD, expiry/revocation, intent before
+effect, stable idempotency, fencing, ambiguity/reconciliation, fresh verification,
+compensation lifecycle, forced-RLS projections and one fixed Kubernetes rollout restart.
+Both retain the same security-sensitive application controls. The official Kubernetes
+client removes request/object mechanics only.
+
+The primary difference is durable workflow machinery. Custom Layer 8 implements its own
+asynchronous remediation lifecycle over PostgreSQL application state and the existing
+Redis Streams delivery plane. Framework Layer 7 uses the already selected Temporal
+service for long approval waits, timers, opaque signals, Activity scheduling,
+retry/backoff, heartbeat, cancellation delivery, worker recovery and deterministic
+workflow replay. No extra agent or workflow framework is added above Temporal and
+LangGraph.
+
+Temporal therefore eliminates custom poller/scheduler/timer/signal/retry/heartbeat/
+recovery code, but not exact authorization, decisions, audit, idempotency, claims,
+fencing, reconciliation, verification or rollback. Operationally, Framework Layer 7
+requires PostgreSQL plus Temporal Server; custom Layer 8 requires PostgreSQL plus Redis
+Streams. Temporal brings namespace/task-queue/history/schema/Worker Versioning
+operations and server-side history lock-in. Custom code brings more queue/lease/lifecycle
+maintenance but avoids Temporal history and server operations.
+
+The 200-run equivalent checkout scenario uses a high-risk exact-target rollout restart,
+two distinct approvals, dry-run, deterministic fake effect and verification, with no
+network, credentials or stateful service. On the same arm64/Python 3.14.7 machine,
+Framework Layer 7 measured 0.953 ms median/1.220 ms p95; custom Layer 8 measured
+5.983/7.210 ms. The methods are not identical: custom is async and exercises its
+in-memory event repository/lease machinery; framework is synchronous and exercises
+strict Pydantic contracts and pure ledger replay. The numbers exclude PostgreSQL,
+Temporal, Redis, Kubernetes, serialization and process boundaries, so they are
+implementation-path indicators—not service throughput or a reason to choose a framework.
+
+Temporal lock-in includes workflow/activity names, deterministic code, signal semantics,
+history format, retry behavior, patch markers and deployment replay qualification.
+Escape remains explicit: retain PostgreSQL application facts, rebuild projections,
+consume opaque commands through another scheduler implementing
+`RemediationActivityOperations`, keep `ActionPort`, and pass the wait/timer/signal/
+retry/heartbeat/cancellation/crash/replay equivalence suite. Framework history is
+discardable; application decisions and receipts are not.

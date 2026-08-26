@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aegis-framework-platform"
-version = "0.6.0"
+version = "0.7.0"
 description = "Framework-first governed enterprise model investigation platform"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
@@ -137,6 +137,8 @@ omit = [
   "src/aegis_framework/temporal.py",
   "src/aegis_framework/evidence_temporal.py",
   "src/aegis_framework/orchestration_postgres.py",
+  "src/aegis_framework/remediation_postgres.py",
+  "src/aegis_framework/remediation_temporal.py",
 ]
 
 [tool.coverage.report]

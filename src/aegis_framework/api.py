@@ -7,7 +7,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from threading import Lock
-from typing import Annotated, NoReturn
+from typing import Annotated, Literal, NoReturn
 
 from fastapi import (
     Depends,
@@ -49,6 +49,7 @@ from aegis_framework.durability import (
 )
 from aegis_framework.errors import (
     AegisFrameworkError,
+    ApprovalExpired,
     AuthenticationFailed,
     ConcurrencyConflict,
     IdempotencyConflict,
@@ -83,6 +84,11 @@ from aegis_framework.orchestration import (
 )
 from aegis_framework.ports import Action, PolicyDecision, PolicyPort
 from aegis_framework.references import TenantReferenceCodec
+from aegis_framework.remediation import (
+    ApprovalDisposition,
+    ApprovalService,
+    ApprovalView,
+)
 from aegis_framework.service import InvestigationService
 
 _IDENTIFIER_ADAPTER = TypeAdapter(Identifier)
@@ -167,6 +173,34 @@ class OrchestrationArtifactPageView(StrictModel):
     next_cursor: str | None
 
 
+class ApiApprovalDecisionRequest(StrictModel):
+    command_id: Identifier
+    disposition: Literal[ApprovalDisposition.GRANT, ApprovalDisposition.DENY]
+    rationale: str = Field(min_length=1, max_length=2_000)
+    expected_version: int = Field(ge=1)
+    plan_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approval_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class ApiApprovalRevocationRequest(StrictModel):
+    command_id: Identifier
+    rationale: str = Field(min_length=12, max_length=2_000)
+    expected_version: int = Field(ge=1)
+
+
+class ApprovalApiView(StrictModel):
+    approval_ref: Identifier
+    plan_ref: Identifier
+    status: str
+    version: int = Field(ge=1)
+    grants: int = Field(ge=0)
+    quorum: int = Field(ge=1)
+    decision_count: int = Field(ge=0)
+    expires_at: str
+    plan_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approval_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
 class BodySizeLimitMiddleware:
     """Reject request bodies over the bound even without Content-Length."""
 
@@ -243,6 +277,7 @@ class ApiRuntime:
     evidence_control: EvidenceStatusPort | None = None
     orchestration_control: OrchestrationArtifactReadPort | None = None
     orchestration_cursor_codec: CursorCodec | None = None
+    approvals: ApprovalService | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -304,8 +339,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.6.0",
-        description="Authenticated durable Layer 6 governed investigation API.",
+        version="0.7.0",
+        description="Authenticated Layer 7 approval and controlled-effect API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -607,6 +642,98 @@ def create_app(
             ),
         )
 
+    @app.get(
+        "/v1/approvals/{approval_id}",
+        response_model=ApprovalApiView,
+    )
+    def approval_status(
+        approval_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> ApprovalApiView:
+        approvals = _require_approvals(selected_runtime)
+        try:
+            view = approvals.get(identity, approval_id=approval_id)
+        except PolicyDenied:
+            _not_found()
+        if view is None:
+            _not_found()
+        return _approval_view(view)
+
+    @app.post(
+        "/v1/approvals/{approval_id}/decisions",
+        response_model=ApprovalApiView,
+    )
+    def decide_approval(
+        approval_id: Annotated[str, Path(min_length=1, max_length=128)],
+        payload: ApiApprovalDecisionRequest,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> ApprovalApiView:
+        approvals = _require_approvals(selected_runtime)
+        try:
+            view = approvals.decide(
+                identity,
+                approval_id=approval_id,
+                disposition=payload.disposition,
+                rationale=payload.rationale,
+                expected_version=payload.expected_version,
+                command_id=payload.command_id,
+                plan_digest=payload.plan_digest,
+                approval_digest=payload.approval_digest,
+            )
+        except PolicyDenied:
+            _not_found()
+        except ApprovalExpired as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="approval is no longer current",
+            ) from exc
+        except (ConcurrencyConflict, IdempotencyConflict) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="approval decision conflicts with current state",
+            ) from exc
+        except IntegrityFailure as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="approval is already terminal",
+            ) from exc
+        return _approval_view(view)
+
+    @app.post(
+        "/v1/approvals/{approval_id}/revocations",
+        response_model=ApprovalApiView,
+    )
+    def revoke_approval(
+        approval_id: Annotated[str, Path(min_length=1, max_length=128)],
+        payload: ApiApprovalRevocationRequest,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> ApprovalApiView:
+        approvals = _require_approvals(selected_runtime)
+        try:
+            approvals.revoke(
+                identity,
+                approval_id=approval_id,
+                expected_version=payload.expected_version,
+                command_id=payload.command_id,
+                rationale=payload.rationale,
+            )
+            view = approvals.get(identity, approval_id=approval_id)
+        except PolicyDenied:
+            _not_found()
+        except (ConcurrencyConflict, IdempotencyConflict) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="approval revocation conflicts with current state",
+            ) from exc
+        except IntegrityFailure as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="approval is already terminal",
+            ) from exc
+        if view is None:
+            _not_found()
+        return _approval_view(view)
+
     @app.post(
         "/v1/investigations",
         response_model=InvestigationResult,
@@ -813,6 +940,9 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         clock=FixedClock(DEMO_TIME).now,
     )
     model_control = _demo_model_control()
+    from aegis_framework.remediation_demo import build_remediation_api_demo
+
+    remediation_demo = build_remediation_api_demo()
     return ApiRuntime(
         authenticator=primary.authenticator,
         governance=primary.governance,
@@ -832,6 +962,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         orchestration_cursor_codec=CursorCodec(
             b"aegis-demo-artifact-cursor-test-only-01"
         ),
+        approvals=remediation_demo.approvals,
     )
 
 
@@ -1031,6 +1162,30 @@ def _require_evidence_control(runtime: ApiRuntime) -> EvidenceStatusPort:
             detail="evidence control is not configured",
         )
     return runtime.evidence_control
+
+
+def _require_approvals(runtime: ApiRuntime) -> ApprovalService:
+    if runtime.approvals is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="approval service is unavailable",
+        )
+    return runtime.approvals
+
+
+def _approval_view(value: ApprovalView) -> ApprovalApiView:
+    return ApprovalApiView(
+        approval_ref=value.approval.approval_id,
+        plan_ref=value.approval.plan_id,
+        status=value.status.value,
+        version=value.version,
+        grants=value.grants,
+        quorum=value.approval.requirement.quorum,
+        decision_count=len(value.decisions),
+        expires_at=value.approval.expires_at.isoformat(),
+        plan_digest=value.approval.plan_digest,
+        approval_digest=value.approval.canonical_digest,
+    )
 
 
 def _authorize_resource(

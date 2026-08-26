@@ -2,7 +2,7 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 6,
+  "layer": 7,
   "generated_on": "2026-08-16",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
@@ -70,10 +70,10 @@
     {
       "id": "08-approval-remediation",
       "name": "Approval-gated remediation actions",
-      "status": "partial",
-      "evidence": ["src/aegis_framework/adapters.py", "docs/limitations.md"],
-      "framework_owned": [],
-      "enterprise_owned": ["proposal boundary", "approval decisions", "fencing", "effects", "verification", "reconciliation"]
+      "status": "delivered",
+      "evidence": ["src/aegis_framework/remediation.py", "src/aegis_framework/remediation_temporal.py", "src/aegis_framework/action_adapters.py", "src/aegis_framework/remediation_postgres.py", "migrations/0006_layer7.sql", "tests/test_remediation_layer7.py", "tests/test_temporal_integration.py"],
+      "framework_owned": ["Temporal durable approval waits/timers/signals, Activity retry/heartbeat/cancellation and workflow replay", "official Kubernetes client request/object mechanics", "FastAPI/Pydantic delivery validation"],
+      "enterprise_owned": ["exact immutable plan/action/approval/effect/verification contracts", "current policy and approval invalidation", "SoD/quorum/expiry/revocation", "tenant idempotency and fencing", "intent/receipt/reconciliation", "fresh verification and compensation policy", "forced RLS and pure projection rebuild"]
     },
     {
       "id": "09-sandbox-execution",
@@ -95,25 +95,25 @@
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_temporal_integration.py"],
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py", "tests/test_temporal_integration.py"],
       "framework_owned": ["Temporal replay", "optional Langfuse evaluator observation"],
-      "enterprise_owned": ["thirty-one hermetic safety cases", "equivalence", "release thresholds", "load/chaos qualification"]
+      "enterprise_owned": ["hermetic safety and approval/effect attack cases", "equivalence", "release thresholds", "load/chaos qualification"]
     },
     {
       "id": "12-observability-replay",
       "name": "Observability and replay",
       "status": "partial",
-      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py", "src/aegis_framework/orchestration_postgres.py"],
+      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/remediation_temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py", "src/aegis_framework/orchestration_postgres.py", "src/aegis_framework/remediation_postgres.py"],
       "framework_owned": ["OTel spans", "Temporal replay", "LangGraph checkpoints"],
-      "enterprise_owned": ["redaction", "cardinality", "event/model/evidence/artifact replay", "graph-version compatibility", "projection rebuild", "retention"]
+      "enterprise_owned": ["redaction", "cardinality", "event/model/evidence/artifact/remediation replay", "graph/workflow-version compatibility", "projection rebuild", "retention"]
     },
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
       "status": "partial",
-      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py"],
+      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py"],
       "framework_owned": ["FastAPI delivery"],
-      "enterprise_owned": ["authorized redacted status/timeline/model/evidence/artifact operations", "opaque/encrypted cursor", "session security", "review UX"]
+      "enterprise_owned": ["authorized redacted status/timeline/model/evidence/artifact/approval operations", "anti-enumeration", "opaque/encrypted cursor", "session security", "review UX"]
     },
     {
       "id": "14-mcp-a2a-interoperability",

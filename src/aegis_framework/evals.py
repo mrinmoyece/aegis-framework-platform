@@ -24,6 +24,11 @@ from aegis_framework.fixtures import (
     demo_identity,
     demo_request,
 )
+from aegis_framework.remediation import RemediationStatus
+from aegis_framework.remediation_demo import (
+    RemediationDemoScenario,
+    run_remediation_demo,
+)
 
 
 class EvalCase(StrictModel):
@@ -56,6 +61,12 @@ class EvalCase(StrictModel):
         "orchestration-role-denial",
         "orchestration-duplicate-task",
         "orchestration-projection-rebuild",
+        "remediation-success",
+        "remediation-denial",
+        "remediation-expiry",
+        "remediation-ambiguity",
+        "remediation-verification-failure",
+        "remediation-rollback",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -101,6 +112,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 
 def _run_case(case: EvalCase) -> EvalOutcome:
+    if case.kind.startswith("remediation-"):
+        return _run_remediation_case(case)
     if case.kind.startswith("orchestration-"):
         return _run_orchestration_case(case)
     if case.kind.startswith("evidence-"):
@@ -176,6 +189,61 @@ def _run_case(case: EvalCase) -> EvalOutcome:
         if secondary.tenant_id != "tenant-beta":
             details.append("secondary_tenant_mismatch")
 
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details),
+    )
+
+
+def _run_remediation_case(case: EvalCase) -> EvalOutcome:
+    bindings = {
+        "remediation-success": (
+            RemediationDemoScenario.SUCCESS,
+            RemediationStatus.VERIFIED,
+            "exact_scope_verified",
+        ),
+        "remediation-denial": (
+            RemediationDemoScenario.DENIAL,
+            RemediationStatus.DENIED,
+            "human_denial_terminal",
+        ),
+        "remediation-expiry": (
+            RemediationDemoScenario.EXPIRY,
+            RemediationStatus.EXPIRED,
+            "approval_timer_expired",
+        ),
+        "remediation-ambiguity": (
+            RemediationDemoScenario.AMBIGUITY,
+            RemediationStatus.VERIFIED,
+            "reconciled_before_verification",
+        ),
+        "remediation-verification-failure": (
+            RemediationDemoScenario.VERIFICATION_FAILURE,
+            RemediationStatus.VERIFICATION_FAILED,
+            "api_acceptance_not_recovery",
+        ),
+        "remediation-rollback": (
+            RemediationDemoScenario.ROLLBACK,
+            RemediationStatus.ROLLED_BACK,
+            "compensation_is_separate_fact",
+        ),
+    }
+    scenario, expected_status, reason = bindings[case.kind]
+    result = run_remediation_demo(scenario)
+    details: list[str] = []
+    if result.status is not expected_status:
+        details.append(f"status={result.status.value}")
+    if reason != case.expected_reason:
+        details.append(f"reason_mismatch={case.expected_reason}")
+    if result.authority != "application-ledger":
+        details.append("framework_became_authority")
+    if result.agent_authority != "proposal-only":
+        details.append("agent_effect_authority_detected")
+    if scenario is RemediationDemoScenario.AMBIGUITY and not result.reconciled:
+        details.append("ambiguous_effect_not_reconciled")
+    if scenario is RemediationDemoScenario.ROLLBACK and result.rollback_outcome is None:
+        details.append("rollback_receipt_missing")
     return EvalOutcome(
         case_id=case.case_id,
         passed=not details,

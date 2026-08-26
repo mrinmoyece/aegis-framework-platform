@@ -1,4 +1,4 @@
-# Layer 6 limitations
+# Layer 7 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -103,7 +103,38 @@
 - The in-memory orchestration ledger is test/demo only. PostgreSQL schema/repository
   integration is environment-gated; HA, partitioning, retention and load remain unproven.
 - The verification agent produces a plan only. Approval service/effects, effect fencing,
-  production verification/reconciliation, sandboxing, memory/RAG, UI, MCP/A2A, and
-  deployment remain explicitly deferred.
+  and production execution remain outside LangGraph. Layer 7 adds separate application
+  approval/effect services; the agent itself still cannot approve or execute.
+- Approval decisions are immutable and exact-scope but are not cryptographically signed
+  by external human keys, externally witnessed, WORM/legal records, or integrated with a
+  production change-management system.
+- SoD and quorum rely on current application identities and distinct actor references.
+  They do not prevent two compromised human accounts, organizational collusion, or an
+  administrator/DBA outside the runtime role.
+- The Kubernetes rollout-restart adapter is production-shaped but disabled by default and
+  tested only with SDK doubles. No live cluster, RBAC, workload identity, admission,
+  policy engine, service-account rotation, API compatibility, rate, latency or failure
+  behavior is qualified.
+- A Deployment rollout restart has no safe inverse. The official adapter intentionally
+  rejects generic compensation; the deterministic fake demonstrates rollback lifecycle.
+  A fixed image rollback needs a separate action contract and approval.
+- At-least-once Activities, client/server timeouts and crash windows can leave external
+  state ambiguous. Fencing protects application acceptance, not a provider request
+  already delivered by a stale worker. Exactly-once effects are not claimed.
+- Reconciliation depends on provider-observable state and stable target identity. It can
+  remain inconclusive and require operator escalation.
+- Verification uses deterministic postconditions and fresh cited evidence in tests.
+  Production source freshness, independence, lag, false results and causal recovery are
+  not qualified. API acceptance is never sufficient.
+- Temporal remediation history uses signals, timers and a patch marker, but production
+  Worker Versioning, multi-day history growth, signal throughput, task-queue isolation,
+  mTLS, HA, failover and disaster recovery remain unqualified.
+- PostgreSQL Layer 7 schema/repository provides forced RLS, immutable decisions/facts/
+  receipts, quotas, fenced claims and rebuilds. Capacity, partitioning, HA/PITR, external
+  witnessing, retention/erasure and multi-region claim order remain unproven.
+- Approval/effect API is deliberately narrow and redacted. A reviewer UI, secure browser
+  session, CSRF controls, notification delivery and accessibility are deferred.
+- General sandbox execution, memory/RAG, UI/BFF, MCP/A2A, deployment/IaC and live
+  qualification remain explicitly deferred.
 
 These are explicit non-production boundaries, not implied capabilities.

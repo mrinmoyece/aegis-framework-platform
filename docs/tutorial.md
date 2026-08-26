@@ -1,4 +1,4 @@
-# Tutorial: trace one governed specialist investigation without trusting frameworks
+# Tutorial: trace one approval-gated remediation without trusting frameworks
 
 ## 1. Run the deterministic delivery adapter
 
@@ -259,3 +259,63 @@ Follow `orchestration.py` for artifact/capability/transition contracts,
 `orchestration_postgres.py` for application truth, and `activity_runtime.py` for the
 single Temporal Activity boundary. Deleting LangGraph checkpoints must not delete these
 application facts.
+
+## 15. Exercise the Layer 7 approval/effect lifecycle
+
+Run every redacted, deterministic scenario:
+
+```bash
+uv run aegis-framework remediation-demo --scenario success
+uv run aegis-framework remediation-demo --scenario denial
+uv run aegis-framework remediation-demo --scenario expiry
+uv run aegis-framework remediation-demo --scenario ambiguity
+uv run aegis-framework remediation-demo --scenario verification_failure
+uv run aegis-framework remediation-demo --scenario rollback
+```
+
+The output contains opaque plan/action references, status/counts and explicit authority
+owners. It omits tenant, actor, rationale, target, evidence and provider receipt values.
+No scenario uses a cluster, network or credential.
+
+Follow the success path:
+
+```text
+immutable plan + current policy
+  -> exact approval request
+  -> two distinct current human grants
+  -> mandatory dry-run
+  -> persist effect intent
+  -> observe exact target
+  -> one fenced ActionPort call
+  -> persist receipt
+  -> read-after-write
+  -> fresh cited evidence + postconditions
+  -> verified
+```
+
+The ambiguity scenario records an uncertain result, blocks blind retry, observes the
+stable tenant/idempotency key and appends reconciliation before verification. The
+verification-failure scenario does not claim recovery. The rollback scenario adds an
+independent compensation intent and receipt.
+
+Start the demo API and read the preloaded exact-scope approval:
+
+```bash
+AEGIS_MODE=demo make serve
+
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: approval-read-001' \
+  http://127.0.0.1:8000/v1/approvals/APPROVAL_ID
+```
+
+The view supplies canonical plan/approval digests needed for a decision but redacts
+human rationale and identity. Submit decisions with two distinct demo approver tokens,
+the current optimistic version, both digests, a unique command ID and bounded rationale.
+Cross-tenant and unauthorized reads return the same `404`.
+
+Inspect `remediation.py` for immutable contracts, policy/approval/effect services and
+pure replay; `remediation_temporal.py` for durable waits/signals/timers/Activities;
+`action_adapters.py` for the fixed Kubernetes operation; migration 0006 and
+`remediation_postgres.py` for RLS/claims/rebuild; and
+[ADR 012](adr/012-temporal-approval-and-effects.md). LangGraph remains proposal-only.
