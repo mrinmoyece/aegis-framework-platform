@@ -43,6 +43,14 @@ from aegis_framework.remediation_temporal import (
     RemediationWorkflowResult,
     TemporalRemediationActivities,
 )
+from aegis_framework.sandbox_temporal import (
+    AegisSandboxWorkflow,
+    SandboxActivityInput,
+    SandboxActivityOutcome,
+    SandboxWorkflowInput,
+    SandboxWorkflowResult,
+    TemporalSandboxActivities,
+)
 from aegis_framework.temporal import (
     ActivityOutcome,
     AegisInvestigationWorkflow,
@@ -59,6 +67,7 @@ from aegis_framework.temporal import (
 _TASK_QUEUE = "aegis-integration-v1"
 _EVIDENCE_TASK_QUEUE = "aegis-evidence-integration-v1"
 _REMEDIATION_TASK_QUEUE = "aegis-remediation-integration-v1"
+_SANDBOX_TASK_QUEUE = "aegis-sandbox-integration-v1"
 
 
 class _RetryOnceOperations(CallbackActivityOperations):
@@ -211,6 +220,83 @@ class _RemediationOperations:
         return RemediationActivityOutcome(outcome="escalated")
 
 
+class _SandboxOperations:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    async def record_request(
+        self, value: SandboxActivityInput
+    ) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("record_request")
+        return SandboxActivityOutcome(outcome="recorded")
+
+    async def authorize_and_claim(
+        self, value: SandboxActivityInput
+    ) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("authorize_and_claim")
+        return SandboxActivityOutcome(outcome="claimed")
+
+    async def provision(self, value: SandboxActivityInput) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("provision")
+        return SandboxActivityOutcome(
+            outcome="provisioned",
+            provider_ref="sandbox:opaque",
+        )
+
+    async def wait_for_completion(
+        self, value: SandboxActivityInput
+    ) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("wait_for_completion")
+        return SandboxActivityOutcome(
+            outcome="succeeded",
+            result_ref="result:opaque",
+        )
+
+    async def capture_outputs(
+        self, value: SandboxActivityInput
+    ) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("capture_outputs")
+        return SandboxActivityOutcome(
+            outcome="captured",
+            result_ref="manifest:opaque",
+        )
+
+    async def attest(self, value: SandboxActivityInput) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("attest")
+        return SandboxActivityOutcome(
+            outcome="attested",
+            result_ref="attestation:opaque",
+        )
+
+    async def cleanup(self, value: SandboxActivityInput) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("cleanup")
+        return SandboxActivityOutcome(outcome="cleaned")
+
+    async def cancel(self, value: SandboxActivityInput) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("cancel")
+        return SandboxActivityOutcome(outcome="cancelled")
+
+    async def reconcile(self, value: SandboxActivityInput) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("reconcile")
+        return SandboxActivityOutcome(outcome="reconciled")
+
+    async def redrive_orphan(
+        self, value: SandboxActivityInput
+    ) -> SandboxActivityOutcome:
+        del value
+        self.calls.append("redrive_orphan")
+        return SandboxActivityOutcome(outcome="orphan_redriven")
+
+
 def _outcomes() -> dict[str, ActivityOutcome]:
     return {
         "authorize": ActivityOutcome(outcome="authorized"),
@@ -279,6 +365,20 @@ def _remediation_input(suffix: str) -> RemediationWorkflowInput:
         workflow_id=f"workflow:{suffix}",
         approval_timeout_seconds=120,
         reconciliation_timeout_seconds=120,
+    )
+
+
+def _sandbox_input(suffix: str) -> SandboxWorkflowInput:
+    return SandboxWorkflowInput(
+        tenant_ref="tenant:opaque",
+        actor_ref="actor:opaque",
+        request_ref=f"request:{suffix}",
+        execution_id=f"sandbox:{suffix}",
+        workflow_id=f"workflow:{suffix}",
+        attempt=1,
+        execution_timeout_seconds=120,
+        reconciliation_timeout_seconds=120,
+        cleanup_timeout_seconds=120,
     )
 
 
@@ -402,6 +502,53 @@ def test_temporal_completion_signal_timeout_and_replay() -> None:
             ).fetch_history()
             replayed = await Replayer(
                 workflows=[AegisInvestigationWorkflow],
+                data_converter=temporal_data_converter(),
+            ).replay_workflow(history)
+            assert replayed.replay_failure is None
+        finally:
+            if environment is not None:
+                await environment.shutdown()
+
+    asyncio.run(execute())
+
+
+@pytest.mark.temporal
+def test_temporal_sandbox_completion_cleanup_and_replay() -> None:
+    async def execute() -> None:
+        client, environment = await _client()
+        operations = _SandboxOperations()
+        activities = TemporalSandboxActivities(operations)
+        worker = Worker(
+            client,
+            task_queue=_SANDBOX_TASK_QUEUE,
+            workflows=[AegisSandboxWorkflow],
+            activities=list(activities.registered()),
+        )
+        workflow_id = f"workflow:sandbox:complete:{uuid4().hex}"
+        try:
+            async with worker:
+                result = await client.execute_workflow(
+                    AegisSandboxWorkflow.run,
+                    _sandbox_input("complete"),
+                    id=workflow_id,
+                    task_queue=_SANDBOX_TASK_QUEUE,
+                    execution_timeout=timedelta(minutes=2),
+                )
+                assert isinstance(result, SandboxWorkflowResult)
+                assert result.status == "succeeded"
+                assert result.result_ref == "attestation:opaque"
+                assert operations.calls == [
+                    "record_request",
+                    "authorize_and_claim",
+                    "provision",
+                    "wait_for_completion",
+                    "capture_outputs",
+                    "attest",
+                    "cleanup",
+                ]
+            history = await client.get_workflow_handle(workflow_id).fetch_history()
+            replayed = await Replayer(
+                workflows=[AegisSandboxWorkflow],
                 data_converter=temporal_data_converter(),
             ).replay_workflow(history)
             assert replayed.replay_failure is None

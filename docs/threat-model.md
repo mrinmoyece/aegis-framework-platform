@@ -1,4 +1,4 @@
-# Layer 7 threat model
+# Layer 8 threat model
 
 ## Assets and trust boundaries
 
@@ -84,6 +84,20 @@ trusted to provide their documented mechanics, not enterprise authority.
 | Malicious/failed rollback | Separate compensation contract, current policy, intent/fence/receipt and verification | Some actions have no safe inverse |
 | Temporal history treated as approval/audit | APIs and effect Activities load only application facts | Operator misuse outside application |
 | Approval rationale leaks | Redacted API/OTel; rationale stays immutable under RLS | DBA/operator boundary |
+| Shell/argument injection | Immutable argv tuple; shells, command-string flags, interpolation, controls and bidi rejected | Approved executable vulnerability |
+| Mutable or substituted image | Registry plus exact OCI sha256 allowlist; admission prerequisite | Registry/toolchain compromise |
+| Host escape surface | No host namespaces/path/socket/devices, no service token, non-root, read-only root, drop-all, no escalation, RuntimeDefault seccomp, required AppArmor/RuntimeClass | Runtime/kernel/admission defect |
+| Namespace mistaken for sandbox | Readiness requires qualified RuntimeClass; docs make no namespace-isolation claim | Cluster operator misconfiguration |
+| Sandbox tenant/approval substitution | Exact tenant/run/task/remediation/action/approval/policy/spec digests reloaded before claim | Authority repository compromise |
+| Sandbox duplicate/stale attempt | Tenant idempotency, observe-before-create, claim expiry, advancing attempts and stable fence | Provider work can outlive a stale worker |
+| Ambiguous Job create/delete | Intent first, observe exact labels/UID, reconcile or escalate; UID-precondition cleanup | API outage can remain ambiguous |
+| Path/symlink/device/archive abuse | Relative NFC paths, traversal/device/control denial, atomic bounded extraction, no links/devices, ratio/member/byte limits | Parser/filesystem defect |
+| Secret literal or output leak | Secret references only; literal scanner; output scanning, redaction/quarantine and no quarantined object ref | Detector false negative |
+| Output/artifact spoofing | Expected path/MIME/count/size allowlists, tenant/run/task/execution binding and canonical manifest | Scanner/provenance defect |
+| Sandbox output grants authority | Output is untrusted and never an approval, effect receipt, audit record, or tenant grant | Downstream wiring defect |
+| Egress to metadata/private service | Network-none default; exact public DNS declarations; external proxy required for exact destinations | Proxy/CNI/DNS compromise |
+| Kubernetes status treated as audit | APIs and replay use application ledger only | Operator misuse outside application |
+| Cluster prerequisite drift | Readiness fails closed for RuntimeClass, admission, CNI and workload identity | Drift after admission |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.
@@ -118,7 +132,7 @@ Temporal mTLS/authentication, production namespace/task-queue isolation, HA/fail
 server schema upgrades, worker version routing, backup/restore, multi-cluster
 replication, load limits, and disaster recovery are not proven. PostgreSQL HA/PITR,
 external event witnessing, retention/erasure execution, live connector/model/Kubernetes
-qualification, DNS-rebinding egress enforcement, parser/general execution sandboxing,
+qualification, DNS-rebinding egress enforcement, live Kata/gVisor/admission/CNI,
 external reconciliation evidence, UI, MCP/A2A, and deployment are also unproven.
 Official adapters are present, but live credentials, regional data
 handling, model/version qualification, tokenizer accuracy, pricing feed freshness,

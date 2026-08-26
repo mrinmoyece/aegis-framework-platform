@@ -427,3 +427,51 @@
     `RemediationActivityOperations`, preserve application facts/`ActionPort`, and pass
     wait/timer/signal/retry/heartbeat/cancel/crash/replay equivalence. Temporal history
     need not be migrated into approval truth.
+
+91. **Why is a Kubernetes namespace not called a sandbox?**
+    Containers normally share the host kernel and namespace isolation depends on cluster
+    policy. Aegis requires a separately qualified RuntimeClass and admission/network/node
+    controls; Kata is recommended for mutually distrustful tenants.
+
+92. **Why use Kubernetes Jobs rather than Docker SDK or subprocess?**
+    Jobs provide durable one-shot lifecycle, identity, deadlines, scheduling and official
+    API mechanics without exposing a host daemon. Docker socket and subprocess do not
+    supply the selected hostile-tenant kernel/filesystem/network boundary.
+
+93. **What does Temporal remove for sandbox execution?**
+    Custom Activity scheduling, retry/backoff, heartbeat timeout, durable cancellation,
+    ambiguity waits, signal history, crash recovery and workflow replay. It does not remove
+    approval, policy, ledger, claims, fencing, artifact trust or reconciliation controls.
+
+94. **Why are exact destinations not enforced by NetworkPolicy alone?**
+    Standard NetworkPolicy is CNI-dependent L3/L4 and has no portable FQDN semantics.
+    Network none is enforceable; exact DNS destinations require a qualified external proxy
+    or equivalent CNI feature and fail closed otherwise.
+
+95. **How is duplicate Job creation handled?**
+    Persist intent first, observe the deterministic name, and adopt only an object with the
+    exact managed-by, execution, request-digest and fence labels. Anything else is conflict;
+    unknown state remains ambiguous.
+
+96. **Why does cleanup bind a provider UID?**
+    A name can be deleted and reused. UID preconditions prevent a stale cleanup worker from
+    deleting a different Job created under the same deterministic name.
+
+97. **How are sandbox artifacts trusted?**
+    They are not. Paths/MIME/count/bytes are allowlisted, content is hashed and scanned,
+    secrets are redacted or quarantined, manifests bind tenant/run/task/execution, and
+    quarantined records expose no object reference.
+
+98. **Can a successful sandbox output authorize remediation?**
+    No. Output is untrusted analysis data, never an approval, policy decision, audit record,
+    fencing token, effect receipt, tenant grant or verification of production state.
+
+99. **What is the managed-sandbox tradeoff?**
+    E2B/Modal can remove cluster operations and provide strong managed isolation, but add
+    vendor image/lifecycle/network/attestation semantics, region/retention/DPA/SLA review,
+    remote availability and lock-in. They must pass the same neutral contract suite.
+
+100. **What remains unproven in Layer 8?**
+     Live Kata/gVisor isolation, admission/CNI/CSI/proxy/workload identity, node escape,
+     cluster upgrades, load/chaos, scanner efficacy, retention deletion, managed vendors,
+     and production credentials. Unit manifest tests cannot qualify those controls.

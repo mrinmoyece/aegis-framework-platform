@@ -8,11 +8,11 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
-**Layer 7 adds exact-scope human approval, controlled effects, reconciliation,
-verification, and rollback while keeping application policy/audit/effect authority
-outside Temporal and LangGraph.**
+**Layer 8 adds approval-bound ephemeral sandbox execution through hardened Kubernetes
+Jobs while keeping policy, ledger, claims, artifacts, and attestations outside Temporal,
+Kubernetes, and LangGraph.**
 
-## Delivered Layer 7
+## Delivered Layer 8
 
 - additive strict application events with aggregate sequence, commit-order tenant
   cursor, expected-version concurrency, aggregate/tenant hash chains, legacy upcast,
@@ -88,6 +88,26 @@ outside Temporal and LangGraph.**
   resourceVersion and target binding—no shell or arbitrary command/patch surface;
 - forced-RLS PostgreSQL plans, policies, quotas, approvals, immutable decisions/facts/
   receipts/verifications, fenced atomic effect claims and projection rebuild records.
+- immutable sandbox spec/request/execution/result/artifact/attestation contracts binding
+  tenant, run, task, Layer 7 remediation, approval, policy, image digest, resources,
+  network, mounts, secrets, outputs, idempotency, retry, cleanup, and fencing;
+- strict rejection of shell strings/interpolation, mutable images, unsafe paths,
+  host/device/socket/namespace privilege, unknown capabilities, secret literals,
+  malicious archives, output overflow, and exact-egress execution until external proxy
+  policy registration is implemented;
+- additive application-ledger sandbox lifecycle and pure replay, forced-RLS PostgreSQL
+  policy/request/quota/claim/fact/artifact/attestation/cleanup/projection tables, and
+  authorized redacted status/artifact APIs;
+- `aegis.sandbox.v1` Temporal workflow for provision/wait/capture/attest/cleanup,
+  cancellation, ambiguous create/delete reconciliation, orphan redrive, bounded retries,
+  heartbeat, and stable operation IDs;
+- provider-neutral `SandboxBackend`, deterministic fake, and disabled-by-default official
+  Kubernetes Job adapter requiring RuntimeClass, admission, NetworkPolicy enforcement,
+  workload identity, non-root/read-only/drop-all/no-escalation/RuntimeDefault security,
+  no service token or host namespaces/path/socket, UID-bound cleanup, and immutable image;
+- safe content-addressed CSI input/output references, atomic bounded ZIP staging,
+  deterministic output allowlists, scanning/redaction/quarantine, retention references,
+  and provenance digests. Sandbox output remains untrusted data.
 
 ## Ownership
 
@@ -97,6 +117,7 @@ outside Temporal and LangGraph.**
 | Temporal | Cross-process schedule, approval waits, Activities, timers, signals, retry/replay/recovery | Tenant grants, policy, approval truth, audit, effect receipts |
 | LangGraph | Fixed cognitive topology, fan-out/join, reducers, routing, graph checkpoints | Roles/capabilities, approval, authorization, audit, effects |
 | Action adapter | One exact provider operation and observation | Policy, approval, fencing, idempotency, audit, verification |
+| Sandbox backend | One ephemeral provider execution and observation | Authorization, approval, policy, ledger, artifact trust, cluster-isolation claim |
 | Official provider SDKs | OpenAI/Anthropic wire protocol and decoding | Model policy, routing, budget, pricing, usage, safety, retry truth |
 | Connector libraries | HTTPX transport, Kubernetes decoding, PyYAML syntax | Tenant/source policy, SSRF, secrets, provenance, pagination truth, quarantine |
 
@@ -204,7 +225,8 @@ never the repository or workflow history.
   routing, budgets, malformed output, fallback/circuit, timeout/cancellation, duplicate
   and ambiguous billing, revocation, tenant isolation, connector pagination, poisoning,
   source revocation, non-causal correlation and SSRF;
-- nine PostgreSQL and four Temporal integration tests pass locally;
+- 331 deterministic tests pass at 90.01% branch coverage, 40 evals pass, and ten
+  PostgreSQL plus five Temporal integration tests pass locally;
 - one Keycloak compatibility test remains environment-gated;
 - tests/evals use no live credentials, real models, or cloud services.
 
@@ -213,13 +235,14 @@ these as production evidence.
 
 ## Framework comparison
 
-`comparison/layer7-metrics.json` pins custom Aegis Layer 8 and records LOC,
+`comparison/layer8-metrics.json` pins custom Aegis Layer 9 and records LOC,
 dependencies, incremental effort, retained controls, operational cost and escape paths.
-The 200-run in-memory specialist benchmark measured the framework path separately from
-the custom async event-repository path; it is not a service benchmark and excludes
-PostgreSQL, Temporal, Redis, networks, and process boundaries. The conclusion is
-deliberately critical: LangGraph removes scheduler/fan-in/checkpoint mechanics, not
-governance, tenant controls, artifact facts, citations, or recovery policy.
+The 200-run in-memory sandbox benchmark measures approval-bound fake lifecycles separately
+from the custom async event-repository path. It is not an isolation or service benchmark
+and excludes PostgreSQL, Temporal, Redis, Kubernetes, CSI, CNI, runtime, network, and
+process boundaries. The conclusion is deliberately critical: Temporal and Kubernetes
+remove workflow/Job mechanics, not policy, approval, tenant controls, artifacts, fencing,
+reconciliation, cleanup, or live-isolation qualification.
 
 ## Commands
 
@@ -232,7 +255,7 @@ governance, tenant controls, artifact facts, citations, or recovery policy.
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 7 comparison metrics |
+| `make measure` | Refresh Layer 8 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
@@ -240,8 +263,10 @@ Start with [architecture](docs/architecture.md),
 [ADR 010](docs/adr/010-secure-evidence-connectors.md),
 [ADR 011](docs/adr/011-governed-specialist-orchestration.md),
 [ADR 012](docs/adr/012-temporal-approval-and-effects.md),
+[ADR 013](docs/adr/013-kubernetes-job-sandbox.md),
 [connector runbook](docs/connector-runbook.md), [runbook](docs/runbook.md),
 [approval/effect runbook](docs/approval-effect-runbook.md),
+[sandbox runbook](docs/sandbox-runbook.md),
 [threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).
 

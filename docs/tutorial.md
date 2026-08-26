@@ -319,3 +319,39 @@ pure replay; `remediation_temporal.py` for durable waits/signals/timers/Activiti
 `action_adapters.py` for the fixed Kubernetes operation; migration 0006 and
 `remediation_postgres.py` for RLS/claims/rebuild; and
 [ADR 012](adr/012-temporal-approval-and-effects.md). LangGraph remains proposal-only.
+
+## Layer 8: approval-bound ephemeral sandboxes
+
+Start with `SandboxSpec`, not a command string. Bind the exact tenant, run, task, Layer 7
+plan/action/approval digests, current sandbox policy digest, immutable OCI image digest,
+argv tokens, content hashes, secret references, network mode, limits, security context,
+expected outputs, retry owner, cleanup policy, idempotency key, attempt, and fence. Any
+change creates a new digest and requires fresh approval.
+
+The durable path is:
+
+```text
+persist request/policy/approval
+  -> reserve quota and claim
+  -> observe deterministic Job identity
+  -> persist provision intent
+  -> create fixed Job + default-deny network policy
+  -> wait/heartbeat/cancel
+  -> persist terminal result
+  -> capture expected outputs
+  -> hash/scan/redact-or-quarantine
+  -> persist manifest and attestation
+  -> persist cleanup intent
+  -> UID-bound delete and observe absence
+```
+
+If create/delete is ambiguous, do not blind-retry. Temporal waits for an opaque reconcile
+or orphan-redrive command; the Activity loads current application truth and observes the
+exact request digest, fence, and provider UID. Kubernetes and Temporal state never become
+audit truth.
+
+Read `sandbox.py` for contracts/policy/ledger/claims, `sandbox_adapters.py` for the fake,
+Kubernetes Job and safe artifact boundary, `sandbox_temporal.py` for durable mechanics,
+`sandbox_postgres.py` and migration 0007 for forced RLS/rebuild, the
+[sandbox runbook](sandbox-runbook.md), and [ADR 013](adr/013-kubernetes-job-sandbox.md).
+Tests are hermetic and execute no process, container, cluster, network, or credential.

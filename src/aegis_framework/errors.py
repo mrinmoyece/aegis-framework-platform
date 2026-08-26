@@ -123,3 +123,19 @@ class MessageClaimConflict(AegisFrameworkError):
 
 class PayloadRejected(AegisFrameworkError):
     pass
+
+
+class SandboxRejected(AegisFrameworkError):
+    pass
+
+
+class SandboxUnavailable(AegisFrameworkError):
+    pass
+
+
+class SandboxAmbiguous(AegisFrameworkError):
+    pass
+
+
+class ArtifactQuarantined(AegisFrameworkError):
+    pass

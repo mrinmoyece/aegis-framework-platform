@@ -382,3 +382,34 @@ facts become explicit conflict records. Missing telemetry/change makes the criti
 abstain, stale telemetry/change makes it abstain, and a missing runbook prevents a
 proposal while preserving a cited hypothesis. The model cannot choose or erase these
 deterministic facts.
+# Layer 8 sandbox execution architecture
+
+Layer 8 adds a separate application-controlled ephemeral compute plane for bounded
+analysis, tests, and patch preparation. It does not add an effect edge to LangGraph.
+Every sandbox request binds the exact Layer 7 remediation plan/action/approval digests,
+current sandbox-policy digest, tenant/run/task, immutable OCI image digest, argv tokens,
+content-addressed inputs, limits, network profile, secret references, expected outputs,
+idempotency key, attempt, and fence.
+
+The application persists request, policy, and approval facts before provider I/O.
+Temporal `aegis.sandbox.v1` owns durable Activity scheduling, retries, heartbeat,
+cancellation, timers, ambiguous create/delete waits, and orphan redrive. PostgreSQL owns
+immutable request/fact/artifact/attestation truth, quotas, claims, cleanup ownership,
+forced-RLS projections, and deterministic replay. Kubernetes Job status and Temporal
+history are provider observations only.
+
+`SandboxBackend` is neutral. The production-shaped adapter uses the official Kubernetes
+client to create a fixed Job and default-deny NetworkPolicy. Activation fails closed unless
+the configured RuntimeClass, admission policies, NetworkPolicy enforcement, and workload
+identity are ready. Exact DNS egress additionally requires an external enforcing proxy;
+base Kubernetes NetworkPolicy is not represented as FQDN enforcement. Exact-destination
+execution remains disabled because proxy policy registration is not implemented. The
+adapter makes no
+claim that a namespace or default container runtime is a hostile-code isolation boundary.
+Kata is the recommended qualified profile; gVisor may be separately qualified.
+
+Content reaches Jobs only by digest-bound CSI references. The adapter never accepts a host
+path, Docker socket, arbitrary volume, service-account token, shell command, mutable image,
+privilege, host namespace, capability add, or runtime fallback. Outputs are bounded,
+allowlisted, hashed, scanned, redacted or quarantined, retained by reference, and treated
+as untrusted data by every downstream consumer.

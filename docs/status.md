@@ -1,4 +1,4 @@
-# Layer 7 qualification status
+# Layer 8 qualification status
 
 ## Delivered
 
@@ -66,23 +66,43 @@
   verification/rebuild tables and atomic effect claims;
 - redacted CLI demonstrations for success, denial, expiry, ambiguity/reconciliation,
   verification failure and rollback.
+- immutable versioned sandbox spec/request/result/attestation/artifact contracts with exact
+  Layer 7 approval, policy, tenant/run/task/remediation/action, OCI digest, argv,
+  content-addressed input, mount/env/secret, network, resource, security, output,
+  idempotency/retry/cleanup, and canonical-digest binding;
+- deny-default sandbox policy for images/registries/commands/purposes/mounts/resources/
+  output/egress/secrets/concurrency/risk/lifetime with policy/spec change invalidation;
+- additive request through reconciliation/cleanup/quarantine application facts, pure
+  replay, tenant claims/fencing, forced-RLS PostgreSQL projections/quotas/artifacts/
+  attestations/cleanup ownership, and redacted status/artifact APIs;
+- `aegis.sandbox.v1` Temporal workflow/Activities for provision, wait/heartbeat/cancel,
+  capture, attest, cleanup, ambiguous create/delete reconciliation and orphan redrive;
+- provider-neutral backend, deterministic fake and disabled official Kubernetes Job
+  adapter requiring RuntimeClass/admission/CNI/workload identity and enforcing non-root,
+  read-only root, drop-all, no-escalation, RuntimeDefault, AppArmor, no service token,
+  no host namespaces/path/socket, immutable image, limits and UID-bound cleanup;
+- network-none adapter and exact-destination abstraction; execution fails closed because
+  external proxy policy registration is not implemented, with no false FQDN claim;
+- bounded atomic archive staging and output allowlists with hashing, scanning, redaction,
+  quarantine, retention references and provenance.
 
 ## Qualification snapshot
 
-- 256 deterministic tests pass with at least 90% meaningful branch coverage;
-- 37 deterministic evals pass, including pagination, poisoning, source revocation,
+- 331 deterministic tests pass with 90.01% meaningful branch coverage;
+- 40 deterministic evals pass, including pagination, poisoning, source revocation,
   deterministic non-causal correlation and private-destination rejection;
-- nine local PostgreSQL integration tests cover forced RLS/tenant isolation,
+- ten local PostgreSQL integration tests cover forced RLS/tenant isolation,
   immutable audit/events/model/evidence/orchestration facts, quota/model races,
   checkpoint isolation, dedicated-pool concurrency, crash ambiguity/reconciliation
   and deterministic rebuild;
-- four local Temporal integration tests cover no-worker recovery, Activity retry,
+- five local Temporal integration tests cover no-worker recovery, Activity retry,
   duplicate signal, cancellation, timeout, replay, opaque evidence pagination, and the
-  real application outbox/Activity/projection path;
+  real application outbox/Activity/projection path, and sandbox provision/capture/
+  attestation/cleanup replay;
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer7-metrics.json`.
+`comparison/layer8-metrics.json`.
 
 ## Not proven
 
@@ -90,5 +110,6 @@ Production Temporal HA/upgrade/failover, PostgreSQL HA/PITR/restore, multi-regio
 load/capacity, WORM witnessing, retention/erasure execution, live IdP rotation, live
 connector/model credentials and provider qualification, production DNS/egress,
 complex-document parser isolation, live Kubernetes credentials/RBAC/admission,
-independent production verification, general sandbox tools, memory/RAG, UI/BFF,
-MCP/A2A and deployment admission remain unproven.
+independent production verification, live Kata/gVisor/admission/CNI/CSI/egress-proxy/
+workload-identity sandbox qualification, memory/RAG, UI/BFF, MCP/A2A and deployment
+admission remain unproven.

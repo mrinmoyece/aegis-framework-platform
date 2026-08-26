@@ -4,6 +4,7 @@ import asyncio
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
+from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
@@ -30,6 +31,7 @@ from aegis_framework.durable_postgres import (
 )
 from aegis_framework.errors import (
     ConcurrencyConflict,
+    IdempotencyConflict,
     IntegrityFailure,
     OrchestrationFailure,
     PolicyDenied,
@@ -88,6 +90,15 @@ from aegis_framework.postgres import (
     tenant_transaction,
 )
 from aegis_framework.references import TenantReferenceCodec
+from aegis_framework.sandbox import (
+    ArtifactDisposition,
+    ArtifactRecord,
+    SandboxFactType,
+)
+from aegis_framework.sandbox import (
+    canonical_digest as sandbox_digest,
+)
+from aegis_framework.sandbox_postgres import PostgresSandboxStore
 from aegis_framework.temporal import TemporalActivityInput
 
 _MIGRATION = Path("migrations/0001_layer2.sql")
@@ -96,6 +107,7 @@ _LAYER4_MIGRATION = Path("migrations/0003_layer4.sql")
 _LAYER5_MIGRATION = Path("migrations/0004_layer5.sql")
 _LAYER6_MIGRATION = Path("migrations/0005_layer6.sql")
 _LAYER7_MIGRATION = Path("migrations/0006_layer7.sql")
+_LAYER8_MIGRATION = Path("migrations/0007_layer8.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -217,6 +229,173 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "UNIQUE (tenant_id, idempotency_key)" in layer7
     assert "FORCE ROW LEVEL SECURITY" in layer7
     assert "PASSWORD" not in layer7
+    layer8 = _LAYER8_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "sandbox_policies",
+        "sandbox_requests",
+        "sandbox_quotas",
+        "sandbox_quota_reservations",
+        "sandbox_attempts",
+        "sandbox_facts",
+        "sandbox_artifacts",
+        "sandbox_manifests",
+        "sandbox_attestations",
+        "sandbox_cleanup_claims",
+        "sandbox_projections",
+        "sandbox_projection_rebuilds",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer8
+    assert "sandbox_requests_immutable" in layer8
+    assert "sandbox_facts_immutable" in layer8
+    assert "sandbox_artifacts_immutable" in layer8
+    assert "sandbox_attestations_immutable" in layer8
+    assert "claim_token text" in layer8
+    assert "fence_token text NOT NULL" in layer8
+    assert "FORCE ROW LEVEL SECURITY" in layer8
+    assert "PASSWORD" not in layer8
+
+
+@pytest.mark.postgres
+def test_live_sandbox_rls_replay_artifact_conflict_and_immutability() -> None:
+    admin_dsn, pool, _repository = _repository_context()
+    suffix = uuid4().hex
+    first_execution = f"sandbox:{suffix}:one"
+    second_execution = f"sandbox:{suffix}:two"
+    store = PostgresSandboxStore(pool=pool)
+    try:
+        with tenant_transaction(pool, tenant_id=_TENANT_ALPHA) as connection:
+            for execution_id in (first_execution, second_execution):
+                connection.execute(
+                    """
+                    INSERT INTO aegis.sandbox_requests (
+                        tenant_id, execution_id, run_id, task_id,
+                        remediation_plan_id, approval_id, schema_version,
+                        request_digest, spec_digest, policy_digest, approval_digest,
+                        image_digest, idempotency_key, request_document, requested_at
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, 1,
+                        %s, %s, %s, %s, %s, %s, %s, %s
+                    )
+                    """,
+                    (
+                        _TENANT_ALPHA,
+                        execution_id,
+                        f"run:{suffix}",
+                        f"task:{suffix}",
+                        f"plan:{suffix}",
+                        f"approval:{suffix}",
+                        sha256(execution_id.encode()).hexdigest(),
+                        "b" * 64,
+                        "c" * 64,
+                        "d" * 64,
+                        "e" * 64,
+                        f"idempotency:{execution_id}",
+                        Jsonb({"schema_version": 1}),
+                        DEMO_TIME,
+                    ),
+                )
+        payload = {
+            "run_id": f"run:{suffix}",
+            "task_id": f"task:{suffix}",
+            "request_digest": sha256(first_execution.encode()).hexdigest(),
+            "spec_digest": "b" * 64,
+            "policy_digest": "c" * 64,
+            "approval_digest": "d" * 64,
+            "fence_token": f"fence:{suffix}",
+        }
+        projection = store.append(
+            tenant_id=_TENANT_ALPHA,
+            execution_id=first_execution,
+            expected_version=0,
+            fact_type=SandboxFactType.REQUEST_RECORDED,
+            command_id=f"sandbox-command:{suffix}",
+            actor_ref=f"actor:{suffix}",
+            recorded_at=DEMO_TIME,
+            payload=payload,
+        )
+        assert projection.version == 1
+        assert (
+            store.rebuild(
+                tenant_id=_TENANT_ALPHA,
+                execution_id=first_execution,
+                rebuilt_at=DEMO_TIME,
+            )
+            == projection
+        )
+        with pytest.raises(IdempotencyConflict):
+            store.append(
+                tenant_id=_TENANT_ALPHA,
+                execution_id=second_execution,
+                expected_version=0,
+                fact_type=SandboxFactType.REQUEST_RECORDED,
+                command_id=f"sandbox-command:{suffix}",
+                actor_ref=f"actor:{suffix}",
+                recorded_at=DEMO_TIME,
+                payload=payload,
+            )
+
+        artifact_material = {
+            "schema_version": 1,
+            "artifact_id": f"artifact:{suffix}",
+            "tenant_id": _TENANT_ALPHA,
+            "run_id": f"run:{suffix}",
+            "task_id": f"task:{suffix}",
+            "execution_id": first_execution,
+            "logical_path": "reports/result.json",
+            "media_type": "application/json",
+            "content_hash": "f" * 64,
+            "size_bytes": 2,
+            "disposition": ArtifactDisposition.ACCEPTED,
+            "redaction_count": 0,
+            "scanner_codes": (),
+            "object_ref": f"object:{suffix}",
+            "retention_expires_at": DEMO_TIME.replace(year=2027),
+        }
+        artifact = ArtifactRecord(
+            **artifact_material,
+            canonical_digest=sandbox_digest(artifact_material),
+        )
+        store.put_artifact(artifact, recorded_at=DEMO_TIME)
+        changed_material = {**artifact_material, "content_hash": "0" * 64}
+        changed = ArtifactRecord(
+            **changed_material,
+            canonical_digest=sandbox_digest(changed_material),
+        )
+        with pytest.raises(IdempotencyConflict):
+            store.put_artifact(changed, recorded_at=DEMO_TIME)
+        assert (
+            store.artifacts(
+                tenant_id=_TENANT_BETA,
+                execution_id=first_execution,
+            )
+            == ()
+        )
+        with (
+            pytest.raises(RepositoryUnavailable),
+            tenant_transaction(pool, tenant_id=_TENANT_ALPHA) as connection,
+        ):
+            connection.execute(
+                """
+                UPDATE aegis.sandbox_requests
+                SET task_id = 'tampered'
+                WHERE tenant_id = %s AND execution_id = %s
+                """,
+                (_TENANT_ALPHA, first_execution),
+            )
+    finally:
+        pool.close()
+        with Connection.connect(admin_dsn, autocommit=True) as connection:
+            assert (
+                connection.execute(
+                    """
+                    SELECT count(*) FROM aegis.sandbox_requests
+                    WHERE tenant_id = %s AND execution_id = %s
+                    """,
+                    (_TENANT_ALPHA, first_execution),
+                ).fetchone()[0]
+                == 1
+            )
 
 
 @pytest.mark.postgres
@@ -866,6 +1045,7 @@ def test_live_evidence_projection_rebuild_and_forced_rls() -> None:
 
 
 @pytest.mark.postgres
+@pytest.mark.postgres
 def test_live_forced_rls_pool_reset_and_audit_immutability() -> None:
     admin_dsn, pool, repository = _repository_context()
     try:
@@ -1400,6 +1580,7 @@ def test_live_model_reservation_reconciliation_rls_and_rebuild() -> None:
         pool.close()
 
 
+@pytest.mark.postgres
 @pytest.mark.postgres
 def test_live_checkpoint_rls_prevents_cross_tenant_reads_and_rebinding() -> None:
     _, pool, _ = _repository_context()

@@ -1,4 +1,4 @@
-# Layer 7 failure modes
+# Layer 8 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -86,6 +86,21 @@
 | Postcondition fails | Roll back only if exact compensation exists, else escalate | Application service | unit |
 | Rollback fails/ambiguous | Escalate and preserve both receipts | Application ledger | unit |
 | Temporal remediation history loss | Reissue from application intent/reference or escalate | Application ledger | documented |
+| Sandbox policy disabled/missing | Deny before claim or provider I/O | Application policy | unit |
+| Spec/policy/approval digest changes | Invalidate request and require fresh approval | Application contracts | unit |
+| Mutable image/shell/privilege/host mount | Strict contract/admission shape rejects | Application + admission | unit/security |
+| Sandbox claim race/stale attempt | One active claim; expiry requires advancing attempt; stale completion rejected | PostgreSQL claim | unit/integration |
+| Kubernetes create timeout/conflict | Observe exact labels/request digest/fence/UID before create/retry | Application reconciler | unit/Temporal |
+| Kubernetes delete timeout | Observe exact UID; retry UID-precondition delete or quarantine | Cleanup reconciler | unit/Temporal |
+| Runtime/admission/CNI/workload identity absent | Readiness fails closed; no Job submitted | Kubernetes adapter | unit/live deferred |
+| Exact egress without proxy | Reject before NetworkPolicy/Job creation | Application policy/adapter | unit |
+| Sandbox timeout/OOM/nonzero/violation | Explicit terminal fact/result; never success-shaped | Backend + ledger | unit |
+| Cancellation race | Persist intent, provider cancel/delete, reject stale result under fence | Application + Temporal | unit/Temporal |
+| Output path/MIME/count/size overflow | Quarantine; no artifact object reference | Artifact boundary | unit |
+| Archive traversal/link/device/bomb | Atomic staging removed; request quarantined | Artifact boundary | unit |
+| Secret/scanner finding | Redact or quarantine before artifact publication | Artifact boundary | unit |
+| Artifact/projection loss | Verify immutable facts/manifests and rebuild pure projection | PostgreSQL/application | unit/integration |
+| Orphan Job after workflow loss | Application cleanup claim owns observe/delete redrive | PostgreSQL + Temporal | documented/integration |
 
 ## Retry rules
 
@@ -100,6 +115,12 @@ loop. Before a retry, application code observes the exact target. Ambiguous inte
 automatic replay until reconciliation. Stable tenant idempotency keys suppress duplicate
 provider work where supported; fencing rejects stale application results but cannot undo
 an already delivered external request.
+
+For sandboxes, Temporal alone retries provision/wait/capture/cleanup Activities.
+Provision always observes the deterministic Job identity before create. Ambiguous create
+or delete never becomes success; reconciliation or orphan redrive observes the exact
+request digest, fence, and provider UID. The official Kubernetes client has no adapter
+retry loop.
 
 ## Operator rules
 

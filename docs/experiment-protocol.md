@@ -95,6 +95,7 @@ Capture on a clean checkout:
 - governed specialist equivalent scenario against custom Aegis Layer 7
   `dce0054a40c34ab4cc9d515aa753bc71d73fab57`, including fixed roles/artifacts,
   scheduler/checkpoint LOC removed, remaining controls, operational cost and escape plan.
+- approval-bound deterministic fake sandbox lifecycle against custom Aegis Layer 9
 
 Record OS, architecture, Python, framework versions, CPU/memory limits, network
 policy, and run count. Do not compare local Apple Silicon numbers with cloud x86

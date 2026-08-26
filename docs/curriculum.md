@@ -126,6 +126,17 @@ After this layer, an engineer should be able to:
 28. Make provider API acceptance succeed while postconditions fail; prove no recovery claim.
 29. Attempt shell/arbitrary Kubernetes patch input and show no contract field accepts it.
 30. Delete a remediation projection and rebuild only from immutable application facts.
+31. Change one sandbox spec or policy digest after approval and prove provider I/O is absent.
+32. Attempt shell/interpolation, mutable image, host path/socket, privilege and capability add.
+33. Feed traversal, symlink, device, duplicate-case and compression-bomb archives.
+34. Race two sandbox claims, expire one, and prove only an advancing fenced attempt completes.
+35. Simulate ambiguous Kubernetes create/delete and reconcile by exact labels and UID.
+36. Exercise timeout, OOM, violation, cancellation, output overflow and quarantine terminals.
+37. Remove RuntimeClass, admission, CNI or workload-identity readiness and prove fail-closed.
+38. Request exact DNS egress without an enforcing proxy and explain why NetworkPolicy is insufficient.
+39. Rebuild sandbox projection from immutable facts without Temporal or Kubernetes history.
+40. Compare the framework layer with custom Layer 9 by LOC, dependencies, mechanics removed,
+    controls retained, runtime, lock-in, escape, and unproven live-isolation claims.
 
 ## Assessment rubric
 

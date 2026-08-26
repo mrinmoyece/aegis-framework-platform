@@ -1,4 +1,4 @@
-# Layer 7 authority and retry ownership
+# Layer 8 authority and retry ownership
 
 ## Ownership matrix
 
@@ -35,6 +35,11 @@
 | Effect intent/idempotency/fence | Application ledger and atomic claim | Activity operation reference | PostgreSQL effect attempt |
 | External operation mechanics | `ActionPort` adapter | Provider receipt is untrusted input | Observe/reconcile through provider API |
 | Effect receipt/verification/rollback | Immutable application facts | Result reference only | PostgreSQL replay + fresh evidence |
+| Sandbox request/spec/policy/approval | Immutable application contracts and current authority | Opaque references/digests only | PostgreSQL request/policy/approval |
+| Sandbox quota/idempotency/claim/fence | Application PostgreSQL control rows | Activity operation reference | PostgreSQL claim/replay |
+| Sandbox provider lifecycle | `SandboxBackend` observation | Temporal/Kubernetes may schedule and observe | Application reconciliation |
+| Sandbox artifact/manifest/attestation | Immutable scanned application facts | Provider output is untrusted input | PostgreSQL artifact facts/object reference |
+| Sandbox cleanup/orphan ownership | Application cleanup claim plus exact provider UID | Temporal schedules redrive | PostgreSQL cleanup claim |
 
 ## Retry matrix
 
@@ -56,6 +61,10 @@
 | Kubernetes client | None | One fixed request per claimed attempt; no client retry |
 | Ambiguous effect | Operator/application reconciler | Observe exact target; retry only after proof |
 | Verification | Application | Fresh evidence after receipt; no API-acceptance shortcut |
+| Sandbox workflow | Temporal | Stable opaque request/operation IDs; application facts remain truth |
+| Kubernetes Job client | None | Observe-before-create, request/fence labels and UID-bound delete |
+| Sandbox artifact capture | Temporal Activity + application bounds | One manifest per exact execution; quarantine on conflict |
+| Sandbox cleanup/orphan redrive | Temporal Activity + application cleanup claim | Observe exact UID before delete; ambiguity never success |
 | Projection | Application replay | Cursor/hash checkpoint; deterministic reducer |
 
 ## Non-negotiable call order
@@ -90,6 +99,12 @@
     target, then execute under the current claim/fence.
 19. Persist receipt or ambiguity, reconcile by observation, and verify with fresh cited
     evidence. Rollback requires its own exact compensation contract.
+20. Bind sandbox request to the exact Layer 7 approval, current sandbox policy and
+    immutable spec; reserve quota and claim before provider I/O.
+21. Observe deterministic provider identity before create, persist result afterward, and
+    reject stale attempts/fences or ambiguous outcomes.
+22. Capture only expected bounded outputs, scan/redact/quarantine as untrusted data,
+    persist manifest/attestation, then clean up by exact provider UID.
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.

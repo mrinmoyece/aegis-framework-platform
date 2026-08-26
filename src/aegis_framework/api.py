@@ -89,6 +89,7 @@ from aegis_framework.remediation import (
     ApprovalService,
     ApprovalView,
 )
+from aegis_framework.sandbox import ArtifactRecord, SandboxProjection, SandboxReadPort
 from aegis_framework.service import InvestigationService
 
 _IDENTIFIER_ADAPTER = TypeAdapter(Identifier)
@@ -201,6 +202,34 @@ class ApprovalApiView(StrictModel):
     approval_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class SandboxApiView(StrictModel):
+    execution_ref: Identifier
+    run_ref: Identifier
+    task_ref: Identifier
+    status: str
+    version: int = Field(ge=1)
+    request_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    spec_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    policy_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approval_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    result_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    manifest_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    attestation_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    cleanup_complete: bool
+
+
+class SandboxArtifactApiView(StrictModel):
+    artifact_ref: Identifier
+    logical_path: str
+    media_type: str
+    content_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+    size_bytes: int = Field(ge=0)
+    disposition: str
+    redaction_count: int = Field(ge=0)
+    scanner_codes: tuple[Identifier, ...]
+    retention_expires_at: str
+
+
 class BodySizeLimitMiddleware:
     """Reject request bodies over the bound even without Content-Length."""
 
@@ -278,6 +307,7 @@ class ApiRuntime:
     orchestration_control: OrchestrationArtifactReadPort | None = None
     orchestration_cursor_codec: CursorCodec | None = None
     approvals: ApprovalService | None = None
+    sandbox_control: SandboxReadPort | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -339,8 +369,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.7.0",
-        description="Authenticated Layer 7 approval and controlled-effect API.",
+        version="0.8.0",
+        description="Authenticated Layer 8 approval-bound sandbox control API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -658,6 +688,60 @@ def create_app(
         if view is None:
             _not_found()
         return _approval_view(view)
+
+    @app.get(
+        "/v1/sandboxes/{execution_id}",
+        response_model=SandboxApiView,
+    )
+    def sandbox_status(
+        execution_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> SandboxApiView:
+        control = _require_sandbox_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.SANDBOX_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        projection = control.projection(
+            tenant_id=identity.tenant_id,
+            execution_id=execution_id,
+        )
+        if projection is None:
+            _not_found()
+        return _sandbox_view(projection)
+
+    @app.get(
+        "/v1/sandboxes/{execution_id}/artifacts",
+        response_model=tuple[SandboxArtifactApiView, ...],
+    )
+    def sandbox_artifacts(
+        execution_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> tuple[SandboxArtifactApiView, ...]:
+        control = _require_sandbox_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.SANDBOX_ARTIFACT_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        if (
+            control.projection(
+                tenant_id=identity.tenant_id,
+                execution_id=execution_id,
+            )
+            is None
+        ):
+            _not_found()
+        return tuple(
+            _sandbox_artifact_view(item)
+            for item in control.artifacts(
+                tenant_id=identity.tenant_id,
+                execution_id=execution_id,
+            )
+        )
 
     @app.post(
         "/v1/approvals/{approval_id}/decisions",
@@ -1002,6 +1086,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
     from aegis_framework.model_postgres import PostgresModelControlStore
     from aegis_framework.orchestration_postgres import PostgresOrchestrationLedger
     from aegis_framework.postgres import PostgresRepository, open_runtime_pool
+    from aegis_framework.sandbox_postgres import PostgresSandboxStore
 
     clock = SystemClock()
     try:
@@ -1063,6 +1148,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
             clock=clock,
         ),
         orchestration_cursor_codec=cursor_codec,
+        sandbox_control=PostgresSandboxStore(pool=pool),
     )
 
 
@@ -1173,6 +1259,15 @@ def _require_approvals(runtime: ApiRuntime) -> ApprovalService:
     return runtime.approvals
 
 
+def _require_sandbox_control(runtime: ApiRuntime) -> SandboxReadPort:
+    if runtime.sandbox_control is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="sandbox control is unavailable",
+        )
+    return runtime.sandbox_control
+
+
 def _approval_view(value: ApprovalView) -> ApprovalApiView:
     return ApprovalApiView(
         approval_ref=value.approval.approval_id,
@@ -1185,6 +1280,38 @@ def _approval_view(value: ApprovalView) -> ApprovalApiView:
         expires_at=value.approval.expires_at.isoformat(),
         plan_digest=value.approval.plan_digest,
         approval_digest=value.approval.canonical_digest,
+    )
+
+
+def _sandbox_view(projection: SandboxProjection) -> SandboxApiView:
+    return SandboxApiView(
+        execution_ref=projection.execution_id,
+        run_ref=projection.run_id,
+        task_ref=projection.task_id,
+        status=projection.status.value,
+        version=projection.version,
+        request_digest=projection.request_digest,
+        spec_digest=projection.spec_digest,
+        policy_digest=projection.policy_digest,
+        approval_digest=projection.approval_digest,
+        result_digest=projection.result_digest,
+        manifest_digest=projection.manifest_digest,
+        attestation_digest=projection.attestation_digest,
+        cleanup_complete=projection.cleanup_complete,
+    )
+
+
+def _sandbox_artifact_view(item: ArtifactRecord) -> SandboxArtifactApiView:
+    return SandboxArtifactApiView(
+        artifact_ref=item.artifact_id,
+        logical_path=item.logical_path,
+        media_type=item.media_type,
+        content_hash=item.content_hash,
+        size_bytes=item.size_bytes,
+        disposition=item.disposition.value,
+        redaction_count=item.redaction_count,
+        scanner_codes=item.scanner_codes,
+        retention_expires_at=item.retention_expires_at.isoformat(),
     )
 
 

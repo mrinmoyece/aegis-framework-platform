@@ -31,6 +31,12 @@ if TYPE_CHECKING:
         ActionObservation,
         ActionReceipt,
     )
+    from aegis_framework.sandbox import (
+        BackendExecution,
+        BackendObservation,
+        SandboxExecutionRequest,
+        SandboxResult,
+    )
 
 
 class Action(StrEnum):
@@ -55,6 +61,9 @@ class Action(StrEnum):
     APPROVAL_REVOKE = "approval:revoke"
     EFFECT_EXECUTE = "effect:execute"
     EFFECT_READ = "effect:read"
+    SANDBOX_EXECUTE = "sandbox:execute"
+    SANDBOX_READ = "sandbox:read"
+    SANDBOX_ARTIFACT_READ = "sandbox:artifact:read"
 
 
 class PolicyDecision(StrictModel):
@@ -167,6 +176,34 @@ class ActionPort(Protocol):
     def compensate(self, intent: ActionIntent) -> ActionReceipt: ...
 
 
+class SandboxBackend(Protocol):
+    """Provider-neutral ephemeral compute boundary."""
+
+    def ready(self) -> bool: ...
+
+    def observe(self, request: SandboxExecutionRequest) -> BackendObservation: ...
+
+    def provision(self, request: SandboxExecutionRequest) -> BackendExecution: ...
+
+    def wait(
+        self,
+        request: SandboxExecutionRequest,
+        execution: BackendExecution,
+    ) -> SandboxResult: ...
+
+    def cancel(
+        self,
+        request: SandboxExecutionRequest,
+        execution: BackendExecution,
+    ) -> None: ...
+
+    def cleanup(
+        self,
+        request: SandboxExecutionRequest,
+        execution: BackendExecution,
+    ) -> None: ...
+
+
 class AuditPort(Protocol):
     def append(
         self,
@@ -240,6 +277,15 @@ class GraphObservabilityPort(Protocol):
 
 class RemediationObservabilityPort(Protocol):
     def remediation(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+
+class SandboxObservabilityPort(Protocol):
+    def sandbox(
         self,
         *,
         tenant_id: str,

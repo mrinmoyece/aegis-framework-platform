@@ -1,8 +1,9 @@
-# Layer 7 local operations runbook
+# Layer 8 local operations runbook
 
 Evidence connector enablement, source-specific operations, cursor recovery and
 reconciliation are in the [connector runbook](connector-runbook.md). Connector code is
-disabled by default; this general runbook does not authorize enabling it.
+disabled by default; this general runbook does not authorize enabling it. Sandbox
+activation and orphan cleanup are in the [sandbox runbook](sandbox-runbook.md).
 
 ## Start application PostgreSQL
 
@@ -12,7 +13,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 through Layer 7 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 8 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -90,6 +91,12 @@ For remediation, verify `remediation_facts` sequence/previous-digest integrity, 
 with `reduce_remediation`, compare exact plan/approval/effect/verification digests,
 record an immutable rebuild row, then swap the projection. Never rebuild approval or
 effect truth from Temporal history, a LangGraph checkpoint, Kubernetes events or traces.
+
+For sandboxes, verify `sandbox_facts` sequence/previous-digest integrity and canonical
+request/spec/policy/approval bindings, fold with `reduce_sandbox`, compare artifact
+manifest/attestation/cleanup facts, record the immutable rebuild, then swap the projection.
+Never rebuild sandbox truth from Temporal history, Kubernetes Job status, Pod logs, CSI
+metadata, or traces.
 
 ## Specialist graph recovery
 

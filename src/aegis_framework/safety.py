@@ -98,6 +98,12 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "effect_outcome",
         "verification_status",
         "rollback",
+        "sandbox_outcome",
+        "artifact_disposition",
+        "output_file_count",
+        "output_byte_bucket",
+        "cleanup_status",
+        "runtime_profile",
     }
 )
 _SAFE_AUDIT_KEYS = frozenset(
