@@ -2,7 +2,10 @@ import { render, screen } from "@testing-library/react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "./DataTable";
 
-type Row = { id: string; label: string };
+interface Row {
+  id: string;
+  label: string;
+}
 const columns: ColumnDef<Row>[] = [
   { accessorKey: "id", header: "ID" },
   { accessorKey: "label", header: "Label" }
