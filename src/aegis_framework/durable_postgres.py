@@ -58,6 +58,7 @@ from aegis_framework.postgres import (
     tenant_transaction,
 )
 from aegis_framework.references import TenantReferenceCodec
+from aegis_framework.telemetry import durable_trace_reference
 
 _ZERO_HASH = "0" * 64
 _MAX_DELIVERY_ATTEMPTS = 5
@@ -116,9 +117,11 @@ class PostgresDurability:
         )
         tenant_ref = self._tenant_references.encode(identity.tenant_id)
         actor_ref = stable_id("actor", identity.issuer, identity.subject_id, length=32)
+        tenant_workflow_ref = stable_id("tenant", identity.tenant_id, length=32)
         workflow_id = stable_id(
-            "workflow", identity.tenant_id, run_id, request_ref, length=40
+            "workflow", tenant_workflow_ref, run_id, request_ref, length=40
         )
+        trace_ref = durable_trace_reference(identity.trace_id).traceparent
         now = self._clock.now()
         try:
             self.append(
@@ -139,6 +142,7 @@ class PostgresDurability:
                             "request_ref": request_ref,
                             "run_id": run_id,
                             "tenant_ref": tenant_ref,
+                            "trace_ref": trace_ref,
                             "wait_for_signal": wait_for_signal,
                             "workflow_id": workflow_id,
                         },
@@ -157,6 +161,7 @@ class PostgresDurability:
                             "request_ref": request_ref,
                             "run_id": run_id,
                             "tenant_ref": tenant_ref,
+                            "trace_ref": trace_ref,
                             "wait_for_signal": wait_for_signal,
                             "workflow_id": workflow_id,
                         },
@@ -438,13 +443,35 @@ class PostgresDurability:
         run_id: str,
         event_type: str,
     ) -> dict[str, JsonValue] | None:
-        events = self.events(
+        maximum_events = 10_000
+        after_cursor = 0
+        scanned = 0
+        latest: dict[str, JsonValue] | None = None
+        while scanned < maximum_events:
+            page_limit = min(500, maximum_events - scanned)
+            page = self.events(
+                tenant_id=tenant_id,
+                aggregate_type="investigation",
+                aggregate_id=run_id,
+                after_cursor=after_cursor,
+                limit=page_limit,
+            )
+            for event in page:
+                if event.event_type == event_type:
+                    latest = dict(event.payload)
+            scanned += len(page)
+            if len(page) < page_limit:
+                return latest
+            after_cursor = page[-1].tenant_cursor
+        if self.events(
             tenant_id=tenant_id,
             aggregate_type="investigation",
             aggregate_id=run_id,
-        )
-        matched = [event for event in events if event.event_type == event_type]
-        return dict(matched[-1].payload) if matched else None
+            after_cursor=after_cursor,
+            limit=1,
+        ):
+            raise IntegrityFailure("activity artifact scan exceeds the event bound")
+        return latest
 
     def replay_legacy(
         self,
@@ -826,7 +853,7 @@ class PostgresDurability:
         aggregate_type: str | None = None,
         aggregate_id: str | None = None,
         after_cursor: int = 0,
-        limit: int = 500,
+        limit: int = 100,
     ) -> tuple[ApplicationEvent, ...]:
         if limit < 1 or limit > 500:
             raise ValueError("event page limit is outside the permitted range")
@@ -907,7 +934,8 @@ class PostgresDurability:
                 ).encode()
             ).hexdigest()
             if (
-                event.aggregate_sequence != sequence + 1
+                event.schema_version != 1
+                or event.aggregate_sequence != sequence + 1
                 or event.tenant_cursor != tenant_cursor + 1
                 or event.aggregate_previous_hash != aggregate_hash
                 or event.tenant_previous_hash != tenant_hash
@@ -1012,7 +1040,8 @@ class PostgresDurability:
                 ).encode()
             ).hexdigest()
             if (
-                event.aggregate_sequence != aggregate_sequence + 1
+                event.schema_version != 1
+                or event.aggregate_sequence != aggregate_sequence + 1
                 or event.aggregate_previous_hash != aggregate_hash
                 or event.tenant_previous_hash != previous_tenant_hash
                 or event.record_hash != expected
@@ -1186,20 +1215,30 @@ class PostgresDurability:
                 raise MessageClaimConflict("outbox claim is stale or not owned")
 
     def rebuild_run(self, *, tenant_id: str, run_id: str) -> RunView:
+        maximum_events = 10_000
+        if not self.verify_run_integrity(
+            tenant_id=tenant_id,
+            run_id=run_id,
+            maximum_events=maximum_events,
+        ):
+            raise IntegrityFailure("run ledger integrity verification failed")
         events: list[ApplicationEvent] = []
         after_cursor = 0
-        while True:
+        while len(events) <= maximum_events:
+            page_limit = min(500, maximum_events + 1 - len(events))
             page = self.events(
                 tenant_id=tenant_id,
                 aggregate_type="investigation",
                 aggregate_id=run_id,
                 after_cursor=after_cursor,
-                limit=500,
+                limit=page_limit,
             )
             events.extend(page)
-            if len(page) < 500:
+            if len(page) < page_limit:
                 break
             after_cursor = page[-1].tenant_cursor
+        if len(events) > maximum_events:
+            raise IntegrityFailure("run projection rebuild exceeds the event bound")
         if not events:
             raise ValueError("run does not exist")
         projection: RunView | None = None

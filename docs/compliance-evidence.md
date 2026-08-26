@@ -15,9 +15,12 @@ operation, or proof of effectiveness.
 | Supplier/supply chain | lockfiles, SBOM, vulnerability/license/secret gates, keyless signing/attestation | incident response, waiver review, registry/admission operations |
 | Secure development | strict typing/lint/tests/evals/CodeQL/dependency review | independent penetration review, threat review cadence, training records |
 | Privacy | telemetry allowlists, automatic tracing disabled, bounded references | DPIA, deletion/legal hold operations, vendor terms, access reviews |
+| AI governance | governed evals, cited hypotheses, critic, budgets, human approval and qualification manifests | impact assessment, approved model inventory, human-label calibration, drift and independent model-risk review |
 
 CI artifacts are retained for 30 days and are not a durable audit archive. An external
 evidence store must bind source commit, workflow identity, digest, approval, policy
 revision, and retention without copying prompts, completions, raw evidence, credentials,
 tenant/actor/request IDs, or locators.
 
+Layer 15 does not change this into a certification claim. The readiness and residual
+risk manifests preserve missing live/process evidence as go-live blockers.

@@ -711,3 +711,17 @@ packages as presence markers and hand-writes the wire mapping.
      Render, mock plan, unit/integration, and deterministic drills prove structure and
      contracts. They do not prove cloud apply, live PKI/IdP/CNI/Kata/Temporal/RDS failover,
      load/chaos, SLO/on-call, penetration/accessibility, or compliance effectiveness.
+121. **Why does Layer 15 refuse an aggregate readiness score?**
+     One critical live blocker must not be hidden by many green local controls.
+122. **Why are local p99 measurements not production capacity evidence?**
+     Inputs are fixed and serial on unnormalized hosts without managed-service,
+     network, data-volume, tenant-mix or saturation behavior.
+123. **What survives replacement of Temporal or LangGraph?**
+     Versioned application events, approvals, receipts, citations and projections;
+     framework history/checkpoints are disposable operational state.
+124. **What makes a chaos result safe?**
+     Convergence, zero unauthorized effects, bounded duplicates, tenant isolation,
+     complete audit/cleanup and explicit reconciliation for ambiguity.
+125. **What still blocks go-live after Layer 15 is green?**
+     Live identity, managed recovery, sandbox enforcement, representative load/SLO/
+     on-call, provider/partner operation and independent risk reviews.

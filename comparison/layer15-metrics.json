@@ -1,0 +1,136 @@
+{
+  "schema_version": 15,
+  "layer": 15,
+  "generated_on": "2026-08-18",
+  "comparison_basis": {
+    "framework_layer15": {
+      "repository": "mrinmoyece/aegis-framework-platform",
+      "base_sha": "60b120c6c6348044e716a2cc79e679b6bd29b758"
+    },
+    "custom_layer16": {
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "1cccd9363fec83f7f4b2748b0e913be3a123d5ce",
+      "pull_request": 18,
+      "status": "open-unmerged"
+    }
+  },
+  "source_loc": {
+    "method": "Physical lines including comments, blanks and docstrings, measured with find/wc at the pinned commits. Whole-repository and layer-increment scopes are reported separately and are not code-efficiency ratios.",
+    "framework_repository_python_production": 44827,
+    "framework_repository_python_tests": 19626,
+    "framework_layer15_qualification_runner": 493,
+    "framework_layer15_focused_tests": 115,
+    "framework_layer15_machine_manifests": 173,
+    "framework_layer15_focused_docs": 284,
+    "custom_repository_python_production": 67920,
+    "custom_repository_python_tests": 31647,
+    "custom_layer16_qualification_runtime": 1557,
+    "custom_layer16_checker_and_tests": 574
+  },
+  "runtime_dependencies": {
+    "framework_direct_python": 14,
+    "framework_locked_python_packages": 151,
+    "framework_new_direct_python": 0,
+    "custom_direct_python": 14,
+    "custom_locked_python_packages": 71,
+    "frameworks": [
+      "Temporal Python SDK",
+      "LangGraph",
+      "FastAPI",
+      "Pydantic",
+      "OpenTelemetry",
+      "MCP SDK",
+      "A2A SDK"
+    ],
+    "custom_orchestration_frameworks": []
+  },
+  "services_and_runtime": {
+    "framework_compose_services": 7,
+    "framework_services": [
+      "application",
+      "PostgreSQL/pgvector",
+      "Temporal",
+      "Keycloak",
+      "OpenTelemetry Collector",
+      "Prometheus",
+      "Grafana"
+    ],
+    "framework_required_stateful_services": [
+      "PostgreSQL/pgvector",
+      "Temporal Server"
+    ],
+    "custom_compose_services": 9,
+    "custom_required_stateful_services": [
+      "PostgreSQL/pgvector",
+      "Redis"
+    ],
+    "framework_kubernetes_yaml_files": 15,
+    "framework_migrations": 10,
+    "custom_kubernetes_deployments": 9,
+    "custom_migrations": 11
+  },
+  "equivalent_qualification_axes": {
+    "framework_governed_cases": 58,
+    "custom_eval_cases": 127,
+    "framework_fault_points": 17,
+    "custom_chaos_branches": 17,
+    "framework_capacity_profiles": 12,
+    "custom_capacity_profiles": 12,
+    "framework_readiness_items": 13,
+    "custom_readiness_categories": 24,
+    "framework_residual_risks": 5,
+    "custom_residual_risks": 11,
+    "assessment": "Both cover the requested axes with deterministic local evidence and explicit live blockers. Counts are disclosed rather than padded; framework case-count, event-count and risk-count parity are not claimed."
+  },
+  "framework_acceleration": [
+    "Temporal supplies durable task scheduling, retries, timers, signals, cancellation delivery, workflow replay and worker recovery mechanics.",
+    "LangGraph supplies bounded fanout/fanin, reducers and checkpoint mechanics.",
+    "FastAPI, Pydantic, OpenTelemetry, MCP/A2A SDKs and React/TanStack supply protocol, validation, delivery, telemetry and UI mechanics.",
+    "The Layer 15 runner composes the existing 58 cross-layer cases instead of adding a second qualification product implementation."
+  ],
+  "framework_complexity": [
+    "Temporal Cloud adds namespace, payload codec, authentication, retention, versioning, capacity, cost and failover qualification.",
+    "LangGraph adds checkpoint compatibility, migration and pruning operations while remaining non-authoritative.",
+    "Framework and application retry/state ownership must be separated to avoid duplicate work or authority leakage.",
+    "The framework dependency closure is larger than the custom pinned closure."
+  ],
+  "remaining_custom_controls": [
+    "identity, tenant, current purpose/RBAC and forced RLS",
+    "application events, dual hashes, idempotency, inbox/outbox and projections",
+    "budget reservation, provider/connector quotas and reconciliation",
+    "evidence provenance, citations, critic policy and deterministic aggregation",
+    "approval, fencing, receipts, verification, compensation and ambiguity",
+    "sandbox policy, artifact trust, cleanup and isolation readiness",
+    "memory acceptance, retention, legal hold, erasure and context policy",
+    "MCP/A2A trust, workload identity, proposal-only effects and revocation",
+    "telemetry redaction, readiness, release, compliance and go-live evidence"
+  ],
+  "performance_methodology": {
+    "framework": "Fixed serial synthetic inputs with local p50/p95/p99, throughput and error budgets; four service/browser/restore profiles remain environment-gated.",
+    "custom": "Pinned report used three samples and one warmup on an unnormalized shared developer host.",
+    "comparison": "Neither report supports production extrapolation or cross-repository latency ranking."
+  },
+  "lock_in_and_escape": {
+    "lock_in": [
+      "Temporal history, namespace and Worker Deployment APIs",
+      "LangGraph checkpoint serialization and graph-version compatibility",
+      "AWS/Kubernetes/Sigstore/GitHub operational APIs",
+      "official SDK upgrade and transitive dependency surfaces"
+    ],
+    "escape": [
+      "provider-neutral application ports",
+      "versioned PostgreSQL event export",
+      "ledger-grounded projection rebuild independent of framework state",
+      "opaque Temporal messages and disposable LangGraph checkpoints",
+      "OTLP/Prometheus and OCI/Kustomize standards",
+      "migration rehearsal requiring identical application projections"
+    ]
+  },
+  "parity_gaps": [
+    "Framework has 58 governed cases versus custom 127 and does not claim catalog-count parity.",
+    "Framework canonical output does not manufacture custom's 203-event/nine-stream shape because event schemas and layer implementations differ.",
+    "Framework PostgreSQL/pgvector, Temporal, browser and logical restore profiles remain separate environment gates.",
+    "Neither side supplies live production capacity, chaos, identity, managed recovery, independent review or certification evidence.",
+    "A production framework export/replacement rehearsal with identical projections remains required."
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "families": [
+    {"id": "oidc-jwks-and-confused-deputy", "case_ids": ["forged-identity-headers", "tenant-isolation", "protocol-confused-deputy"], "status": "Locally Verified"},
+    {"id": "prompt-evidence-memory-poisoning", "case_ids": ["prompt-injection", "evidence-poisoning", "memory-context"], "status": "Locally Verified"},
+    {"id": "model-tool-schema-attacks", "case_ids": ["model-malformed", "graph-authority-override", "protocol-schema-bomb"], "status": "Locally Verified"},
+    {"id": "ssrf-dns-redirect", "case_ids": ["evidence-ssrf", "protocol-ssrf"], "status": "Locally Verified"},
+    {"id": "path-archive-shell", "case_ids": ["sandbox-input-security", "sandbox-archive-security"], "status": "Locally Verified"},
+    {"id": "approval-forgery-and-duplicate-effects", "case_ids": ["remediation-denial", "remediation-ambiguity", "durable-duplicate-request"], "status": "Locally Verified"},
+    {"id": "sandbox-isolation-and-resources", "case_ids": ["sandbox-egress-security", "sandbox-input-security"], "status": "Environment-Gated"},
+    {"id": "protocol-drift-escalation-revocation", "case_ids": ["protocol-proposal-only", "protocol-trust-revocation", "protocol-denial-wallet"], "status": "Locally Verified"},
+    {"id": "ui-xss-csrf-cache", "case_ids": ["tenant-isolation", "prompt-injection"], "status": "Environment-Gated"},
+    {"id": "telemetry-backup-secrets", "case_ids": ["observability-secret-absence", "observability-outage-correctness", "observability-replay-convergence"], "status": "Locally Verified"},
+    {"id": "supply-chain", "case_ids": ["durable-framework-outage"], "status": "Environment-Gated"}
+  ]
+}

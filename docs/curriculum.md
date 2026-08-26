@@ -260,3 +260,10 @@ After this layer, an engineer should be able to:
 - **Not qualified:** treats IdP roles, LangGraph checkpoints, traces, or API payloads
   as current authorization/audit truth; treats Temporal completion as application
   truth; overlaps retry owners; or claims production evidence from local profiles.
+# Module: final enterprise qualification
+
+Learners run the Layer 15 journey, map every result to an authority boundary, inject
+deterministic faults, interpret bounded latency percentiles, triage residual risk and
+make a no-go decision from one live blocker. The capstone is a 60-minute walkthrough
+using [the Layer 15 demo](demo-layer15.md), ending with an explicit statement of what
+local evidence cannot prove.

@@ -15,6 +15,7 @@ import subprocess  # nosec B404
 import uuid
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
@@ -127,17 +128,33 @@ class FaultPlan(DigestModel):
 
 class RecoveryResult(DigestModel):
     fault_point: FaultPoint
+    fault_injected: bool
     converged: bool
     authorized_effects: int = Field(ge=0, le=1)
     unauthorized_effects: int = Field(ge=0)
     stale_effects: int = Field(ge=0)
     duplicate_effects: int = Field(ge=0)
     reconciled: bool
+    recovery_verified: bool
     cleanup_complete: bool
     audit_complete: bool
     tenant_isolated: bool
     attempts: int = Field(ge=1, le=8)
     event_digests: tuple[str, ...] = Field(min_length=1, max_length=32)
+
+
+@dataclass
+class _RecoverySimulation:
+    events: list[str]
+    attempts: int
+    fault_injected: bool
+    converged: bool
+    authorized_effects: int
+    duplicate_effects: int
+    reconciled: bool
+    cleanup_complete: bool
+    audit_complete: bool
+    tenant_isolated: bool
 
 
 def run_fault_scenario(plan: FaultPlan) -> RecoveryResult:
@@ -149,58 +166,90 @@ def run_fault_scenario(plan: FaultPlan) -> RecoveryResult:
         FaultPoint.ACTION,
         FaultPoint.SANDBOX,
     }
-    derived_points = {FaultPoint.PROJECTION, FaultPoint.INDEX, FaultPoint.CACHE}
     cleanup_points = {FaultPoint.SANDBOX, FaultPoint.ACTIVITY}
+    rebuild_points = {
+        FaultPoint.PROJECTION,
+        FaultPoint.INDEX,
+        FaultPoint.CACHE,
+    }
+    if plan.occurrence > plan.maximum_attempts:
+        raise ValueError("fault occurrence exceeds recovery attempt budget")
 
-    events: list[str] = []
-    authorized_effects = 0
-    stale_effects = 0
-    duplicate_effects = 0
-    reconciled = False
-    cleanup_complete = plan.fault_point not in cleanup_points
-    audit_complete = False
-
-    total_attempts = min(plan.occurrence + 1, plan.maximum_attempts)
-    for attempt_num in range(1, total_attempts + 1):
-        events.append(f"attempt:{attempt_num}:intent-recorded")
-        is_fault_attempt = attempt_num == plan.occurrence
-        if is_fault_attempt:
-            events.append(f"fault:{plan.fault_point.value}")
+    simulation = _RecoverySimulation(
+        events=[],
+        attempts=0,
+        fault_injected=False,
+        converged=False,
+        authorized_effects=0,
+        duplicate_effects=0,
+        reconciled=False,
+        cleanup_complete=plan.fault_point not in cleanup_points,
+        audit_complete=False,
+        tenant_isolated=True,
+    )
+    effect_delivered = False
+    for attempt in range(1, plan.maximum_attempts + 1):
+        simulation.attempts = attempt
+        simulation.events.append(f"attempt:{attempt}:intent-recorded")
+        if attempt == plan.occurrence:
+            simulation.fault_injected = True
+            simulation.events.append(
+                f"attempt:{attempt}:fault-injected:{plan.fault_point.value}"
+            )
             if plan.fault_point in effect_points:
-                events.extend(
-                    ("effect-ambiguous", "effect-observed", "result-reconciled")
+                effect_delivered = True
+                simulation.authorized_effects = 1
+                simulation.events.extend(
+                    (
+                        f"attempt:{attempt}:effect-observed",
+                        f"attempt:{attempt}:result-ambiguous",
+                    )
                 )
-                reconciled = True
-                if attempt_num > 1:
-                    stale_effects += 1
             else:
-                events.append("retry-same-intent")
+                simulation.events.append(f"attempt:{attempt}:effect-blocked")
+            if plan.fault_point in cleanup_points:
+                simulation.cleanup_complete = False
+            continue
+        if effect_delivered:
+            simulation.events.append(f"attempt:{attempt}:reconcile-same-intent")
+            simulation.reconciled = True
         else:
-            if plan.fault_point in effect_points:
-                authorized_effects = 1
-            events.append("result-recorded")
-        if plan.fault_point in derived_points:
-            events.append("derived-state-rebuilt")
-        if plan.fault_point in cleanup_points:
-            events.append("cleanup-confirmed")
-            cleanup_complete = True
+            simulation.authorized_effects = 1
+            simulation.events.append(f"attempt:{attempt}:effect-authorized")
+        simulation.events.append(f"attempt:{attempt}:result-recorded")
+        simulation.converged = True
+        break
 
-    events.append("audit-confirmed")
-    audit_complete = True
-
+    if not simulation.fault_injected:
+        raise ValueError(
+            "fault scenario completed without injecting the configured fault"
+        )
+    if simulation.converged and plan.fault_point in rebuild_points:
+        simulation.events.append("derived-state-rebuilt")
+    if simulation.converged and plan.fault_point in cleanup_points:
+        simulation.cleanup_complete = True
+        simulation.events.append("cleanup-confirmed")
+    if simulation.converged:
+        simulation.audit_complete = True
+        simulation.events.append("audit-confirmed")
+    recovery_verified = simulation.converged and (
+        simulation.reconciled if plan.fault_point in effect_points else True
+    )
     return RecoveryResult(
         fault_point=plan.fault_point,
-        converged=True,
-        authorized_effects=authorized_effects,
+        fault_injected=simulation.fault_injected,
+        converged=simulation.converged,
+        authorized_effects=simulation.authorized_effects,
         unauthorized_effects=0,
-        stale_effects=stale_effects,
-        duplicate_effects=duplicate_effects,
-        reconciled=reconciled or (plan.fault_point not in effect_points),
-        cleanup_complete=cleanup_complete,
-        audit_complete=audit_complete,
-        tenant_isolated=True,
-        attempts=total_attempts,
-        event_digests=tuple(canonical_digest(item) for item in events),
+        stale_effects=0,
+        duplicate_effects=simulation.duplicate_effects,
+        reconciled=simulation.reconciled,
+        recovery_verified=recovery_verified,
+        cleanup_complete=simulation.cleanup_complete,
+        audit_complete=simulation.audit_complete,
+        tenant_isolated=simulation.tenant_isolated,
+        attempts=simulation.attempts,
+        event_digests=tuple(canonical_digest(item) for item in simulation.events),
     )
 
 

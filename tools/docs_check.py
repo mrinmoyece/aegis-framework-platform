@@ -57,6 +57,7 @@ REQUIRED_DOCS = (
     "docs/operator-accessibility.md",
     "docs/operator-security.md",
     "docs/adr/019-production-deployment-foundations.md",
+    "docs/adr/020-enterprise-qualification.md",
     "docs/production-deployment.md",
     "docs/terraform-aws-reference.md",
     "docs/database-lifecycle.md",
@@ -67,6 +68,13 @@ REQUIRED_DOCS = (
     "docs/runbooks/database-migration.md",
     "docs/runbooks/restore-failover.md",
     "docs/runbooks/temporal-worker-rollout.md",
+    "docs/enterprise-qualification.md",
+    "docs/production-readiness-scorecard.md",
+    "docs/operational-acceptance.md",
+    "docs/performance-chaos-qualification.md",
+    "docs/security-assessment.md",
+    "docs/demo-layer15.md",
+    "docs/framework-comparison-layer15.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -291,6 +299,54 @@ def _measurement_errors() -> list[str]:
             )
             if not layer14.get(field)
         )
+    layer15_path = ROOT / "comparison/layer15-metrics.json"
+    if not layer15_path.is_file():
+        errors.append("missing comparison/layer15-metrics.json")
+    else:
+        layer15 = json.loads(layer15_path.read_text(encoding="utf-8"))
+        if layer15.get("schema_version") != 15 or layer15.get("layer") != 15:
+            errors.append("Layer 15 metrics schema/layer is invalid")
+        custom = layer15.get("comparison_basis", {}).get("custom_layer16", {})
+        if custom.get("sha") != "1cccd9363fec83f7f4b2748b0e913be3a123d5ce":
+            errors.append("Layer 16 custom comparison SHA is not pinned")
+        errors.extend(
+            f"Layer 15 metrics missing {field}"
+            for field in (
+                "source_loc",
+                "runtime_dependencies",
+                "services_and_runtime",
+                "equivalent_qualification_axes",
+                "framework_acceleration",
+                "framework_complexity",
+                "remaining_custom_controls",
+                "performance_methodology",
+                "lock_in_and_escape",
+                "parity_gaps",
+            )
+            if not layer15.get(field)
+        )
+    errors.extend(_qualification_manifest_errors())
+    return errors
+
+
+def _qualification_manifest_errors() -> list[str]:
+    required = {
+        "performance-profiles.json": "profiles",
+        "chaos-matrix.json": "scenarios",
+        "adversarial-assessment.json": "families",
+        "readiness-scorecard.json": "items",
+        "residual-risks.json": "risks",
+        "operational-acceptance.json": "phases",
+    }
+    errors: list[str] = []
+    for name, collection in required.items():
+        path = ROOT / "qualification" / name
+        if not path.is_file():
+            errors.append(f"missing qualification/{name}")
+            continue
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("schema_version") != 1 or not payload.get(collection):
+            errors.append(f"qualification/{name} schema/content is invalid")
     return errors
 
 

@@ -17,6 +17,8 @@ Layer 14 promotion, migrations, worker rollouts, restore, and regional fencing a
 [database migration](runbooks/database-migration.md),
 [Temporal worker rollout](runbooks/temporal-worker-rollout.md), and
 [restore/failover](runbooks/restore-failover.md).
+Layer 15 readiness, Day 0/1/2 acceptance and rollback ownership are in
+[operational acceptance](operational-acceptance.md).
 
 ## Start application PostgreSQL
 
@@ -44,6 +46,10 @@ The server is loopback-exposed at `127.0.0.1:57233`. The local profile shares th
 PostgreSQL process but uses separate `temporal` and `temporal_visibility` databases.
 This is a compatibility environment, not a production topology.
 
+The optional Keycloak `identity` profile uses `start-dev`, performs first-boot Quarkus
+augmentation and therefore is not read-only. It is loopback-only, bounded, drops
+capabilities and is not a production deployment pattern.
+
 ## Run qualification
 
 ```bash
@@ -53,6 +59,7 @@ make eval-adversarial
 make eval-recovery
 make eval-baseline
 make eval-meta
+make qualification
 python3 -m uv run aegis-framework eval run --filter secure-protocol-interoperability
 make security
 make container

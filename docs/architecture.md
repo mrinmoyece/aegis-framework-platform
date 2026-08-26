@@ -2,6 +2,9 @@
 
 > Layer 14 deployment, recovery, and regional architecture is summarized at the end of
 > this document and detailed in [production deployment](production-deployment.md).
+> Layer 15 integrated qualification is defined in
+> [enterprise qualification](enterprise-qualification.md) and never changes the
+> authority boundaries below.
 
 ## Product boundary
 

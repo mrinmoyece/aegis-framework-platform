@@ -10,6 +10,7 @@ const source = readFileSync(
 
 const expectedRoutes = [
   "/operator/api/approvals/{approval_id}/decisions",
+  "/operator/api/protocol-peers/{peer_id}/trust",
   "/operator/api/snapshot",
   "/operator/readyz",
   "/operator/session",
@@ -18,7 +19,7 @@ const expectedRoutes = [
   "/operator/session/logout",
   "/operator/session/tenant"
 ];
-if (manifest.schema_version !== 1 || manifest.api_version !== "0.14.0") {
+if (manifest.schema_version !== 1 || manifest.api_version !== "0.15.0") {
   throw new Error("operator contract version drift");
 }
 for (const route of expectedRoutes) {

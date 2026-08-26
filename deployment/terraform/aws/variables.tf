@@ -4,7 +4,7 @@ variable "region" {
 
   validation {
     condition     = can(regex("^[a-z]{2}(-gov)?-[a-z]+-[0-9]$", var.region))
-    error_message = "The region value must be an AWS region identifier."
+    error_message = "Region must be an AWS region identifier."
   }
 }
 
@@ -14,7 +14,7 @@ variable "environment" {
 
   validation {
     condition     = contains(["staging", "production"], var.environment)
-    error_message = "The environment value must be staging or production."
+    error_message = "Environment must be staging or production."
   }
 }
 
@@ -24,7 +24,7 @@ variable "name" {
 
   validation {
     condition     = can(regex("^[a-z][a-z0-9-]{2,24}$", var.name))
-    error_message = "The name value must be a short lowercase DNS label."
+    error_message = "Name must be a short lowercase DNS label."
   }
 }
 
@@ -70,7 +70,7 @@ variable "sandbox_ami_id" {
 
   validation {
     condition     = can(regex("^ami-[0-9a-f]{8,17}$", var.sandbox_ami_id))
-    error_message = "The sandbox_ami_id value must be an explicit qualified AMI ID."
+    error_message = "Sandbox AMI ID must be an explicit qualified AMI ID."
   }
 }
 
@@ -117,7 +117,7 @@ variable "backup_account_id" {
 
   validation {
     condition     = can(regex("^[0-9]{12}$", var.backup_account_id))
-    error_message = "The backup_account_id value must be a 12-digit AWS account ID."
+    error_message = "Backup account ID must be a 12 digit AWS account ID."
   }
 }
 
@@ -131,9 +131,7 @@ variable "eks_admin_principal_arn" {
   type        = string
 
   validation {
-    condition = can(
-      regex("^arn:aws:iam::[0-9]{12}:role/.+$", var.eks_admin_principal_arn)
-    )
-    error_message = "The eks_admin_principal_arn value must be an IAM role ARN."
+    condition     = can(regex("^arn:aws:iam::[0-9]{12}:role/.+$", var.eks_admin_principal_arn))
+    error_message = "EKS admin principal ARN must be an IAM role ARN."
   }
 }

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "scenarios": [
+    {"id": "intent-crash", "fault_point": "intent", "case_ids": ["durable-worker-recovery"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "effect-crash", "fault_point": "effect", "case_ids": ["remediation-ambiguity"], "maximum_duplicate_effects": 0, "reconciliation_required": true},
+    {"id": "result-crash", "fault_point": "result", "case_ids": ["remediation-ambiguity"], "maximum_duplicate_effects": 0, "reconciliation_required": true},
+    {"id": "projection-loss", "fault_point": "projection", "case_ids": ["orchestration-projection-rebuild", "observability-replay-convergence"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "outbox-redelivery", "fault_point": "outbox", "case_ids": ["durable-duplicate-request"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "temporal-activity-retry", "fault_point": "activity", "case_ids": ["durable-worker-recovery"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "temporal-signal-duplicate", "fault_point": "temporal-signal", "case_ids": ["durable-cancellation-race"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "temporal-timeout", "fault_point": "temporal-timer", "case_ids": ["durable-cancellation-race", "remediation-expiry"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "heartbeat-loss", "fault_point": "heartbeat", "case_ids": ["durable-worker-recovery"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "langgraph-checkpoint-version", "fault_point": "langgraph-checkpoint", "case_ids": ["orchestration-replay", "cross-tenant-checkpoint"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "provider-outage", "fault_point": "provider", "case_ids": ["model-timeout-cancel", "model-fallback-circuit"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "connector-outage", "fault_point": "connector", "case_ids": ["evidence-policy-revocation", "evidence-pagination"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "action-ambiguity", "fault_point": "action", "case_ids": ["remediation-ambiguity"], "maximum_duplicate_effects": 0, "reconciliation_required": true},
+    {"id": "sandbox-orphan", "fault_point": "sandbox", "case_ids": ["sandbox-input-security", "sandbox-archive-security"], "maximum_duplicate_effects": 0, "reconciliation_required": true},
+    {"id": "memory-embed-failure", "fault_point": "embed", "case_ids": ["memory-context"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "memory-index-loss", "fault_point": "index", "case_ids": ["memory-retrieval", "memory-retention"], "maximum_duplicate_effects": 0, "reconciliation_required": false},
+    {"id": "tenant-cache-loss", "fault_point": "cache", "case_ids": ["memory-tenant-cache"], "maximum_duplicate_effects": 0, "reconciliation_required": false}
+  ]
+}

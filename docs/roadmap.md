@@ -1,6 +1,6 @@
 # Roadmap across the 16 Aegis capabilities
 
-| Layer | Capability | Layer 14 status | Framework-first direction |
+| Layer | Capability | Layer 15 status | Framework-first direction |
 |---:|---|---|---|
 | 1 | Platform foundation | **Delivered** | Strict Python, contracts, deterministic slice, CI/container/docs |
 | 2 | Tenant identity and authorization | **Delivered** | OIDC/JWT current grants, purpose/risk policy, forced RLS, quota, secret refs, audit |
@@ -17,15 +17,15 @@
 | 13 | Secure operator workspace and BFF | **Delivered offline/demo boundary** | React/TanStack/Zod workspace, fail-closed BFF session boundary, tenant teardown, safe mutation review, polling, accessibility/security/build gates; live IdP/session store/browser qualification deferred |
 | 14 | Secure MCP and A2A interoperability | **Delivered offline/adapter boundary** | Official MCP/A2A SDK mechanics with application trust, identity, policy, ledger, Temporal and operator controls |
 | 15 | Production deployment foundations | **Partial: executable reference boundary** | Kustomize, direct AWS Terraform, Temporal Cloud topology, signed supply chain, migration/HA/capacity/DR/retention/fenced-region contracts and deterministic gates; live operation deferred |
-| 16 | Final enterprise qualification | Partial | Threat/limitations/review gates; chaos/load/legal/privacy sign-off pending |
+| 16 | Final enterprise qualification | **Delivered locally; production blocked** | Integrated journey, invariants, adversarial, deterministic chaos, bounded capacity, readiness and operations; live sign-off remains required |
 
 ## Next layer boundary
 
-Layer 14 delivers production deployment foundations as renderable, mock-planned, and
-deterministically tested reference evidence. The next capability is final enterprise
-qualification. Real cloud apply, live managed failover, production PKI, OIDC/session
-operation, SLO/on-call, load/chaos, provider/connector/partner qualification,
-penetration/accessibility/human review, and compliance certification remain explicit.
+Layer 15 delivers final repository/local enterprise qualification over Layer 14.
+Real cloud apply, live managed failover, production PKI, OIDC/session operation,
+SLO/on-call, representative load/chaos, provider/connector/partner qualification,
+penetration/accessibility/human review, privacy/legal acceptance and compliance
+certification remain explicit hard gates.
 
 Layer 13 pins MCP `2026-07-28`/SDK `2.0.0` and A2A `1.0` (spec tag `v1.0.1`)/
 SDK `1.1.2`. Public federation, production PKI/token brokerage, partner qualification,

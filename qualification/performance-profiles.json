@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "methodology": "Fixed synthetic checkout inputs, fixed clocks and deterministic fakes; wall-clock samples are local CI guardrails only. Percentiles use nearest-rank over bounded concurrent batches driven via asyncio.gather. They exclude network, process startup, managed services and production extrapolation.",
+  "profiles": [
+    {
+      "component": "Authenticated API checkout",
+      "driver": "api-checkout",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 10000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.2
+    },
+    {
+      "component": "Evidence, LangGraph fanout and model limiter",
+      "driver": "investigation-connectors-graph-model",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 10000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.2
+    },
+    {
+      "component": "Application ledger, replay and outbox intent",
+      "driver": "ledger-replay-outbox",
+      "runs": 50,
+      "status": "Locally Verified",
+      "p99_budget_ms": 2000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 1
+    },
+    {
+      "component": "Two-person approval, effect ambiguity and reconciliation",
+      "driver": "approval-effect-reconciliation",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 8000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.3
+    },
+    {
+      "component": "Sandbox policy and archive quarantine",
+      "driver": "sandbox-security-pack",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 8000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.5
+    },
+    {
+      "component": "Memory retrieval, index and context",
+      "driver": "memory-retrieval-index-context",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 8000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.5
+    },
+    {
+      "component": "MCP and A2A trust boundary",
+      "driver": "protocol-mcp-a2a-pack",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 8000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.3
+    },
+    {
+      "component": "Governed evaluation suite",
+      "driver": "governed-evaluation-suite",
+      "runs": 20,
+      "status": "Locally Verified",
+      "p99_budget_ms": 60000,
+      "maximum_error_rate": 0,
+      "concurrency": 4,
+      "minimum_iterations_per_second": 0.016
+    },
+    {
+      "component": "PostgreSQL and pgvector",
+      "status": "Environment-Gated",
+      "command": "make integration"
+    },
+    {
+      "component": "Temporal scheduling and activity recovery",
+      "status": "Environment-Gated",
+      "command": "make temporal-integration"
+    },
+    {
+      "component": "Operator UI bundle and browser journey",
+      "status": "Environment-Gated",
+      "command": "make frontend-ci frontend-e2e"
+    },
+    {
+      "component": "Logical restore and projection rebuild",
+      "status": "Environment-Gated",
+      "command": "make restore-drill restore-drill-db"
+    }
+  ]
+}

@@ -29,6 +29,13 @@ review, explicit ambiguity, polling, CSP, axe, Playwright, dependency/license/au
 bundle gates. Live IdP/session-store and production browser qualification remain
 deferred.**
 
+**Layer 15 adds integrated enterprise qualification: a canonical authenticated
+checkout journey over the real application/eval paths, application-ledger replay,
+cross-layer security invariants, deterministic chaos, bounded local capacity profiles,
+a no-score readiness gate, residual-risk ownership, operational acceptance and a
+pinned comparison with custom Aegis Layer 16. It explicitly does not claim live
+production evidence.**
+
 **Layer 8 adds approval-bound ephemeral sandbox execution through hardened Kubernetes
 Jobs while keeping policy, ledger, claims, artifacts, and attestations outside Temporal,
 Kubernetes, and LangGraph.**
@@ -312,6 +319,16 @@ make integration
 
 AEGIS_TEST_TEMPORAL_ADDRESS=127.0.0.1:57233 make temporal-integration
 ```
+
+Final bounded repository qualification:
+
+```bash
+make qualification
+```
+
+Generated evidence is written under `build/qualification/`; source manifests and live
+blockers are under `qualification/` and
+[the readiness scorecard](docs/production-readiness-scorecard.md).
 
 The eight PostgreSQL tests prove forced RLS/pool reset, immutable audit/events/artifacts,
 quota/model races, checkpoint isolation, ledger/outbox atomicity, projection rebuild,

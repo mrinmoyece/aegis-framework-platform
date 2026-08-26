@@ -25,6 +25,8 @@ class RoleCatalog:
             {
                 Action.INVESTIGATION_RUN,
                 Action.INVESTIGATION_READ,
+                Action.EVIDENCE_QUERY_READ,
+                Action.EVIDENCE_CURSOR_READ,
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
@@ -39,6 +41,9 @@ class RoleCatalog:
                 Action.MEMORY_WRITE,
                 Action.MEMORY_READ,
                 Action.MEMORY_RETRIEVE,
+                Action.OPERATIONS_READ,
+                Action.SUPPORT_READ,
+                Action.REPLAY_READ,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -47,6 +52,8 @@ class RoleCatalog:
         "incident-viewer": frozenset(
             {
                 Action.INVESTIGATION_READ,
+                Action.EVIDENCE_QUERY_READ,
+                Action.EVIDENCE_CURSOR_READ,
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
@@ -57,6 +64,7 @@ class RoleCatalog:
                 Action.SANDBOX_ARTIFACT_READ,
                 Action.MEMORY_READ,
                 Action.MEMORY_RETRIEVE,
+                Action.OPERATIONS_READ,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -70,6 +78,8 @@ class RoleCatalog:
                 Action.QUOTA_READ,
                 Action.QUOTA_WRITE,
                 Action.AUDIT_READ,
+                Action.EVIDENCE_QUERY_READ,
+                Action.EVIDENCE_CURSOR_READ,
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
@@ -84,6 +94,10 @@ class RoleCatalog:
                 Action.MEMORY_READ,
                 Action.MEMORY_RETRIEVE,
                 Action.MEMORY_DELETE,
+                Action.OPERATIONS_READ,
+                Action.SUPPORT_READ,
+                Action.REPLAY_READ,
+                Action.PROJECTION_REBUILD,
             }
         ),
         "tenant-auditor": frozenset(
@@ -92,6 +106,8 @@ class RoleCatalog:
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
                 Action.AUDIT_READ,
+                Action.EVIDENCE_QUERY_READ,
+                Action.EVIDENCE_CURSOR_READ,
                 Action.MODEL_CATALOG_READ,
                 Action.MODEL_HEALTH_READ,
                 Action.MODEL_USAGE_READ,
@@ -101,6 +117,9 @@ class RoleCatalog:
                 Action.SANDBOX_READ,
                 Action.SANDBOX_ARTIFACT_READ,
                 Action.MEMORY_READ,
+                Action.OPERATIONS_READ,
+                Action.SUPPORT_READ,
+                Action.REPLAY_READ,
             }
         ),
         "workload-investigator": frozenset(

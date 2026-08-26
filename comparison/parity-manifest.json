@@ -33,7 +33,7 @@
     {
       "id": "02-tenant-identity-authorization",
       "name": "Tenant identity and authorization",
-      "status": "delivered",
+      "status": "partial",
       "evidence": [
         "src/aegis_framework/identity.py",
         "src/aegis_framework/authorization.py",
@@ -461,21 +461,40 @@
     {
       "id": "16-enterprise-qualification",
       "name": "Final enterprise qualification",
-      "status": "partial",
+      "status": "delivered",
       "evidence": [
+        "tools/qualification.py",
+        "qualification/performance-profiles.json",
+        "qualification/chaos-matrix.json",
+        "qualification/adversarial-assessment.json",
+        "qualification/readiness-scorecard.json",
+        "qualification/residual-risks.json",
+        "qualification/operational-acceptance.json",
+        "tests/test_qualification_layer15.py",
+        "docs/adr/020-enterprise-qualification.md",
+        "docs/enterprise-qualification.md",
+        "docs/production-readiness-scorecard.md",
+        "docs/operational-acceptance.md",
+        "docs/performance-chaos-qualification.md",
+        "docs/security-assessment.md",
+        "docs/framework-comparison-layer15.md",
+        "comparison/layer15-metrics.json",
         "docs/threat-model.md",
         "docs/limitations.md",
         "docs/status.md",
         "docs/runbook.md"
       ],
-      "framework_owned": [],
+      "framework_owned": [
+        "Temporal scheduling, retry, timer, signal, cancellation and workflow replay mechanics",
+        "LangGraph bounded fanout/fanin, reducers and checkpoint mechanics",
+        "FastAPI, Pydantic, OpenTelemetry, MCP/A2A and React delivery mechanics"
+      ],
       "enterprise_owned": [
-        "security",
-        "privacy",
-        "legal",
-        "load",
-        "chaos",
-        "DR sign-off"
+        "identity, tenant policy, RLS and application event truth",
+        "evidence, citations, budgets, approvals, fencing, effects and reconciliation",
+        "sandbox, memory, protocol trust and telemetry privacy policy",
+        "security, privacy, legal, capacity, chaos and DR sign-off",
+        "readiness status, residual risk, operational acceptance and rollback"
       ]
     }
   ]
