@@ -7,11 +7,11 @@ WORKDIR /app
 RUN python -m pip install --no-cache-dir uv==0.12.5
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
-RUN uv sync --frozen --no-dev --no-editable
+RUN uv sync --frozen --no-dev --no-editable --extra postgres
 
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/mrinmoyece/aegis-framework-platform" \
-      org.opencontainers.image.description="Aegis framework-first Layer 1"
+      org.opencontainers.image.description="Aegis framework-first Layer 2"
 ENV PATH="/app/.venv/bin:${PATH}" \
     LANGGRAPH_STRICT_MSGPACK=true \
     PYTHONUNBUFFERED=1 \

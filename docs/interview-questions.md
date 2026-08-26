@@ -106,3 +106,64 @@
     There is no measured cache, rate-limit, or pub/sub requirement. PostgreSQL already
     serves durable checkpoint needs; another state owner would add operations and
     licensing decisions without value.
+
+## Layer 2 identity, tenancy and durability
+
+25. **Why are verified token roles ignored?**
+    A valid signature proves the issuer made a claim, not that the application's
+    current tenant grant remains active. Roles, purposes, risk ceilings and
+    permissions come from the current application principal/grant records.
+
+26. **What is authoritative about `(issuer, subject)`?**
+    The exact configured issuer and verified subject form the external identity key.
+    Application storage maps that key to one tenant and principal kind. Subject alone
+    is not globally authoritative.
+
+27. **Why include a grant version in the token?**
+    Revocation/role change advances the application principal version. An older signed
+    token then fails before policy instead of retaining stale authorization until
+    expiry.
+
+28. **Why can an unverified tenant claim scope an RLS lookup?**
+    It cannot grant access by itself. It only chooses a denied-by-default partition;
+    the exact verified issuer/subject must resolve inside it and return the same
+    authoritative tenant and grant version.
+
+29. **Which JWKS behaviors are custom and why?**
+    Maximum response/key/ID size, TTL, unknown-key cooldown, HTTPS/loopback policy and
+    no stale-on-error behavior are product risk choices. PyJWT supplies JOSE
+    cryptography and registered-claim validation.
+
+30. **Why not Casbin or OPA in Layer 2?**
+    The policy surface is a small immutable role map plus current purpose/risk/grant
+    checks. Casbin does not authenticate/manage grants; OPA adds another service.
+    `PolicyPort` preserves a later escape when scale justifies one.
+
+31. **Why both forced RLS and application predicates?**
+    Predicates communicate intent and support indexes. Forced RLS remains a database
+    guard when a predicate is omitted and prevents table owners from silently
+    bypassing policy (except PostgreSQL superusers, which remain an operator boundary).
+
+32. **How does pool reset prevent tenant leakage?**
+    Tenant context is set with transaction-local `set_config`. Commit/rollback clears
+    it; the transaction helper verifies that, and the pool reset hook rejects any
+    surviving value before reuse.
+
+33. **How are quota races serialized?**
+    A transaction advisory-locks the tenant/reservation key for retry identity, then
+    locks the tenant quota row. The durable reservation stores both allow and deny
+    decisions.
+
+34. **Why is audit per-tenant hash-chained?**
+    It detects deletion/reordering within each tenant without creating cross-tenant
+    ordering dependencies. RLS, privilege denial and a trigger enforce immutability;
+    external witnessing remains a gap.
+
+35. **How are LangGraph PostgreSQL tables tenant-protected?**
+    An application owner table binds opaque thread IDs to tenants. Forced RLS policies
+    on saver tables join each `thread_id` to that owner under transaction tenant
+    context.
+
+36. **What does the local Keycloak test prove?**
+    One loopback token follows the same strict verifier. It does not prove production
+    IdP rotation, HA, outage behavior, revocation latency or deployment.

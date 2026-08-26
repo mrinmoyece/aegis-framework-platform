@@ -1,17 +1,8 @@
 .DEFAULT_GOAL := help
 
 UV ?= uv
-VENV_BIN ?= .venv/bin
-HAS_UV := $(shell command -v $(UV) >/dev/null 2>&1 && printf yes)
-RUFF := $(if $(HAS_UV),$(UV) run ruff,$(VENV_BIN)/ruff)
-MYPY := $(if $(HAS_UV),$(UV) run mypy,$(VENV_BIN)/mypy)
-PYTEST := $(if $(HAS_UV),$(UV) run pytest,$(VENV_BIN)/pytest)
-PYTHON := $(if $(HAS_UV),$(UV) run python,$(VENV_BIN)/python)
-BANDIT := $(if $(HAS_UV),$(UV) run bandit,$(VENV_BIN)/bandit)
-PIP_AUDIT := $(if $(HAS_UV),$(UV) run pip-audit,$(VENV_BIN)/pip-audit)
-AEGIS := $(if $(HAS_UV),$(UV) run aegis-framework,$(VENV_BIN)/aegis-framework)
 
-.PHONY: help bootstrap format lint type test eval docs security demo serve measure container compose-config ci
+.PHONY: help bootstrap format lint type test integration eval docs security demo serve measure container compose-config ci
 
 help:
 	@printf '%s\n' \
@@ -20,6 +11,7 @@ help:
 	  'lint            Run Ruff without mutation' \
 	  'type            Run strict mypy' \
 	  'test            Run branch coverage tests (minimum 90%%)' \
+	  'integration     Run configured local PostgreSQL/Keycloak integration tests' \
 	  'eval            Run deterministic safety evals' \
 	  'docs            Validate documentation and manifests' \
 	  'security        Run static and dependency vulnerability checks' \
@@ -34,40 +26,43 @@ bootstrap:
 	$(UV) sync --locked --all-extras
 
 format:
-	$(RUFF) format .
-	$(RUFF) check --fix .
+	$(UV) run ruff format .
+	$(UV) run ruff check --fix .
 
 lint:
-	$(RUFF) format --check .
-	$(RUFF) check .
+	$(UV) run ruff format --check .
+	$(UV) run ruff check .
 
 type:
-	$(MYPY)
+	$(UV) run mypy
 
 test:
-	$(PYTEST)
+	$(UV) run pytest
+
+integration:
+	$(UV) run pytest -m 'postgres or keycloak' --no-cov
 
 eval:
-	$(AEGIS) eval --cases evals/cases.json
+	$(UV) run aegis-framework eval --cases evals/cases.json
 
 docs:
-	$(PYTHON) tools/docs_check.py
+	$(UV) run python tools/docs_check.py
 
 security:
-	$(BANDIT) -q -r src
-	$(PIP_AUDIT) --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
+	$(UV) run bandit -q -r src
+	$(UV) run pip-audit --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
 
 demo:
-	$(AEGIS) demo --scenario success
+	$(UV) run aegis-framework demo --scenario success
 
 serve:
-	$(AEGIS) serve
+	$(UV) run aegis-framework serve
 
 measure:
-	$(PYTHON) tools/measure.py --write comparison/layer1-metrics.json
+	$(UV) run python tools/measure.py --write comparison/layer2-metrics.json
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer1 .
+	docker build --pull --tag aegis-framework-platform:layer2 .
 
 compose-config:
 	docker compose config --quiet

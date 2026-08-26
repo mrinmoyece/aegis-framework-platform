@@ -1,8 +1,15 @@
 # Failure modes
 
-| Failure | Layer 1 behavior | Authority owner | Test/eval |
+| Failure | Layer 2 behavior | Authority owner | Test/eval |
 |---|---|---|---|
-| Missing role | Deny before graph; audit denial | Policy | service/API tests |
+| Missing/malformed bearer | Generic `401`; no repository or graph authority | Authenticator | API tests |
+| Unknown issuer/audience/algorithm/key | Fail authentication closed | OIDC verifier | JWT attack tests |
+| Expired/future/long token | Fail authentication within explicit skew/lifetime | OIDC verifier | JWT attack tests |
+| JWKS unavailable/oversized/malformed | No stale success; identity unavailable | JWKS adapter | identity tests |
+| Rotated signing key | Cooldown-bounded refresh then verify current key | JWKS adapter | rotation test |
+| Stale/revoked grant version | Fail authentication before policy | Principal/grant repository | identity tests |
+| Missing role/purpose/risk grant | Deny before graph; audit denial | Policy | policy/service/API tests |
+| Cross-tenant resource | Generic `404` before object lookup | Delivery policy | API anti-enumeration tests |
 | Tenant mismatch from evidence adapter | Raise explicit isolation error; mark run failed | Application service | service test |
 | Budget exhausted | Deterministic abstention; zero checkpoints/model calls | Budget | eval |
 | Duplicate completed request | Reauthorize, return stored result, no new graph run | Idempotency | graph/service tests |
@@ -17,14 +24,20 @@
 | Specialist contradiction | Abstain, return reasons, no proposal | Critic | eval |
 | Prompt injection in evidence | Drop untrusted text, flag, abstain, no proposal | Evidence projection/critic | eval |
 | Checkpoint process loss in demo | State is lost; do not claim durability | Saver selection | documented limitation |
-| PostgreSQL unavailable | Durable adapter cannot start/run; no memory success fallback | Saver/operator | explicit adapter boundary |
+| PostgreSQL unavailable | Readiness/authenticated governance fail closed; no memory fallback | Repository/operator | readiness test |
+| Runtime role can bypass RLS | Pool configuration fails | PostgreSQL adapter | integration policy |
+| Tenant context remains after transaction | Connection is rejected/reset, not returned as success | Pool adapter | PostgreSQL integration |
+| Optimistic version changed | Explicit concurrency conflict | Repository | governance tests |
+| Quota race | Serialized row update; durable winner/denials | Quota repository | PostgreSQL integration |
+| Audit mutation | Privilege and trigger reject update/delete | Audit repository | PostgreSQL integration |
+| Cross-tenant checkpoint | RLS hides read; owner uniqueness rejects rebinding | Checkpoint repository | graph/PostgreSQL tests |
 | Langfuse unavailable | Default runtime unaffected because external export is opt-in | Observability operator | adapter is non-authoritative |
 | Audit adapter unavailable | Operation must not be represented as fully audited | Audit operator | production gap |
 | Approval/effect requested | No decision endpoint; effect adapter raises | Approval/effect boundary | service test |
 
 ## Retry ownership
 
-LangGraph may retry/replay nodes according to graph/checkpoint configuration. Layer 1
+LangGraph may retry/replay nodes according to graph/checkpoint configuration. Layer 2
 does not attach external effects to nodes. The application idempotency record owns
 whole-run duplicate suppression. A future Temporal workflow will own long-running
 approval/effect retries. Provider SDK retries must be bounded and observable when

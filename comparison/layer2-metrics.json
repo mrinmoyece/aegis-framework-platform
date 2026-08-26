@@ -1,0 +1,94 @@
+{
+  "comparison_basis": {
+    "custom": {
+      "branch": "mrinmoyece-aegis-identity-governance",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 3,
+        "locked_total": null
+      },
+      "implementation_effort_proxy": {
+        "additions": 4069,
+        "changed_files": 44,
+        "commits": 1,
+        "deletions": 159
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "81409792c97698479a9ca827a4143c6391f28d2b",
+      "source_loc": {
+        "production": 1947,
+        "tests": 1272,
+        "total": 3219
+      },
+      "test_functions": 53
+    },
+    "effort_definition": "Git additions/deletions and changed files from each Layer 1 foundation",
+    "foundation_sha": "ec297ad118e3f0040f15fe0507b5da7078eefdad",
+    "loc_definition": "non-blank, non-comment physical Python lines"
+  },
+  "dependencies": {
+    "direct_development": 8,
+    "direct_optional": 4,
+    "direct_runtime": 9,
+    "locked_total": 108
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "Darwin",
+    "python": "3.14.7"
+  },
+  "framework_code_removed": [
+    "custom graph scheduler",
+    "parallel fan-out and deterministic join engine",
+    "checkpoint serialization and state-history plumbing",
+    "HTTP routing and OpenAPI generation",
+    "JWT signature and registered-claim cryptography",
+    "PostgreSQL connection-pool lifecycle"
+  ],
+  "implementation_effort_proxy": {
+    "additions": 5632,
+    "changed_files": 56,
+    "commits": 1,
+    "deletions": 613
+  },
+  "layer": 2,
+  "lock_in_and_escape": {
+    "fastapi": "typed request/response models at the delivery adapter",
+    "langfuse": "ObservabilityPort plus OpenTelemetry",
+    "langgraph": "OrchestratorPort plus JSON-compatible domain state",
+    "psycopg_postgresql": "repository ports plus application-owned SQL migrations",
+    "pyjwt": "AuthenticatorPort plus standard OIDC/JWT claims and JWK documents"
+  },
+  "measured_at": "2026-08-15T09:24:02.548297+00:00",
+  "qualification_counts": {
+    "deterministic_evals_passed": 8,
+    "deterministic_tests_passed": 100,
+    "keycloak_integration_environment_gated": 1,
+    "postgres_integration_passed": 3
+  },
+  "remaining_custom_controls": [
+    "issuer registry and bounded JWKS rotation policy",
+    "authoritative principal and tenant resolution",
+    "immutable RBAC, purpose, risk, and policy evaluation",
+    "quota reservation and retry ownership",
+    "forced RLS schema and transaction tenant context",
+    "tenant-scoped checkpoint ownership",
+    "secret-reference boundary",
+    "redacted hash-chained durable audit",
+    "API anti-enumeration and readiness failure policy"
+  ],
+  "runtime": {
+    "median_ms": 1.841,
+    "network": false,
+    "p95_ms": 2.325,
+    "runs": 50,
+    "scenario": "deterministic-success"
+  },
+  "schema_version": 2,
+  "source_loc": {
+    "production": 4728,
+    "tests": 2112,
+    "total": 6840
+  }
+}

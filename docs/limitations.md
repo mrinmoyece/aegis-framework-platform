@@ -1,31 +1,44 @@
-# Layer 1 limitations
+# Layer 2 limitations
 
-- Evidence, policy, budget, approval, idempotency, and audit adapters are in-memory
-  educational doubles. They are neither distributed nor durable.
-- The default LangGraph saver is `InMemorySaver`; process restart loses checkpoints.
-  PostgreSQL construction and Compose are supplied, but the demo API does not switch
-  itself to PostgreSQL. The local profile publishes PostgreSQL on port `55432`.
-- PostgreSQL has no tenant RLS, backup, HA, retention, migration, or erasure policy in
-  this layer. pgvector is installed in the image but no embedding/vector code exists.
-- No live OpenAI or Anthropic adapter is installed. The fake model proves structured
-  contracts and safety routing, not model quality.
-- Injection detection is deliberately simple. It demonstrates containment by
-  minimization and abstention, not universal prompt-injection detection.
-- Content hashes detect citation mismatch but do not prove source authenticity.
-- Hash-chain audit is process-local and not an enterprise ledger.
-- Langfuse is opt-in. Its service is not included in Compose, and automatic
-  LangGraph/LangChain capture is prohibited because it may export graph state.
-- No authentication middleware exists; the API trusts identity headers supplied by a
-  secure upstream in any real deployment.
-- The educational API budget is in-memory, configurable at app construction, and
-  defaults to 10,000 units per fixture tenant. It resets with the process and is not
-  a distributed quota.
+- Production mode can build OIDC/JWT identity and PostgreSQL governance from explicit
+  environment configuration. Missing configuration fails readiness closed. The
+  deterministic static authenticator is available only in explicit demo/test mode.
+- JWT attacks and deterministic two-key rotation are tested. A local,
+  environment-gated Keycloak token test exists, but live IdP rotation, outage,
+  revocation latency, HA, realm administration, and production traffic are unproven.
+- PostgreSQL integration tests prove the migration, non-bypass runtime role, forced
+  RLS, transaction/pool reset, audit mutation prevention, quota concurrency, and
+  checkpoint isolation. They do not prove HA, backup/restore, PITR, failover,
+  cross-region latency, capacity, retention, or erasure operations.
+- The local Keycloak Compose profile contains no users, client secrets, or realm
+  credentials. Operators must supply bootstrap credentials and configure a local
+  client/claim mapper before the gated live test.
+- `SecretReference` prevents values entering domain/API/graph/audit data. Layer 2 does
+  not resolve Vault/KMS secrets, broker short-lived credentials, rotate them, or prove
+  provider isolation.
+- The production investigation route remains unavailable until future production
+  evidence and model adapters exist. This avoids silently using deterministic fixtures
+  with production identity. The authenticated governance routes are production-shaped.
+- Evidence and model fixtures remain deterministic. No live OpenAI, Anthropic,
+  telemetry, GitHub, or runbook credentials/network calls exist.
+- Injection detection demonstrates minimization and abstention, not universal
+  prompt-injection classification. Content hashes do not prove source authenticity.
+- Durable audit is application-owned, immutable to the runtime, tenant hash-chained,
+  and redacted. It is not externally witnessed, signed by HSM/KMS, WORM-retained, or
+  legally qualified.
+- LangGraph saver tables are protected by an application RLS overlay. Saver upgrades
+  must be requalified against table/schema changes. Checkpoints remain neither audit
+  nor authorization.
+- Policy is explicit immutable RBAC plus purpose/risk/current grant checks. There is no
+  delegated administration UI, policy simulation service, Cedar/Casbin/OPA adapter, or
+  formal policy proof.
+- API anti-enumeration normalizes status/details but timing behavior has not been
+  load-tested. TLS, ingress, WAF, session/BFF/CSRF behavior, and browser UX are absent.
 - There is no approval decision endpoint, effect execution, fencing, independent
   verification, reconciliation, or rollback.
-- Temporal, MCP, A2A, browser/UI, retrieval, memory, and human workflow are deferred.
-- Runtime measurements are single-process local measurements, not load, reliability,
-  or cost benchmarks.
-- Dependency vulnerability audit needs network access to current advisory data;
-  `make ci` remains network-free and `make security` is a separate gate.
+- Temporal, MCP, A2A, sandbox execution, vector retrieval, memory, distributed workers,
+  and human workflow remain deferred.
+- Local runtime measurements are not reliability, throughput, load, or cost
+  benchmarks. Dependency advisory checks require current advisory network access.
 
-These are deliberate scope limits, not implied framework capabilities.
+These are deliberate boundaries, not implied framework or enterprise capabilities.

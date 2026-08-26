@@ -29,6 +29,14 @@ compared layer.
 8. malformed structured output;
 9. invalid citation;
 10. checkpoint/replay process behavior.
+11. JWT issuer/audience/algorithm/key/time attacks;
+12. deterministic signing-key rotation and JWKS bounds;
+13. stale/revoked grant and purpose/risk denial;
+14. cross-tenant API anti-enumeration;
+15. forced RLS and connection-pool reset;
+16. quota race and retry behavior;
+17. durable audit mutation prevention/redaction;
+18. tenant-isolated framework checkpoints.
 
 Inputs, expected status, citation rules, and authority boundaries must match. A
 framework feature cannot be credited if the custom implementation is tested against
@@ -48,6 +56,8 @@ Capture on a clean checkout:
 - number of application-owned versus framework-owned controls;
 - defect count from independent review and CI;
 - implementation elapsed time from first commit to green PR.
+- framework mechanics removed, remaining application-owned controls, and an explicit
+  port/escape hatch for every selected framework.
 
 Record OS, architecture, Python, framework versions, CPU/memory limits, network
 policy, and run count. Do not compare local Apple Silicon numbers with cloud x86
@@ -73,6 +83,10 @@ checks to optimize LOC.
 A data point is publishable only if both implementations pass the same required
 safety cases, no live network/model is used, branch coverage is at least 90%, and an
 independent reviewer has no unresolved high-confidence correctness finding.
+
+Environment-gated PostgreSQL and local Keycloak compatibility are reported separately
+from the network-free deterministic count. A skipped gate is not a pass and cannot be
+reported as production evidence.
 
 ## Lock-in evaluation
 

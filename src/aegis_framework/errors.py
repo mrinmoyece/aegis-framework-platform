@@ -9,6 +9,14 @@ class PolicyDenied(AegisFrameworkError):
     pass
 
 
+class AuthenticationFailed(AegisFrameworkError):
+    pass
+
+
+class IdentityUnavailable(AegisFrameworkError):
+    pass
+
+
 class BudgetExhausted(AegisFrameworkError):
     pass
 
@@ -46,4 +54,20 @@ class InvestigationInProgress(AegisFrameworkError):
 
 
 class OptionalDependencyMissing(AegisFrameworkError):
+    pass
+
+
+class ConcurrencyConflict(AegisFrameworkError):
+    pass
+
+
+class RepositoryUnavailable(AegisFrameworkError):
+    pass
+
+
+class AuditFailure(AegisFrameworkError):
+    pass
+
+
+class MigrationFailure(AegisFrameworkError):
     pass

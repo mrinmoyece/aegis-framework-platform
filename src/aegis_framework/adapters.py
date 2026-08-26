@@ -12,6 +12,15 @@ from typing import ClassVar
 
 from pydantic import AwareDatetime, Field
 
+from aegis_framework.access import (
+    AuditEventView,
+    GrantRecord,
+    GrantStatus,
+    PolicyRecord,
+    PrincipalRecord,
+    QuotaRecord,
+    TenantRecord,
+)
 from aegis_framework.domain import (
     ApprovalGrant,
     ApprovalRequest,
@@ -20,12 +29,15 @@ from aegis_framework.domain import (
     IdentityContext,
     InvestigationRequest,
     InvestigationResult,
+    PrincipalKind,
     RemediationProposal,
+    RiskLevel,
     StrictModel,
     stable_id,
 )
 from aegis_framework.errors import (
     ApprovalBoundaryFailure,
+    ConcurrencyConflict,
     EffectsDisabled,
     IdempotencyConflict,
 )
@@ -36,6 +48,7 @@ from aegis_framework.ports import (
     RunClaim,
     RunClaimStatus,
 )
+from aegis_framework.safety import safe_audit_attributes
 
 
 class SystemClock:
@@ -53,6 +66,53 @@ class FixedClock:
         return self._value
 
 
+class InMemoryIdentityRepository:
+    def __init__(
+        self,
+        *,
+        tenants: Sequence[TenantRecord],
+        principals: Sequence[PrincipalRecord],
+        grants: Sequence[GrantRecord],
+    ) -> None:
+        self._tenants = {tenant.tenant_id: tenant for tenant in tenants}
+        self._principals = {
+            (principal.issuer, principal.subject_id): principal
+            for principal in principals
+        }
+        self._grants = tuple(grants)
+
+    def resolve_principal(
+        self, *, tenant_id: str, issuer: str, subject_id: str
+    ) -> PrincipalRecord | None:
+        principal = self._principals.get((issuer, subject_id))
+        return (
+            principal
+            if principal is not None and principal.tenant_id == tenant_id
+            else None
+        )
+
+    def active_grants(
+        self,
+        *,
+        tenant_id: str,
+        issuer: str,
+        subject_id: str,
+        now: datetime,
+    ) -> Sequence[GrantRecord]:
+        return tuple(
+            grant
+            for grant in self._grants
+            if grant.tenant_id == tenant_id
+            and grant.issuer == issuer
+            and grant.subject_id == subject_id
+            and grant.status is GrantStatus.ACTIVE
+            and grant.expires_at > now
+        )
+
+    def get_tenant(self, *, tenant_id: str) -> TenantRecord | None:
+        return self._tenants.get(tenant_id)
+
+
 class DenyAllPolicy:
     def authorize(
         self,
@@ -60,11 +120,16 @@ class DenyAllPolicy:
         action: Action,
         *,
         resource_tenant_id: str,
+        purpose: str,
+        risk: RiskLevel,
     ) -> PolicyDecision:
         del identity, action, resource_tenant_id
         return PolicyDecision(
             allowed=False,
             policy_id="deny-all:v1",
+            policy_revision=1,
+            purpose=purpose,
+            risk=risk,
             reason="no_explicit_grant",
         )
 
@@ -85,27 +150,41 @@ class RolePolicy:
         action: Action,
         *,
         resource_tenant_id: str,
+        purpose: str,
+        risk: RiskLevel,
     ) -> PolicyDecision:
         if identity.tenant_id != resource_tenant_id:
             return PolicyDecision(
                 allowed=False,
                 policy_id="role-policy:v1",
+                policy_revision=1,
+                purpose=purpose,
+                risk=risk,
                 reason="tenant_mismatch",
             )
-        granted = {
-            candidate
-            for role in identity.roles
-            for candidate in self._ROLE_GRANTS.get(role, frozenset())
-        }
-        if action not in granted:
+        grant = next(
+            (
+                binding
+                for binding in identity.grants
+                if binding.purpose == purpose and action.value in binding.permissions
+            ),
+            None,
+        )
+        if grant is None:
             return PolicyDecision(
                 allowed=False,
                 policy_id="role-policy:v1",
-                reason="action_not_granted",
+                policy_revision=1,
+                purpose=purpose,
+                risk=risk,
+                reason="action_or_purpose_not_granted",
             )
         return PolicyDecision(
             allowed=True,
             policy_id="role-policy:v1",
+            policy_revision=1,
+            purpose=purpose,
+            risk=risk,
             reason="explicit_role_grant",
         )
 
@@ -173,9 +252,12 @@ class InMemoryEvidence:
 
 
 class AuditRecord(StrictModel):
+    event_id: str
     sequence: int = Field(ge=1)
     tenant_id: str
     event_type: str
+    actor_ref: str
+    principal_kind: PrincipalKind
     recorded_at: AwareDatetime
     attributes: dict[str, str | int | bool]
     previous_hash: str
@@ -188,6 +270,7 @@ class HashChainAudit:
     def __init__(self, clock: FixedClock | SystemClock) -> None:
         self._clock = clock
         self._records: list[AuditRecord] = []
+        self._tenant_heads: dict[str, tuple[int, str]] = {}
         self._lock = Lock()
 
     def append(
@@ -198,16 +281,33 @@ class HashChainAudit:
         attributes: Mapping[str, str | int | bool],
     ) -> None:
         with self._lock:
-            sequence = len(self._records) + 1
-            previous_hash = self._records[-1].record_hash if self._records else "0" * 64
+            previous_sequence, previous_hash = self._tenant_heads.get(
+                identity.tenant_id, (0, "0" * 64)
+            )
+            sequence = previous_sequence + 1
             recorded_at = self._clock.now()
+            actor_ref = stable_id(
+                "actor", identity.issuer, identity.subject_id, length=32
+            )
+            event_id = stable_id(
+                "audit",
+                identity.tenant_id,
+                str(sequence),
+                event_type,
+                recorded_at.isoformat(),
+                length=32,
+            )
+            safe_attributes = safe_audit_attributes(attributes)
             canonical = json.dumps(
                 {
+                    "event_id": event_id,
                     "sequence": sequence,
                     "tenant_id": identity.tenant_id,
                     "event_type": event_type,
+                    "actor_ref": actor_ref,
+                    "principal_kind": identity.principal_kind.value,
                     "recorded_at": recorded_at.isoformat(),
-                    "attributes": dict(sorted(attributes.items())),
+                    "attributes": safe_attributes,
                     "previous_hash": previous_hash,
                 },
                 separators=(",", ":"),
@@ -215,14 +315,21 @@ class HashChainAudit:
             )
             self._records.append(
                 AuditRecord(
+                    event_id=event_id,
                     sequence=sequence,
                     tenant_id=identity.tenant_id,
                     event_type=event_type,
+                    actor_ref=actor_ref,
+                    principal_kind=identity.principal_kind,
                     recorded_at=recorded_at,
-                    attributes=dict(attributes),
+                    attributes=safe_attributes,
                     previous_hash=previous_hash,
                     record_hash=sha256(canonical.encode()).hexdigest(),
                 )
+            )
+            self._tenant_heads[identity.tenant_id] = (
+                sequence,
+                self._records[-1].record_hash,
             )
 
     def records_for(self, tenant_id: str) -> tuple[AuditRecord, ...]:
@@ -231,13 +338,19 @@ class HashChainAudit:
         )
 
     def verify(self) -> bool:
-        previous_hash = "0" * 64
+        heads: dict[str, tuple[int, str]] = {}
         for record in self._records:
+            previous_sequence, previous_hash = heads.get(
+                record.tenant_id, (0, "0" * 64)
+            )
             canonical = json.dumps(
                 {
+                    "event_id": record.event_id,
                     "sequence": record.sequence,
                     "tenant_id": record.tenant_id,
                     "event_type": record.event_type,
+                    "actor_ref": record.actor_ref,
+                    "principal_kind": record.principal_kind.value,
                     "recorded_at": record.recorded_at.isoformat(),
                     "attributes": dict(sorted(record.attributes.items())),
                     "previous_hash": previous_hash,
@@ -246,10 +359,92 @@ class HashChainAudit:
                 sort_keys=True,
             )
             expected = sha256(canonical.encode()).hexdigest()
-            if record.previous_hash != previous_hash or record.record_hash != expected:
+            if (
+                record.sequence != previous_sequence + 1
+                or record.previous_hash != previous_hash
+                or record.record_hash != expected
+            ):
                 return False
-            previous_hash = record.record_hash
+            heads[record.tenant_id] = (record.sequence, record.record_hash)
         return True
+
+
+class InMemoryGovernance:
+    def __init__(
+        self,
+        *,
+        tenants: Sequence[TenantRecord],
+        policies: Sequence[PolicyRecord],
+        quotas: Sequence[QuotaRecord],
+        audit: HashChainAudit,
+    ) -> None:
+        self._tenants = {tenant.tenant_id: tenant for tenant in tenants}
+        self._policies = {policy.tenant_id: policy for policy in policies}
+        self._quotas = {(quota.tenant_id, quota.quota_key): quota for quota in quotas}
+        self._audit = audit
+        self._lock = Lock()
+
+    def ready(self) -> bool:
+        return True
+
+    def get_tenant(self, *, tenant_id: str) -> TenantRecord | None:
+        return self._tenants.get(tenant_id)
+
+    def current_policy(self, *, tenant_id: str) -> PolicyRecord | None:
+        return self._policies.get(tenant_id)
+
+    def get_quota(self, *, tenant_id: str, quota_key: str) -> QuotaRecord | None:
+        return self._quotas.get((tenant_id, quota_key))
+
+    def list_audit(
+        self, *, identity: IdentityContext, limit: int
+    ) -> Sequence[AuditEventView]:
+        if limit < 1 or limit > 100:
+            raise ValueError("audit limit is outside the permitted range")
+        records = self._audit.records_for(identity.tenant_id)[-limit:]
+        return tuple(
+            AuditEventView(
+                event_id=record.event_id,
+                sequence=record.sequence,
+                event_type=record.event_type,
+                actor_ref=record.actor_ref,
+                principal_kind=record.principal_kind,
+                recorded_at=record.recorded_at,
+                attributes=record.attributes,
+                previous_hash=record.previous_hash,
+                record_hash=record.record_hash,
+            )
+            for record in records
+        )
+
+    def replace_policy(
+        self,
+        *,
+        policy: PolicyRecord,
+        expected_version: int,
+    ) -> PolicyRecord:
+        with self._lock:
+            current = self._policies.get(policy.tenant_id)
+            if current is None or current.version != expected_version:
+                raise ConcurrencyConflict("policy version changed")
+            updated = policy.model_copy(update={"version": expected_version + 1})
+            self._policies[policy.tenant_id] = updated
+            return updated
+
+    def replace_quota(
+        self,
+        *,
+        quota: QuotaRecord,
+        expected_version: int,
+    ) -> QuotaRecord:
+        with self._lock:
+            key = (quota.tenant_id, quota.quota_key)
+            current = self._quotas.get(key)
+            if current is None or current.version != expected_version:
+                raise ConcurrencyConflict("quota version changed")
+            updated = quota.model_copy(update={"version": expected_version + 1})
+            self._quotas[key] = updated
+            return updated
 
 
 @dataclass

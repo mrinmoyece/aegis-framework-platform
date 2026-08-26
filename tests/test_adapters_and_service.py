@@ -22,6 +22,7 @@ from aegis_framework.domain import (
     ApprovalGrant,
     ApprovalStatus,
     InvestigationResult,
+    RiskLevel,
 )
 from aegis_framework.errors import (
     EffectsDisabled,
@@ -110,6 +111,8 @@ def test_policy_is_deny_by_default_and_effects_are_never_granted() -> None:
         identity,
         Action.INVESTIGATION_RUN,
         resource_tenant_id=identity.tenant_id,
+        purpose="incident-response",
+        risk=RiskLevel.MEDIUM,
     )
     assert deny.allowed is False
     policy = RolePolicy()
@@ -117,11 +120,15 @@ def test_policy_is_deny_by_default_and_effects_are_never_granted() -> None:
         identity,
         Action.EFFECT_EXECUTE,
         resource_tenant_id=identity.tenant_id,
+        purpose="incident-response",
+        risk=RiskLevel.HIGH,
     ).allowed
     assert not policy.authorize(
         identity,
         Action.INVESTIGATION_RUN,
         resource_tenant_id="tenant-beta",
+        purpose="incident-response",
+        risk=RiskLevel.MEDIUM,
     ).allowed
 
 
@@ -134,7 +141,12 @@ def test_denied_run_never_reaches_graph() -> None:
     )
     with pytest.raises(PolicyDenied):
         service.investigate(demo_identity(), demo_request())
-    assert bundle.orchestrator.checkpoint_count("thread:not-created") == 0
+    assert (
+        bundle.orchestrator.checkpoint_count(
+            tenant_id="tenant-acme", thread_ref="thread:not-created"
+        )
+        == 0
+    )
 
 
 def test_budget_exhaustion_abstains_before_graph() -> None:
@@ -144,7 +156,13 @@ def test_budget_exhaustion_abstains_before_graph() -> None:
         demo_request(),
     )
     assert result.critic.reasons == ("tenant_budget_exhausted",)
-    assert bundle.orchestrator.checkpoint_count(result.thread_ref) == 0
+    assert (
+        bundle.orchestrator.checkpoint_count(
+            tenant_id=result.tenant_id,
+            thread_ref=result.thread_ref,
+        )
+        == 0
+    )
     replay = bundle.service.investigate(
         demo_identity(request_id="budget-empty"),
         demo_request(),
@@ -222,8 +240,10 @@ class _FailOnceOrchestrator:
             raise OrchestrationFailure("synthetic framework outage")
         return self._delegate.run(**kwargs)
 
-    def checkpoint_count(self, thread_ref: str) -> int:
-        return self._delegate.checkpoint_count(thread_ref)
+    def checkpoint_count(self, *, tenant_id: str, thread_ref: str) -> int:
+        return self._delegate.checkpoint_count(
+            tenant_id=tenant_id, thread_ref=thread_ref
+        )
 
 
 class _FailOnceAcceptedAudit:
@@ -379,7 +399,14 @@ def test_checkpoint_reads_reauthorize_and_derive_tenant_thread() -> None:
     )
     with pytest.raises(PolicyDenied):
         bundle.service.checkpoint_count(
-            identity.model_copy(update={"roles": ()}),
+            identity.model_copy(
+                update={
+                    "roles": (),
+                    "permissions": (),
+                    "purposes": (),
+                    "grants": (),
+                }
+            ),
             incident_id=demo_request().incident_id,
         )
 

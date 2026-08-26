@@ -1,6 +1,7 @@
 [
   {
     "case_id": "success",
+    "kind": "investigation",
     "scenario": "success",
     "expected_status": "complete",
     "expected_critic": "accepted",
@@ -8,6 +9,7 @@
   },
   {
     "case_id": "contradiction",
+    "kind": "investigation",
     "scenario": "contradiction",
     "expected_status": "abstained",
     "expected_critic": "abstained",
@@ -15,6 +17,7 @@
   },
   {
     "case_id": "prompt-injection",
+    "kind": "investigation",
     "scenario": "prompt_injection",
     "expected_status": "abstained",
     "expected_critic": "abstained",
@@ -22,6 +25,7 @@
   },
   {
     "case_id": "budget-exhaustion",
+    "kind": "investigation",
     "scenario": "budget_exhaustion",
     "expected_status": "abstained",
     "expected_critic": "abstained",
@@ -29,9 +33,25 @@
   },
   {
     "case_id": "tenant-isolation",
+    "kind": "investigation",
     "scenario": "tenant_isolation",
     "expected_status": "complete",
     "expected_critic": "accepted",
     "expected_reason": "corroborated_and_cited"
+  },
+  {
+    "case_id": "forged-identity-headers",
+    "kind": "identity-attack",
+    "expected_reason": "identity_claims_authoritative"
+  },
+  {
+    "case_id": "cross-tenant-checkpoint",
+    "kind": "checkpoint-tenant-attack",
+    "expected_reason": "checkpoint_tenant_binding"
+  },
+  {
+    "case_id": "graph-authority-override",
+    "kind": "graph-authority-attack",
+    "expected_reason": "application_policy_authoritative"
   }
 ]
