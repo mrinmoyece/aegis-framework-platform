@@ -5,7 +5,6 @@
       "authorization_url",
       "code_challenge",
       "code_challenge_method",
-      "code_verifier",
       "expires_at",
       "nonce",
       "state"
