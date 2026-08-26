@@ -3,7 +3,15 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 
+from aegis_framework.evals import load_cases
+from aegis_framework.evaluation import (
+    EvaluationRunner,
+    load_baseline,
+    load_dataset,
+    load_suite,
+)
 from aegis_framework.langfuse_adapter import (
     LangfuseObservability,
     _mask_langfuse_payload,
@@ -105,6 +113,29 @@ def test_langfuse_evaluation_publishes_aggregates_only() -> None:
         "level": "ERROR",
         "status_message": "failed",
     }
+    assert client.flushes == 1
+
+
+def test_langfuse_layer10_publishes_only_sanitized_digests_and_counts() -> None:
+    dataset = load_dataset(Path("evals/dataset.json"))
+    report = EvaluationRunner(
+        suite=load_suite(Path("evals/suite.json")),
+        dataset=dataset,
+        baseline=load_baseline(Path("evals/baseline.json")),
+    ).run(load_cases(Path("evals/cases.json")), filters=("prompt-injection",))
+    client = _FakeClient()
+    adapter = LangfuseObservability(client)
+    adapter.publish_dataset_manifest(dataset)
+    adapter.publish_case_result(report.results[0])
+    adapter.publish_evaluation_report(report)
+    rendered = repr((client.starts, client.observations))
+    assert "tenant-acme" not in rendered
+    assert "ignore previous instructions" not in rendered
+    assert [item["name"] for item in client.starts] == [
+        "aegis.layer10.eval.dataset",
+        "aegis.layer10.eval.case",
+        "aegis.layer10.eval.report",
+    ]
     assert client.flushes == 1
 
 

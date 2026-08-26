@@ -22,6 +22,8 @@ _DEFAULT_BEARER = "demo-responder-token"
 
 _DEFAULT_BEARER = "demo-responder-token"
 
+_DEFAULT_BEARER = "demo-responder-token"
+
 
 def _headers(
     *,

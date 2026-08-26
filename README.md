@@ -20,6 +20,13 @@ LangGraph-bounded untrusted context — with production wiring of the SQL query 
 retrieval-serving path, a real embedding provider, and KMS-qualified erasure still
 deferred.**
 
+**Layer 10 adds governed deterministic enterprise evaluation: immutable neutral
+suite/dataset/scorer/result/baseline/waiver/report contracts, a hermetic runner over
+all 44 real Layers 1-9 cases, adversarial and 17-point fault packs, non-waivable
+safety baselines, deterministic JSON/Markdown/JUnit, dedicated CI gates, and an
+optional sanitized Langfuse publisher. Evaluation remains release evidence, never
+runtime authority or production certification.**
+
 ## Delivered Layer 8
 
 - additive strict application events with aggregate sequence, commit-order tenant
@@ -152,6 +159,32 @@ deferred.**
   qualified KMS/blob integration. See [status](docs/status.md) and
   [limitations](docs/limitations.md).
 
+  `comparison/layer10-metrics.json` pins custom Aegis Layer 11 at
+  `d17447f016cfd335ad9ff9900e9478b9d25844ea` and records LOC, dependencies,
+  incremental effort, required services, framework facilities removed, remaining
+  custom evaluation/governance, hosted escape, catalog/fault/meta counts, and the
+  200-run equivalent deterministic evaluation scenario. The comparison does not
+  claim latency parity because the custom runtime was not executed under the same
+  interpreter.
+
+## Delivered Layer 10
+
+- immutable, strict, schema-versioned neutral evaluation contracts and canonical
+  digests for suites, scenarios, cases, datasets, scorers, results, baselines,
+  comparisons, waivers, reports, provenance, fingerprints, bounds and trace refs;
+- hermetic deterministic execution of 44 real cross-layer cases, stable filtering/
+  sharding/replay, hard timeouts, dataset hash and secret/PII validation, and no
+  required network, process, credential, production data or model judge;
+- eight outcome classes, broad adversarial taxonomy, 17 named fault cut points,
+  multidimensional deterministic scorers, non-waivable hard safety, reviewed
+  baselines, scoped expiring waivers and missing/new/tamper detection;
+- deterministic bounded JSON/Markdown/JUnit reports, optional sanitized Langfuse
+  dataset/report publishing, and dedicated safety/adversarial/recovery/baseline/meta
+  CI gates;
+- candid pinned comparison with custom Aegis Layer 11. Framework Layer 10 is
+  smaller and reuses real Layers 1-9 scenarios, but has a narrower catalog and less
+  granular case-specific scoring than the custom implementation.
+
 ## Ownership
 
 | Owner | Responsibility | Not authoritative for |
@@ -183,6 +216,9 @@ uv run aegis-framework remediation-demo --scenario success
 uv run aegis-framework remediation-demo --scenario ambiguity
 uv run aegis-framework remediation-demo --scenario rollback
 uv run aegis-framework memory-demo
+uv run aegis-framework eval list
+uv run aegis-framework eval replay
+uv run aegis-framework eval compare
 ```
 
 Run the deterministic API:
@@ -267,20 +303,11 @@ never the repository or workflow history.
 
 ## Qualification status
 
-- 256 deterministic tests pass at 90%+ meaningful branch coverage;
-- 37 deterministic evals cover cognitive/model safety, durable recovery,
-  routing, budgets, malformed output, fallback/circuit, timeout/cancellation, duplicate
-  and ambiguous billing, revocation, tenant isolation, connector pagination, poisoning,
-  source revocation, non-causal correlation and SSRF;
-- 331 deterministic tests pass at 90.01% branch coverage, 40 evals pass, and ten
-  PostgreSQL plus five Temporal integration tests pass locally;
-- 350 deterministic tests pass at 90.19% branch coverage, 44 evals pass — including
-  memory retrieval/tenant-cache/context/retention cases — and eleven PostgreSQL plus six
-  Temporal integration tests pass locally;
-- 352 deterministic tests pass at 90.17% branch coverage, 44 evals pass — including a
-  live forced-RLS pgvector `hybrid_candidates` query exercised by an integration test
-  with cross-tenant isolation, and digest-only retrieval/context-build ledger facts — and
-  eleven PostgreSQL plus six Temporal integration tests pass locally;
+- 415 deterministic tests pass at 90%+ meaningful branch coverage, 44 evals pass — including
+  governed Layer 10 evaluation with JUnit/Markdown/JSON report artefacts, immutable
+  canonical digest chains, baseline/waiver/comparison contracts, hermetic runtime, and all
+  cross-layer scenario coverage — and eleven PostgreSQL plus six Temporal integration tests
+  pass locally;
 - one Keycloak compatibility test remains environment-gated;
 - tests/evals use no live credentials, real models, real embedding providers, or cloud
   services.
@@ -313,13 +340,18 @@ parity is not measured by either benchmark.
 | Command | Purpose |
 |---|---|
 | `make lint` / `make type` / `make test` | Strict deterministic gates |
-| `make eval` | Twenty-six deterministic evals |
+| `make eval` | Complete governed 44-case deterministic suite |
+| `make eval-safety` | Non-waivable safety gates |
+| `make eval-adversarial` | Adversarial attack pack |
+| `make eval-recovery` | Recovery and deterministic fault gates |
+| `make eval-baseline` | Reviewed baseline comparison |
+| `make eval-meta` | Evaluator repeatability/governance meta-tests |
 | `make integration` | Configured PostgreSQL/Keycloak tests |
 | `make temporal-integration` | Configured Temporal workflow/replay test |
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 9 comparison metrics |
+| `make measure` | Refresh Layer 10 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),

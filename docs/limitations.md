@@ -1,4 +1,4 @@
-# Layer 9 limitations
+# Layer 10 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -191,5 +191,20 @@
   concurrent-write throughput on the derived index are unmeasured.
 - Full operator UI/BFF, MCP/A2A, production deployment/IaC, and live provider/runtime
   qualification remain explicitly deferred.
+- The governed suite executes 44 existing real cross-layer deterministic cases and
+  separately meta-tests 17 named fault cuts. It is smaller than custom Aegis Layer 11's
+  pinned 91-case/22-cut catalog and does not claim catalog-count parity.
+- Deterministic scorers deliberately make all required safety dimensions fail when a
+  canonical case fails. They do not yet model nullable case-specific metric
+  applicability, confidence intervals, statistical drift, or human-label agreement.
+- The hermetic guard denies common Python network/process entry points and required cases
+  contain no native untrusted code. It is not an OS sandbox against malicious native
+  extensions or direct syscalls.
+- Environment-gated evaluation mode checks configuration while PostgreSQL/pgvector and
+  Temporal behavior is qualified by the repository's dedicated integration suites. An
+  offline report never claims those services ran.
+- The optional model-judge contract is disabled and has no implementation. Production
+  model/connector qualification, independent penetration/human labeling, observability/
+  SLOs, UI, MCP/A2A, deployment, and final load/chaos certification remain deferred.
 
 These are explicit non-production boundaries, not implied capabilities.

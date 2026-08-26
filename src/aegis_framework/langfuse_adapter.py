@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from aegis_framework.errors import OptionalDependencyMissing
 from aegis_framework.ports import Observation
@@ -14,6 +14,13 @@ from aegis_framework.safety import (
     safe_observability_attributes,
     tenant_bucket,
 )
+
+if TYPE_CHECKING:
+    from aegis_framework.evaluation import (
+        CaseResult,
+        DatasetContract,
+        EvaluationReport,
+    )
 
 
 class _LangfuseObservation(Protocol):
@@ -177,6 +184,78 @@ class LangfuseObservability:
                 status_message="passed" if passed else "failed",
             )
         self._client.flush()
+
+    def publish_case_result(self, result: CaseResult) -> None:
+        """Publish a digest-only case result without sensitive payloads."""
+
+        with self._client.start_as_current_observation(
+            name="aegis.layer10.eval.case",
+            as_type="evaluator",
+            input={
+                "case_digest": result.result_id,
+                "suite_digest": result.suite_digest,
+            },
+            metadata={"sanitized": True, "deterministic": True},
+        ) as observation:
+            observation.update(
+                output={
+                    "passed": result.passed,
+                    "metric_count": len(result.metrics),
+                    "trace_ref_count": len(result.trace_refs),
+                },
+                level="DEFAULT" if result.passed else "ERROR",
+                status_message="passed" if result.passed else "failed",
+            )
+
+    def publish_evaluation_report(self, report: EvaluationReport) -> None:
+        """Publish sanitized aggregates; local comparison remains authority."""
+
+        with self._client.start_as_current_observation(
+            name="aegis.layer10.eval.report",
+            as_type="evaluator",
+            input={
+                "report_digest": report.report_id,
+                "suite": report.suite_id,
+                "suite_version": report.suite_version,
+            },
+            metadata={
+                "automatic_langgraph_capture": False,
+                "deterministic": True,
+                "sanitized": True,
+            },
+        ) as observation:
+            observation.update(
+                output={
+                    "passed": report.passed,
+                    "case_count": len(report.results),
+                    "violation_count": len(report.comparison.violations),
+                },
+                level="DEFAULT" if report.passed else "ERROR",
+                status_message="passed" if report.passed else "failed",
+            )
+        self._client.flush()
+
+    def publish_dataset_manifest(self, dataset: DatasetContract) -> None:
+        """Publish only governed dataset identity and counts, never fixture content."""
+
+        with self._client.start_as_current_observation(
+            name="aegis.layer10.eval.dataset",
+            as_type="evaluator",
+            input={
+                "dataset_digest": dataset.canonical_digest,
+                "dataset_version": dataset.version,
+            },
+            metadata={"sanitized": True, "synthetic": True},
+        ) as observation:
+            observation.update(
+                output={
+                    "active_case_count": len(dataset.case_ids),
+                    "quarantined_case_count": len(dataset.quarantined_case_ids),
+                    "deleted_case_count": len(dataset.deleted_case_ids),
+                },
+                level="DEFAULT",
+                status_message="published",
+            )
 
 
 def build_langfuse_observability() -> LangfuseObservability:

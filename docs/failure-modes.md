@@ -1,4 +1,4 @@
-# Layer 9 failure modes
+# Layer 10 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -115,6 +115,17 @@
 | Retrieval/context-build unaudited | `MemoryRetrievalService` appends digest-only `RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/`CONTEXT_BUILT` `MemoryOperationFact`s with strict sequencing and idempotent replay | Application ledger | unit |
 | Memory ingested without explicit acceptance | `MemoryAcceptance` (human/policy disposition, digest, reason code) bound to tenant/memory ID is required before any candidate/scan/chunk/embed/index fact | Application lifecycle service | unit |
 | Temporal Activity heartbeat stalls silently | Initial heartbeat plus a periodic 10-second heartbeat under a 30-second `heartbeat_timeout` detects a stalled worker | Temporal Activity | unit |
+| Evaluation suite/dataset source tampered | Canonical suite/dataset/source hashes differ from reviewed baseline; promotion stops | Evaluation comparison | meta + baseline gate |
+| Case added or removed silently | Complete run compares exact baseline and dataset case sets | Evaluation comparison | meta + baseline gate |
+| Scorer direction/threshold changed | Suite digest and exact baseline scorer set fail comparison until explicit review | Evaluation comparison | meta + baseline gate |
+| Safety waiver attempted | Hard-safety scorer rejects waiver regardless of owner/expiry | Evaluation comparison | meta |
+| Waiver expired or mis-scoped | Comparison fails closed and reports stable reason code | Evaluation comparison | meta |
+| Dataset contains secret/PII/private production content | Provenance validation, source digest and bounded scan reject before execution | Dataset governance | meta |
+| Case hangs | Hard per-case signal timeout becomes evaluator failure; no silent skip | Evaluation runner | meta |
+| Eval attempts network/process escape | Hermetic guard raises before connection/process creation | Evaluation runner | meta |
+| Eval report overflows or leaks payload | Byte cap and digest/reason-only schema reject; redaction tests gate exporter | Reporting adapter | meta |
+| Order/shard/replay differs | Stable sorted selection/hash shard and canonical result comparison fail | Evaluation runner | meta |
+| Langfuse unavailable | Local report/comparison remains authoritative; publication fails separately | Optional adapter | unit |
 
 ## Retry rules
 

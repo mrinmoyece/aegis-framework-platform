@@ -1,4 +1,4 @@
-# Layer 9 curriculum
+# Layer 10 curriculum
 
 ## Learning outcomes
 
@@ -65,6 +65,17 @@ After this layer, an engineer should be able to:
 50. compare Framework Layer 9 candidly with custom Aegis Layer 10, including what the
     live pgvector-query implementations now share and what still differs (application
     wiring into the serving path, final MMR/bounds ownership).
+51. distinguish immutable evaluation release evidence from runtime authorization,
+    approval, audit, effect receipt, production verification and SLO evidence;
+52. design canonical suite/dataset/case/scorer/result/baseline/comparison/waiver/report
+    contracts with deterministic clocks, seeds, IDs, ordering and shards;
+53. enforce non-waivable hard safety, reviewed baselines, scoped expiring waivers,
+    missing/new/tamper detection and synthetic dataset lifecycle;
+54. inject named faults around intent/effect/result/framework cut points and assert
+    convergence without duplicate, stale or unauthorized effects;
+55. compare Framework Layer 10 candidly with custom Aegis Layer 11 by catalog breadth,
+    LOC/dependencies/services, removed framework mechanics, retained governance and
+    hosted escape.
 
 ## Suggested sequence
 
@@ -108,6 +119,10 @@ After this layer, an engineer should be able to:
 | Memory retrieval/context | `InMemoryHybridIndex`, `LangGraphMemoryContextBuilder` | Rebuild the index and diff retrieval before/after | Why is retrieved memory framed as untrusted state? |
 | Memory persistence | migration 0008, `memory_postgres.py` | Probe forced RLS and run `hybrid_candidates` against a wrong-tenant/classification query | What would wiring the SQL query into the serving path require? |
 | Memory lifecycle/Temporal | `memory_temporal.py`, memory runbook | Hold, attempt erase, release, then erase | Which fact blocks crypto-erasure? |
+| Evaluation contracts | ADR 015, `evaluation.py` | Tamper suite/dataset/baseline/scorer | Which mismatch blocks promotion? |
+| Adversarial/recovery packs | `evals/suite.json`, Layer 10 tests | Reverse, shard, inject every fault point | Why are sleeps and random crashes insufficient evidence? |
+| Baseline governance | evaluation runbook | Expire/over-broaden a waiver | Which findings can never be waived? |
+| Framework comparison | Layer 10 metrics | Compare pinned custom Layer 11 | Which evaluator/governance code remains custom? |
 
 ## Practical exercises
 
@@ -172,6 +187,14 @@ After this layer, an engineer should be able to:
     query and prove it returns zero candidates; compare its scoring/prefilter design with
     custom Aegis Layer 10's live pgvector query and explain what wiring it into the
     production serving path would require.
+47. Attempt network and process escape from a fake evaluation executor and verify a
+    redacted evaluator failure with no destination or tenant value in the reports.
+48. Divide the corpus into four shards, reverse input order, and prove exact union,
+    disjointness, stable ordering, and byte-identical replay.
+49. Add a soft metric regression with a valid waiver, then expire it and attempt the
+    same waiver against a hard safety scorer.
+50. Change one governed fixture byte without updating provenance and verify loading
+    fails before application code runs.
 
 ## Assessment rubric
 

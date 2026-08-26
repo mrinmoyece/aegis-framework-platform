@@ -107,6 +107,29 @@
     serves durable checkpoint needs; another state owner would add operations and
     licensing decisions without value.
 
+**L10-1. Why is an evaluation report not production truth?**
+    It is versioned release evidence over synthetic fixtures and deterministic
+    adapters. Runtime state, authorization, approval, effects and audit still come
+    from their application authorities.
+
+**L10-2. Why can a quality average not compensate for one safety failure?**
+    Hard safety scorers use exact thresholds and are non-waivable. Every failed
+    canonical control produces a hard regression regardless of aggregate quality.
+
+**L10-3. How is a baseline update governed?**
+    The command requires a complete passing run, reviewer and reason. The baseline
+    binds exact suite, dataset, case set, scorer direction, threshold and tolerance.
+
+**L10-4. Why keep model judges out of required CI?**
+    They are probabilistic, provider/network dependent and vulnerable to the same
+    untrusted content. A future isolated judge can supplement reviewed labels but
+    cannot be the sole safety gate.
+
+**L10-5. Why retain custom evaluation code instead of adopting LangSmith/DeepEval?**
+    Domain invariants concern tenant authority, citations, budgets, approvals,
+    effects and recovery. Hosted or judge-oriented tools do not remove those
+    controls; neutral contracts keep CI offline and replaceable.
+
 ## Layer 2 identity, tenancy and durability
 
 25. **Why are verified token roles ignored?**

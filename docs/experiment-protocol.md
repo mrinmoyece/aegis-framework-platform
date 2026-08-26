@@ -155,3 +155,16 @@ Score each framework on:
 The [decision matrix](../comparison/decision-matrix.csv) and
 [parity manifest](../comparison/parity-manifest.json) are the machine-readable
 starting assets.
+## Layer 10 deterministic evaluation protocol
+
+Required release evidence uses only the repository's reviewed synthetic dataset,
+fixed suite clock/seed/fingerprints, deterministic adapters, one bounded case at a
+time, hard timeout, stable sorted selection/hash shards, and canonical reports.
+Run `make eval`, `eval-safety`, `eval-adversarial`, `eval-recovery`,
+`eval-baseline`, and `eval-meta`.
+
+PostgreSQL/pgvector and Temporal evidence is collected by their separate
+environment-gated integration jobs. Time skipping may use only a preinstalled
+Temporal test-server binary; no test may download it. Model judges, live providers,
+production records, sleeps, and random process termination are excluded from
+required CI. See ADR 015 and `docs/evaluation-runbook.md`.

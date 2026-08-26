@@ -164,6 +164,27 @@ Temporal LangGraph plugin is not used: per-node Temporal Activities would overla
 ownership and increase framework coupling. Interrupts are not used for approval or
 effects; any future non-authoritative pause must resume only through application intent.
 
+## Layer 6 specialist graph
+
+The static graph is `coordinator -> four specialists -> critic -> optional remediation
+planner -> verification agent -> coordinator decision`. The coordinator creates exactly
+four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
+parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
+checkpoint history. Application code provides the fixed role set, deny-by-default
+capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
+dispatch intent, result fencing, terminal decision, and all tenant authority.
+
+Every artifact is a frozen strict neutral envelope with schema version, tenant,
+incident, run and optional task linkage, producer role, ordinal, provenance digests,
+bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
+artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
+resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
+
+Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
+Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
+ownership and increase framework coupling. Interrupts are not used for approval or
+effects; any future non-authoritative pause must resume only through application intent.
+
 ## Three durable owners
 
 | Owner | Owns | Never authoritative for |
@@ -542,3 +563,30 @@ an existing sequence raises `IdempotencyConflict`; an out-of-order sequence rais
 table/class — so retrieval and context-build activity is now audit-observable alongside
 ingest, supersession, legal hold, and erasure, without ever carrying raw query text or
 content across the ledger boundary.
+# Layer 10 evaluation plane
+
+Evaluation is a release-evidence plane outside the application event stream:
+
+```text
+versioned synthetic dataset + suite/scorers + code/policy/framework fingerprints
+  -> hermetic EvaluationExecutorPort
+  -> real deterministic Layers 1-9 application scenarios
+  -> case results + bounded digest-only trace references
+  -> non-waivable safety thresholds + reviewed baseline/waivers
+  -> deterministic JSON / Markdown / JUnit
+  -> optional sanitized Langfuse publisher
+```
+
+The runner sorts case IDs, derives per-case seeds and result IDs from canonical
+digests, fixes the suite clock, denies network/process entry points, enforces one
+case at a time and a hard timeout, and uses stable hash sharding. Framework
+checkpoint/history references remain diagnostic digests and cannot become
+application truth. PostgreSQL/pgvector and Temporal qualification stay in separate
+environment-gated jobs.
+
+The suite/dataset/scorer/result/baseline/comparison/waiver/report contracts live in
+`evaluation.py`; the checked-in artifacts live under `evals/`. Dataset hash,
+provenance, license, consent, classification, retention, migration, quarantine,
+deletion and secret/PII scan are validated before execution. See
+[ADR 015](adr/015-governed-deterministic-evaluation.md) and the
+[evaluation runbook](evaluation-runbook.md).
