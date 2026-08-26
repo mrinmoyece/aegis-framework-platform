@@ -1,0 +1,37 @@
+[
+  {
+    "case_id": "success",
+    "scenario": "success",
+    "expected_status": "complete",
+    "expected_critic": "accepted",
+    "expected_reason": "corroborated_and_cited"
+  },
+  {
+    "case_id": "contradiction",
+    "scenario": "contradiction",
+    "expected_status": "abstained",
+    "expected_critic": "abstained",
+    "expected_reason": "specialist_contradiction"
+  },
+  {
+    "case_id": "prompt-injection",
+    "scenario": "prompt_injection",
+    "expected_status": "abstained",
+    "expected_critic": "abstained",
+    "expected_reason": "untrusted_instruction_detected"
+  },
+  {
+    "case_id": "budget-exhaustion",
+    "scenario": "budget_exhaustion",
+    "expected_status": "abstained",
+    "expected_critic": "abstained",
+    "expected_reason": "tenant_budget_exhausted"
+  },
+  {
+    "case_id": "tenant-isolation",
+    "scenario": "tenant_isolation",
+    "expected_status": "complete",
+    "expected_critic": "accepted",
+    "expected_reason": "corroborated_and_cited"
+  }
+]

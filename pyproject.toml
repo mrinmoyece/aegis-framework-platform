@@ -1,0 +1,123 @@
+[build-system]
+requires = ["hatchling==1.32.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aegis-framework-platform"
+version = "0.1.0"
+description = "Framework-first enterprise checkout incident investigation"
+readme = "README.md"
+requires-python = ">=3.13,<3.15"
+license = "MIT"
+authors = [{ name = "Mrinmoy" }]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Framework :: FastAPI",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = [
+  "fastapi==0.141.1",
+  "langchain-core==1.5.5",
+  "langgraph==1.2.11",
+  "opentelemetry-api==1.44.0",
+  "opentelemetry-sdk==1.44.0",
+  "pydantic==2.13.4",
+  "uvicorn==0.52.3",
+]
+
+[project.optional-dependencies]
+framework-observability = [
+  "langfuse==4.14.4",
+  "opentelemetry-exporter-otlp-proto-http==1.44.0",
+]
+postgres = [
+  "langgraph-checkpoint-postgres==3.1.2",
+  "psycopg[binary,pool]==3.3.4",
+]
+
+[dependency-groups]
+dev = [
+  "bandit==1.9.4",
+  "httpx2==2.10.0",
+  "mypy==2.3.0",
+  "pip-audit==2.10.1",
+  "pre-commit==4.6.2",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.16.3",
+]
+
+[project.scripts]
+aegis-framework = "aegis_framework.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aegis_framework"]
+
+[tool.uv]
+required-version = "==0.12.5"
+
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+  "ASYNC",
+  "B",
+  "DTZ",
+  "E",
+  "F",
+  "I",
+  "PERF",
+  "PT",
+  "RUF",
+  "S",
+  "SIM",
+  "UP",
+  "W",
+]
+ignore = [
+  "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["DTZ001", "S101", "S105", "S106"]
+"tools/**/*.py" = ["T201"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["aegis_framework"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+packages = ["aegis_framework"]
+mypy_path = "src"
+warn_unreachable = true
+
+[tool.pytest.ini_options]
+addopts = [
+  "--strict-config",
+  "--strict-markers",
+  "--cov=aegis_framework",
+  "--cov-branch",
+  "--cov-report=term-missing:skip-covered",
+  "--cov-fail-under=90",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["aegis_framework"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+skip_covered = true
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]

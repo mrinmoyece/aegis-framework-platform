@@ -1,0 +1,28 @@
+{
+  "dependencies": {
+    "direct_development": 8,
+    "direct_optional": 4,
+    "direct_runtime": 7,
+    "locked_total": 104
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "Darwin",
+    "python": "3.14.7"
+  },
+  "measured_at": "2026-08-15T08:49:32.913782+00:00",
+  "runtime": {
+    "median_ms": 1.668,
+    "network": false,
+    "p95_ms": 2.053,
+    "runs": 50,
+    "scenario": "deterministic-success"
+  },
+  "schema_version": 1,
+  "source_loc": {
+    "definition": "non-blank, non-comment physical Python lines",
+    "production": 2339,
+    "tests": 1050,
+    "total": 3389
+  }
+}

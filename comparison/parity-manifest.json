@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "comparison_target": "mrinmoyece/aegis-agent-platform",
+  "scenario": "checkout-failure-incident-response",
+  "layer": 1,
+  "generated_on": "2026-08-15",
+  "status_definitions": {
+    "delivered": "Runnable and tested in this layer",
+    "partial": "A boundary or deterministic subset exists; enterprise completion is explicit",
+    "planned": "No runnable implementation in this layer",
+    "not-applicable": "Deliberately outside the compared product"
+  },
+  "capabilities": [
+    {
+      "id": "01-platform-foundation",
+      "name": "Platform foundation",
+      "status": "delivered",
+      "evidence": ["pyproject.toml", "src/aegis_framework", "tests", ".github/workflows/ci.yml"],
+      "framework_owned": ["graph scheduling", "API validation mechanics"],
+      "enterprise_owned": ["authority boundaries", "release policy"]
+    },
+    {
+      "id": "02-tenant-identity-authorization",
+      "name": "Tenant identity and authorization",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/domain.py", "src/aegis_framework/adapters.py"],
+      "framework_owned": [],
+      "enterprise_owned": ["identity", "policy", "tenant enforcement"]
+    },
+    {
+      "id": "03-durable-event-ledger",
+      "name": "Durable PostgreSQL event ledger",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/postgres.py", "compose.yaml"],
+      "framework_owned": ["graph checkpoints"],
+      "enterprise_owned": ["audit", "idempotency", "RLS", "retention"]
+    },
+    {
+      "id": "04-distributed-worker-runtime",
+      "name": "Distributed worker runtime",
+      "status": "planned",
+      "evidence": ["docs/roadmap.md"],
+      "framework_owned": [],
+      "enterprise_owned": ["leases", "work ownership", "backpressure"]
+    },
+    {
+      "id": "05-provider-neutral-model-gateway",
+      "name": "Provider-neutral model gateway",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/ports.py", "src/aegis_framework/model.py"],
+      "framework_owned": ["structured graph node invocation"],
+      "enterprise_owned": ["provider policy", "quotas", "credentials", "schema validation"]
+    },
+    {
+      "id": "06-evidence-connectors-correlation",
+      "name": "Durable evidence connectors and correlation",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/fixtures.py", "src/aegis_framework/safety.py"],
+      "framework_owned": [],
+      "enterprise_owned": ["tenant scoping", "provenance", "source signatures"]
+    },
+    {
+      "id": "07-specialist-orchestration",
+      "name": "Governed durable specialist orchestration",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/graph.py", "tests/test_graph.py"],
+      "framework_owned": ["fan-out", "fan-in", "reducers", "checkpoints"],
+      "enterprise_owned": ["policy", "budget", "citation rules", "run idempotency"]
+    },
+    {
+      "id": "08-approval-remediation",
+      "name": "Approval-gated remediation actions",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/adapters.py", "tests/test_adapters_and_service.py"],
+      "framework_owned": [],
+      "enterprise_owned": ["proposal", "approval", "fencing", "effects", "verification"]
+    },
+    {
+      "id": "09-sandbox-execution",
+      "name": "Hardened sandbox execution",
+      "status": "planned",
+      "evidence": ["docs/roadmap.md"],
+      "framework_owned": [],
+      "enterprise_owned": ["isolation", "egress", "credentials", "resource limits"]
+    },
+    {
+      "id": "10-memory-pgvector-rag",
+      "name": "Event-grounded memory and pgvector RAG",
+      "status": "planned",
+      "evidence": ["compose.yaml", "docs/adr/004-postgresql-without-redis.md"],
+      "framework_owned": [],
+      "enterprise_owned": ["tenant filtering", "provenance", "relevance policy"]
+    },
+    {
+      "id": "11-enterprise-evaluation-gates",
+      "name": "Deterministic enterprise evaluation gates",
+      "status": "partial",
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py"],
+      "framework_owned": ["optional Langfuse evaluator observations"],
+      "enterprise_owned": ["case equivalence", "release thresholds"]
+    },
+    {
+      "id": "12-observability-replay",
+      "name": "Observability and replay",
+      "status": "partial",
+      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/langfuse_adapter.py"],
+      "framework_owned": ["OTel spans", "Langfuse view", "checkpoint history"],
+      "enterprise_owned": ["redaction", "cardinality", "audit replay", "retention"]
+    },
+    {
+      "id": "13-operator-workspace-bff",
+      "name": "Secure operator workspace and BFF",
+      "status": "planned",
+      "evidence": ["src/aegis_framework/api.py", "docs/roadmap.md"],
+      "framework_owned": ["FastAPI delivery"],
+      "enterprise_owned": ["authentication", "session security", "review UX"]
+    },
+    {
+      "id": "14-mcp-a2a-interoperability",
+      "name": "Secure MCP and A2A interoperability",
+      "status": "planned",
+      "evidence": ["docs/roadmap.md"],
+      "framework_owned": [],
+      "enterprise_owned": ["capability grants", "tool identity", "effect policy"]
+    },
+    {
+      "id": "15-production-deployment",
+      "name": "Production deployment foundations",
+      "status": "partial",
+      "evidence": ["Dockerfile", "compose.yaml", ".github/workflows"],
+      "framework_owned": ["dependency build tooling"],
+      "enterprise_owned": ["provenance", "admission", "secrets", "HA", "DR"]
+    },
+    {
+      "id": "16-enterprise-qualification",
+      "name": "Final enterprise qualification",
+      "status": "partial",
+      "evidence": ["docs/threat-model.md", "docs/limitations.md", "docs/experiment-protocol.md"],
+      "framework_owned": [],
+      "enterprise_owned": ["security", "privacy", "legal", "load", "chaos", "DR sign-off"]
+    }
+  ]
+}

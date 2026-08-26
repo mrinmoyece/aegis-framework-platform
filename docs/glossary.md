@@ -1,0 +1,94 @@
+# Glossary
+
+**Abstention**
+A deliberate non-answer when evidence, budget, validation, or corroboration is
+insufficient. It is not a successful empty investigation.
+
+**A2A**
+Agent-to-Agent protocol work, deferred until official stable SDKs can be placed behind
+identity and capability controls.
+
+**Approval boundary**
+An application-owned service that turns a proposal into a separately governed
+pending/approved/rejected record. Graph output cannot cross it by assignment.
+
+**Checkpoint**
+Framework persistence of graph state at execution boundaries. Useful for resumption;
+not authorization, audit, idempotency, or an effect receipt.
+
+**Citation**
+The evidence ID, locator, and content hash attached to a finding/hypothesis and
+validated against evidence collected for the run.
+
+**Critic**
+The deterministic join node that checks injection flags, specialist availability,
+citations, contradictions, and corroboration before producing a proposal.
+
+**Effect**
+A mutation of an external/production system. Layer 1 has no enabled effect.
+
+**Enterprise-owned control**
+Policy, tenant isolation, budget, idempotency, approval, effect fencing, verification,
+reconciliation, or audit whose authority cannot be delegated to an agent framework.
+
+**Evidence projection**
+Conversion of untrusted source records into a minimal, allowlisted structured view for
+a model adapter.
+
+**Fencing token**
+A monotonically governed token proving an effect worker still owns authority. It
+prevents stale workers acting after a lease/approval changes; deferred.
+
+**Framework-owned state**
+Node progress, intermediate channels, checkpoint metadata, trace data, and other
+mechanics managed by LangGraph/Langfuse/Temporal.
+
+**Idempotency**
+Application behavior ensuring retries/duplicates with the same tenant/request/input do
+not duplicate work, while conflicting input is rejected.
+
+**Langfuse**
+The selected optional framework trace/eval backend. Layer 1 uses manual minimized
+observations rather than automatic graph capture.
+
+**LangGraph**
+The selected bounded investigation graph framework, using static topology,
+super-steps, reducers, and checkpoints.
+
+**LangSmith**
+LangChain's commercial tracing/evaluation platform. Its client is transitive, but the
+platform is not configured because it would duplicate Langfuse.
+
+**MCP**
+Model Context Protocol. Tool interoperability is deferred until identity, capability,
+and effect boundaries can govern it.
+
+**Pregel / super-step**
+LangGraph's bulk-synchronous execution model: runnable parallel nodes execute within a
+super-step and joins proceed after required branch updates arrive.
+
+**Proposal**
+Non-authoritative suggested remediation. It always requires separate approval.
+
+**Reconciliation**
+Independent comparison of intended and observed external state after an effect;
+deferred.
+
+**RLS**
+PostgreSQL row-level security. Required for production tenant data, not supplied by
+framework checkpoints.
+
+**Structured model port**
+Provider-neutral interface that accepts a typed specialist task and returns output
+that must pass domain validation.
+
+**Temporal**
+A durable workflow engine deferred until long-running approvals/effects need replay
+across process boundaries.
+
+**Tenant bucket**
+A bounded hash bucket exported for aggregate telemetry instead of a tenant identifier.
+
+**Verification**
+Evidence-based check that a controlled effect achieved its intended outcome. Layer 1
+does not execute this journey stage.
