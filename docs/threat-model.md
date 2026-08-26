@@ -247,3 +247,13 @@ The checked-in production digest is an offline render fixture and must not be pr
 No source commit signature, real cloud apply, managed failover, production PKI,
 load/chaos, on-call, penetration, accessibility, or compliance effectiveness claim is
 made.
+# Layer 15 qualification threats
+
+Qualification artifacts are derived and non-authoritative. A forged green report,
+timing manipulation, skipped environment gate, stale readiness status or framework
+checkpoint must not approve a release or effect. CI runs fixed local inputs, validates
+machine manifests, emits no identity/evidence/prompt fields and keeps live blockers
+explicit. The executable attack-family map is
+`qualification/adversarial-assessment.json`; residual risk is
+`qualification/residual-risks.json`. Independent penetration and live control
+effectiveness remain required.

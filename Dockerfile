@@ -12,6 +12,7 @@ RUN npm run build
 
 FROM ${PYTHON_IMAGE} AS builder
 ENV UV_COMPILE_BYTECODE=1 \
+    UV_COMPILE_BYTECODE_TIMEOUT=180 \
     UV_LINK_MODE=copy
 WORKDIR /app
 RUN python -m pip install --no-cache-dir uv==0.12.5
@@ -28,7 +29,7 @@ RUN ln -sf /usr/bin/python .venv/bin/python \
 
 FROM ${PYTHON_RUNTIME_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/mrinmoyece/aegis-framework-platform" \
-      org.opencontainers.image.description="Aegis framework-first governed Layer 14"
+      org.opencontainers.image.description="Aegis framework-first governed Layer 15"
 ENV PATH="/app/.venv/bin:${PATH}" \
     AEGIS_MIGRATIONS_DIR="/app/migrations" \
     LANGGRAPH_STRICT_MSGPACK=true \
@@ -43,4 +44,5 @@ USER 10001:10001
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)"]
-CMD ["uvicorn", "aegis_framework.api:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+ENTRYPOINT ["aegis-framework"]
+CMD ["serve", "--host", "0.0.0.0", "--port", "8000"]

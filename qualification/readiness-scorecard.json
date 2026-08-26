@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "owner": "platform-engineering",
+  "approver": "platform-security",
+  "date": "2026-08-15",
+  "slo_gates_passed": true,
+  "security_sign_off": false,
+  "items": [
+    {
+      "id": "canonical-checkout",
+      "status": "Locally Verified",
+      "owner": "platform-engineering",
+      "blocking": false,
+      "evidence": [
+        "make qualification",
+        "build/qualification/evidence.json"
+      ]
+    },
+    {
+      "id": "cross-layer-security",
+      "status": "Locally Verified",
+      "owner": "platform-security",
+      "blocking": false,
+      "evidence": [
+        "make qualification",
+        "make security"
+      ]
+    },
+    {
+      "id": "local-postgres-pgvector",
+      "status": "Environment-Gated",
+      "owner": "data-platform",
+      "blocking": false,
+      "evidence": [
+        "make integration"
+      ]
+    },
+    {
+      "id": "local-temporal",
+      "status": "Environment-Gated",
+      "owner": "workflow-platform",
+      "blocking": false,
+      "evidence": [
+        "make temporal-integration"
+      ]
+    },
+    {
+      "id": "browser-acceptance",
+      "status": "Environment-Gated",
+      "owner": "operator-experience",
+      "blocking": false,
+      "evidence": [
+        "make frontend-ci frontend-e2e"
+      ]
+    },
+    {
+      "id": "production-oidc-pki-rotation",
+      "status": "Live Evidence Required",
+      "owner": "identity-platform",
+      "blocking": true,
+      "evidence": [
+        "docs/operational-acceptance.md#go-live-gates"
+      ]
+    },
+    {
+      "id": "managed-postgres-restore-failover",
+      "status": "Live Evidence Required",
+      "owner": "data-platform",
+      "blocking": true,
+      "evidence": [
+        "docs/backup-restore-dr.md"
+      ]
+    },
+    {
+      "id": "temporal-cloud-failover-upgrade",
+      "status": "Live Evidence Required",
+      "owner": "workflow-platform",
+      "blocking": true,
+      "evidence": [
+        "docs/runbooks/temporal-worker-rollout.md"
+      ]
+    },
+    {
+      "id": "provider-connector-partner-qualification",
+      "status": "Live Evidence Required",
+      "owner": "integrations",
+      "blocking": true,
+      "evidence": [
+        "docs/connector-runbook.md",
+        "docs/protocol-runbook.md"
+      ]
+    },
+    {
+      "id": "sandbox-runtime-isolation",
+      "status": "Live Evidence Required",
+      "owner": "sandbox-platform",
+      "blocking": true,
+      "evidence": [
+        "docs/sandbox-runbook.md"
+      ]
+    },
+    {
+      "id": "production-load-chaos-slo-oncall",
+      "status": "Live Evidence Required",
+      "owner": "sre",
+      "blocking": true,
+      "evidence": [
+        "docs/operational-acceptance.md"
+      ]
+    },
+    {
+      "id": "penetration-accessibility-privacy-legal",
+      "status": "Live Evidence Required",
+      "owner": "risk-and-compliance",
+      "blocking": true,
+      "evidence": [
+        "docs/compliance-evidence.md"
+      ]
+    },
+    {
+      "id": "active-active-multi-region",
+      "status": "Deferred",
+      "owner": "architecture",
+      "blocking": false,
+      "evidence": [
+        "docs/capacity-and-multi-region.md"
+      ]
+    }
+  ]
+}

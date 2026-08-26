@@ -551,3 +551,10 @@ Now simulate regional recovery with `build/restore-drill.json`. It verifies cont
 cursor/aggregate sequence, dual hashes, a one-step generation advance, derived-state
 rebuild requirements, and Temporal/outbox/effect reconciliation. It deliberately reports
 `cloud_apply_performed=false` and `live_managed_failover_performed=false`.
+# Layer 15 walkthrough
+
+Run `make qualification`, then compare `build/qualification/evidence.json`,
+`chaos.json` and `performance.json` with the source manifests under `qualification/`.
+Trace one successful checkout through budget reservation, evidence, LangGraph,
+proposal-only agent output, two-person approval, effect reconciliation, memory and
+application replay. Continue with the [15/30/60-minute demos](demo-layer15.md).

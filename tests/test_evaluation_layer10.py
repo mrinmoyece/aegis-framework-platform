@@ -120,11 +120,24 @@ def test_every_fault_cut_point_converges_without_unsafe_effects() -> None:
     assert {item.canonical_digest for item in first} == {
         item.canonical_digest for item in replayed
     }
+    assert all(item.fault_injected for item in first)
     assert all(item.converged for item in first)
     assert all(item.unauthorized_effects == 0 for item in first)
     assert all(item.stale_effects == item.duplicate_effects == 0 for item in first)
+    assert all(item.recovery_verified for item in first)
     assert all(item.cleanup_complete and item.audit_complete for item in first)
     assert all(item.tenant_isolated for item in first)
+
+
+def test_fault_scenario_rejects_missing_injection_budget() -> None:
+    with pytest.raises(
+        ValueError, match="fault occurrence exceeds recovery attempt budget"
+    ):
+        run_fault_scenario(
+            FaultPlan(
+                fault_point=FaultPoint.EFFECT, occurrence=2, maximum_attempts=1, seed=7
+            )
+        )
 
 
 def test_runner_is_repeatable_order_independent_and_shard_stable(

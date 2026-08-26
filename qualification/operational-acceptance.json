@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "accepted_for_production": false,
+  "phases": [
+    {"id": "day-0", "owner": "release-commander", "commands": ["make ci", "make security", "make container", "make qualification"], "rollback": "Stop promotion and retain the prior immutable digest."},
+    {"id": "day-1", "owner": "primary-on-call", "commands": ["make restore-drill", "make temporal-integration", "make integration"], "rollback": "Fence new work, drain workers and reconcile pending intent."},
+    {"id": "day-2", "owner": "service-owner", "commands": ["make frontend-e2e", "make protocol", "make eval"], "rollback": "Disable affected tenant/source/peer and preserve ledger evidence."}
+  ]
+}

@@ -690,14 +690,35 @@ class InMemoryDurability:
         run_id: str,
         event_type: str,
     ) -> dict[str, JsonValue] | None:
-        events = self.events(
+        maximum_events = 10_000
+        after_cursor = 0
+        scanned = 0
+        latest: dict[str, JsonValue] | None = None
+        while scanned < maximum_events:
+            page_limit = min(500, maximum_events - scanned)
+            page = self.events(
+                tenant_id=tenant_id,
+                aggregate_type="investigation",
+                aggregate_id=run_id,
+                after_cursor=after_cursor,
+                limit=page_limit,
+            )
+            for event in page:
+                if event.event_type == event_type:
+                    latest = dict(event.payload)
+            scanned += len(page)
+            if len(page) < page_limit:
+                return latest
+            after_cursor = page[-1].tenant_cursor
+        if self.events(
             tenant_id=tenant_id,
             aggregate_type="investigation",
             aggregate_id=run_id,
-            limit=500,
-        )
-        matched = [event for event in events if event.event_type == event_type]
-        return dict(matched[-1].payload) if matched else None
+            after_cursor=after_cursor,
+            limit=1,
+        ):
+            raise IntegrityFailure("activity artifact scan exceeds the event bound")
+        return latest
 
     def accept_signal(
         self,
@@ -1014,7 +1035,8 @@ class InMemoryDurability:
                 ).encode()
             ).hexdigest()
             if (
-                event.event_id in seen
+                event.schema_version != 1
+                or event.event_id in seen
                 or event.aggregate_sequence != aggregate.sequence + 1
                 or event.tenant_cursor != tenant_head.cursor + 1
                 or event.aggregate_previous_hash != aggregate.record_hash
@@ -1081,7 +1103,8 @@ class InMemoryDurability:
                 ).encode()
             ).hexdigest()
             if (
-                event.aggregate_sequence != aggregate_sequence + 1
+                event.schema_version != 1
+                or event.aggregate_sequence != aggregate_sequence + 1
                 or event.aggregate_previous_hash != aggregate_hash
                 or event.tenant_previous_hash != previous_tenant_hash
                 or event.record_hash != expected

@@ -493,8 +493,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.14.0",
-        description="Authenticated Layer 14 operations and interoperability API.",
+        version="0.15.0",
+        description="Authenticated Layer 15 enterprise qualification API.",
         default_response_class=JSONResponse,
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
@@ -848,6 +848,12 @@ def create_app(
         identity: IdentityContext = Depends(authenticated),
     ) -> ApprovalApiView:
         approvals = _require_approvals(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.REMEDIATION_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
         try:
             view = approvals.get(identity, approval_id=approval_id)
         except PolicyDenied:
@@ -1348,6 +1354,12 @@ def create_app(
         identity: IdentityContext = Depends(authenticated),
     ) -> DurableRunResponse:
         durable = _require_durable(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.PROJECTION_REBUILD,
+            resource_tenant_id=identity.tenant_id,
+        )
         # Persist audit intent before mutation (intent-before-side-effect).
         _audit_operational_access(
             selected_runtime,

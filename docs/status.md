@@ -287,3 +287,23 @@ Cloud namespace/PrivateLink/failover, RDS PITR/cross-account restore, second reg
 PKI/secret rotation, CNI/proxy/admission/Kata enforcement, production OIDC/session,
 provider/connector/peer traffic, load/chaos, SLO/on-call, penetration/accessibility,
 legal/privacy review, and compliance certification remain deferred.
+
+# Layer 15 enterprise qualification status
+
+## Delivered
+
+- one machine-runnable canonical checkout qualification over real application/eval
+  paths, application ledger replay and projection convergence;
+- all 58 governed cross-layer cases, eleven adversarial families, all 17 deterministic
+  fault contract points with mapped real-path cases, and twelve bounded capacity profiles;
+- explicit authorization, durable parity, schema-integrity and fixture-role hardening;
+- no-score readiness scorecard, exact residual-risk owners/expiry/fail-closed response,
+  operational acceptance, compliance mapping, demos and custom Layer 16 comparison;
+- a dedicated CI qualification job and artifacts while preserving every existing gate.
+
+## Not proven
+
+Production readiness remains false. Live identity/PKI, managed PostgreSQL and Temporal
+recovery, provider/connector/partner operation, enforced sandbox isolation, production
+load/chaos/SLO/on-call, signed protected promotion, independent security/accessibility/
+privacy/legal review and certification remain hard gates.

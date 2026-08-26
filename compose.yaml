@@ -30,9 +30,12 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${AEGIS_KEYCLOAK_ADMIN_USERNAME:-local-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${AEGIS_KEYCLOAK_ADMIN_PASSWORD:-change-me-before-use}
+      KC_HTTP_MANAGEMENT_HEALTH_ENABLED: "false"
+      JAVA_OPTS_KC_HEAP: "-Xms128m -Xmx384m"
+      JAVA_OPTS_APPEND: "-XX:ActiveProcessorCount=2"
     ports:
       - "127.0.0.1:${AEGIS_KEYCLOAK_PORT:-58080}:8080"
-    read_only: true
+    # The local start-dev profile performs Quarkus augmentation on first boot.
     tmpfs:
       - /opt/keycloak/data:size=256m,mode=1770
       - /tmp:size=32m,mode=1777

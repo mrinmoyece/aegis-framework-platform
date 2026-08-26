@@ -208,6 +208,24 @@
   SLOs, UI, MCP/A2A, deployment, and final load/chaos certification remain deferred.
 
 These are explicit non-production boundaries, not implied capabilities.
+
+# Layer 15 qualification limitations
+
+- The canonical journey uses deterministic fakes and in-memory application persistence;
+  real PostgreSQL/pgvector and Temporal use separate fresh-service gates.
+- The 58-case catalog is smaller than custom Aegis Layer 16's pinned 127-case catalog.
+  Equivalent axes are compared; case-count parity is not claimed.
+- Local p50/p95/p99 values use few serial samples on unnormalized CI/developer hosts.
+  They are regression thresholds, not capacity forecasts, SLO evidence or cross-repo
+  latency comparisons.
+- Deterministic fault count/convergence fields are a labeled contract-model simulation;
+  real-path eval cases provide regression signal, not process, network, node, zone,
+  region or managed-service chaos.
+- UI, restore, infrastructure, supply-chain and adapter gates remain separate commands;
+  `make qualification` does not falsely mark absent environments green.
+- No live production effect, credential, provider, connector, peer or tenant data is
+  used. Penetration, accessibility, privacy/legal, on-call and certification evidence
+  remain external hard gates.
 # Layer 11 observability limitations
 
 - Local Collector, Prometheus and Grafana Compose services prove configuration and

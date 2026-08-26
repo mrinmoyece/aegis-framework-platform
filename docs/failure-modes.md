@@ -211,3 +211,16 @@ blind re-embedding under a stale version.
 MCP/A2A SDK retries do not own application retry. Temporal retries whole Activities with
 the same operation, idempotency and fence. An ambiguous peer outcome is observed before
 any new network attempt.
+# Layer 15 qualification failure modes
+
+- A failed journey, eval, chaos invariant, performance budget or manifest validation
+  fails `make qualification`; do not regenerate baselines or loosen budgets to pass.
+- Missing PostgreSQL, Temporal, browser or restore services leave the named item
+  environment-gated; a skip is not evidence.
+- Timing regression is a CI signal, not production SLO failure. Reproduce on comparable
+  hardware before changing a budget.
+- Report loss is not application data loss. Re-run from source events/manifests.
+- A readiness blocker cannot be cleared by an aggregate score or documentation-only
+  status change.
+- Production chaos that risks unauthorized effects, tenant isolation or unreconciled
+  ambiguity must stop and fence new work.

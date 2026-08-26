@@ -1,0 +1,40 @@
+{
+    "schema_version": 1,
+    "risks": [
+        {
+            "id": "R15-001",
+            "risk": "Application HTTP rate limiting is not implemented; ingress and tenant quotas remain required.",
+            "owner": "platform-security",
+            "expires_on": "2026-09-17",
+            "fail_closed": "Do not expose the API without reviewed ingress limits and tenant quota evidence."
+        },
+        {
+            "id": "R15-002",
+            "risk": "PostgreSQL and Temporal adapter modules remain excluded from aggregate unit-test coverage accounting.",
+            "owner": "quality-engineering",
+            "expires_on": "2026-09-17",
+            "fail_closed": "Require their dedicated environment-backed suites before promotion."
+        },
+        {
+            "id": "R15-003",
+            "risk": "Local timing profiles do not measure networked services, noisy neighbors or production scale.",
+            "owner": "sre",
+            "expires_on": "2026-09-17",
+            "fail_closed": "Block production capacity approval until representative environment evidence exists."
+        },
+        {
+            "id": "R15-004",
+            "risk": "Current vulnerability waivers expire on 2026-09-17 and depend on upstream no-fix status.",
+            "owner": "platform-security",
+            "expires_on": "2026-09-17",
+            "fail_closed": "Supply-chain verification rejects expiry, a published fix, unused waivers or mismatched findings."
+        },
+        {
+            "id": "R15-005",
+            "risk": "Independent penetration, accessibility, privacy, legal and compliance effectiveness reviews are absent.",
+            "owner": "risk-and-compliance",
+            "expires_on": "2026-09-17",
+            "fail_closed": "Readiness remains blocked and no certification claim is permitted."
+        }
+    ]
+}
