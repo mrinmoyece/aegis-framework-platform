@@ -18,6 +18,10 @@ from aegis_framework.remediation_demo import (
 
 _DEFAULT_BEARER = "demo-responder-token"
 
+_DEFAULT_BEARER = "demo-responder-token"
+
+_DEFAULT_BEARER = "demo-responder-token"
+
 
 def _headers(
     *,

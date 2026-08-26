@@ -28,7 +28,14 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | Instructor | 1.16.0 evaluated, not installed | Validation/retry wrapper | Structured parsing/repair | Policy/budget/ledger still remain | Reject: version/retry overlap |
 | LangChain provider interfaces | 1.5.1 evaluated, not installed | LangChain messages/tracing/tokenizer | Provider runnable wrappers | Enterprise controls still remain | Reject: coupling without control removal |
 | Portkey/OpenRouter | Not installed | External gateway/SaaS | Hosted routing/retry/cost UI | Application truth and privacy controls | Reject: external authority/trace/retry plane |
-| pgvector/RAG | Deferred | Extension/index | Vector search | Tenant/provenance/relevance | `EvidencePort` |
+| pgvector (PostgreSQL extension) | 0.8.x local digest | PostgreSQL extension | `vector` column type/cast, distance operators | Retrieval scoring/prefilters, tenant/provenance scoping, application wiring | Select: raw SQL write path plus live `hybrid_candidates` query; not yet wired into serving path |
+| LangGraph `Store`/long-term memory | 1.2.11 evaluated, not installed | Embedded checkpointer-adjacent store | Namespaced key/value put/search helpers | Retention, legal hold, citations, tenancy, erasure, audit | Reject: framework store as authority for durable memory |
+| LangChain vector stores/retrievers/text splitters | 1.5.1/0.4.x evaluated, not installed | Broad abstraction + provider-specific stores | Generic `VectorStore`/`Retriever`/splitter interfaces | Tenant/citation/retention/erasure controls still remain | Reject: overlap without control removal; opaque splitter/store semantics |
+| LlamaIndex (index/query engine) | 0.14.x evaluated, not installed | Broad indexing/query framework + optional hosted services | Index construction/query-engine orchestration | All enterprise controls remain | Reject: overlap without control removal; heavy dependency surface |
+| Haystack | 2.x evaluated, not installed | Pipeline/component framework + optional hosted services | Pipeline/component orchestration for RAG | All enterprise controls remain | Reject: overlap with LangGraph/application ports without control removal |
+| pgvector-python client | 0.4.x evaluated, not installed | psycopg/asyncpg adapter registration | Vector type adaptation convenience | Raw `%s::vector` cast already sufficient; no new control removed | Reject: unnecessary dependency for a two-line cast |
+| Embedding abstraction libraries (e.g. provider-agnostic embedding SDKs) | Evaluated, not installed | Additional provider abstraction layer | Unified embed-call surface | `EmbeddingPort` already provides this seam; no real provider shipped either way | Reject: no control removed while adding a dependency and a second abstraction over the same port |
+| pgvector/RAG | Selected | Extension/index | Durable embedding write path plus live forced-RLS hybrid SQL query (store-tested) | Serving-path wiring, tenant/provenance/relevance benchmarking at scale, legal hold | `EmbeddingPort`/`MemoryReadPort`; see ADR 014 |
 | PyGithub | 2.9.1 evaluated, not installed | Requests/urllib3/PyNaCl | GitHub object/pagination wrappers | All Layer 5 controls remain | Reject: non-official and obscures call controls |
 | githubkit | 0.16.1 evaluated, not installed | HTTPX/cache/generated schemas | GitHub generated API | All Layer 5 controls remain | Reject: non-official and excess surface |
 | LangChain community loaders | 0.4.2 evaluated, not installed | Broad loader/network stack | Loader dispatch | Trust/provenance/sandbox remain | Reject: sunset/overlap |
@@ -151,6 +158,8 @@ Escape hatches:
 - PyJWT/IdP: `AuthenticatorPort` + standard JWT/JWK/OIDC;
 - Langfuse: `ObservabilityPort` + OpenTelemetry.
 - OpenAI/Anthropic: `ModelProviderAdapter` + neutral `ModelRequest`/`ProviderResult`.
+- pgvector/memory: `EmbeddingPort`/`SummarizationPort`/`MemoryReadPort` + immutable
+  `memory_facts` replay; the raw `vector` cast is portable PostgreSQL, not a vendor SDK.
 
 ## Primary sources
 
@@ -412,3 +421,110 @@ availability, vendor image/build identity, network-policy semantics, region/rete
 attestation, SLA and incident-response dependencies. Daytona needs renewed diligence
 after its public core moved private. None is represented as a drop-in production security
 claim, and no live managed-service benchmark is presented.
+
+# Layer 9 memory framework decision
+
+The selected production-shaped adapter is direct pgvector SQL (raw `%s::vector` casts,
+forced RLS, immutability triggers over `memory_facts`/`memory_chunks`) plus the already
+selected LangGraph (bounded context building only), Temporal (`aegis.memory.v1` durable
+ingest/compact/purge/rebuild Activities) and Pydantic (immutable `MemoryRecord`/`MemoryFact`
+contracts). No new memory/RAG framework or vector-store abstraction is added. Full
+rationale, rejected alternatives and primary sources are in
+[ADR 014](adr/014-pgvector-sql-event-grounded-memory.md).
+
+| Option | Useful mechanics | Decision |
+|---|---|---|
+| Direct pgvector SQL (`vector` column, raw cast) | Durable embedding storage, forced RLS, immutability triggers, no ORM/abstraction indirection, plus a live `hybrid_candidates` hybrid-scoring query | Selected; store-level query implemented and integration-tested, not yet wired into the serving path |
+| LangGraph `Store`/long-term memory | Namespaced key/value put/search helpers | Rejected: framework store as durable authority for tenancy, retention, legal hold, citations, erasure |
+| LangChain vector stores/retrievers/text splitters | Generic `VectorStore`/`Retriever`/splitter interfaces | Rejected: overlap without control removal; opaque store/splitter semantics; still requires all enterprise controls |
+| LlamaIndex | Index construction/query-engine orchestration | Rejected: overlap without control removal; heavy dependency surface |
+| Haystack | Pipeline/component framework for RAG | Rejected: overlap with LangGraph/application ports without control removal |
+| pgvector-python client | Vector type adaptation convenience for psycopg/asyncpg | Rejected: unnecessary dependency for a two-line raw cast already covered by psycopg |
+| Embedding abstraction libraries | Unified embed-call surface across providers | Rejected: `EmbeddingPort` already provides this seam; no real provider ships either way |
+
+This does not claim a qualified, production-serving live pgvector retrieval path.
+`PostgresMemoryStore.hybrid_candidates` implements and integration-tests a live
+forced-RLS SQL query combining cosine ANN distance, lexical `ts_rank_cd`, and
+recency/quality scoring with ACL/classification/time/retention prefilters, including a
+cross-tenant/classification isolation assertion — but it is proven at the store layer
+only. `MemoryRetrievalService`/`InMemoryMemoryControl` and `/v1/memories/retrieve` still
+serve from `InMemoryHybridIndex`; wiring `hybrid_candidates` into that live path remains
+explicit future work rather than an implicit capability.
+
+Primary references (accessed 2026-08-17): [LangGraph persistence/Store](https://docs.langchain.com/oss/python/langgraph/persistence),
+[LangChain vector stores](https://python.langchain.com/docs/concepts/vectorstores/),
+[LangChain retrievers](https://python.langchain.com/docs/concepts/retrievers/),
+[LangChain PGVector integration](https://python.langchain.com/docs/integrations/vectorstores/pgvector/),
+[LangChain text splitters](https://python.langchain.com/docs/concepts/text_splitters/),
+[LlamaIndex](https://docs.llamaindex.ai/en/stable/),
+[Haystack](https://docs.haystack.deepset.ai/docs/intro),
+[pgvector-python](https://github.com/pgvector/pgvector-python),
+[pgvector extension](https://github.com/pgvector/pgvector),
+[psycopg adapt](https://www.psycopg.org/psycopg3/docs/advanced/adapt.html).
+
+## Framework Layer 9 versus custom Aegis Layer 10
+
+The pinned custom comparison is
+`mrinmoyece/aegis-agent-platform@c9474184af756ce93d19d86360c339541e8263fb`
+on `mrinmoyece-aegis-layer-10-memory-rag`, one commit above custom Layer 9
+`ed16fb8b`. Custom Layer 10 has 44,117 production LOC, 22,194 test LOC and 66,311 total
+LOC, with 395 test functions, 12 runtime and seven optional dependencies (no lock file).
+Its one-commit memory/RAG increment from custom Layer 9 is 13,545 additions and 104
+deletions across 58 files.
+
+Framework Layer 9 currently measures 31,501 production LOC, 14,110 test LOC and 45,611
+total LOC, with 12 runtime, seven optional, eight development and 131 locked packages —
+unchanged dependency counts from Layer 8, confirming no new dependency was added for
+pgvector/memory (the existing `psycopg` connection is reused for the raw `vector` cast
+and the `hybrid_candidates` query). Its working Layer 9 increment is recorded
+transparently in `comparison/layer9-metrics.json`; that Git proxy includes accumulated
+later-layer changes and must not be read as isolated memory authoring effort.
+
+Both implementations independently avoid LangChain, LlamaIndex, Haystack and
+`pgvector-python`, choosing raw SQL over pgvector instead. Neither adds a new dependency
+for memory. The prior material asymmetry has narrowed: custom Layer 10's
+`memory/postgres.py` implements a live pgvector cosine ANN query (`embedding <=> %s::vector`
+in a combined lexical+vector `ORDER BY` clause) exercised by its own retrieval path, and
+this framework's `PostgresMemoryStore.hybrid_candidates` now implements an equivalent live
+forced-RLS query (cosine ANN distance, lexical `ts_rank_cd`, recency/quality scoring,
+ACL/classification/time/retention prefilters, deterministic tie-break ordering), proven by
+a PostgreSQL integration test including a cross-tenant/classification isolation
+assertion. The remaining, candid difference: this framework's query is proven at the
+store/repository layer only — `MemoryRetrievalService`/`InMemoryMemoryControl` and
+`/v1/memories/retrieve` still serve from `InMemoryHybridIndex`, so wiring
+`hybrid_candidates` into the production retrieval path remains explicit future work. This
+comparison does not independently verify whether custom Layer 10's query is wired into
+its own production serving path.
+
+Temporal removes a custom durable memory-lifecycle scheduler, retry/backoff, and replay
+implementation for ingest/compact/purge/rebuild; this framework's Activities additionally
+send a periodic 10-second heartbeat (beyond an initial heartbeat) under a 30-second
+timeout so a stalled worker is detected promptly. LangGraph's role is unchanged from
+earlier layers: bounded context assembly only, never authority. Neither framework removes
+exact contracts, tenancy, legal hold/retention, citation enforcement, banned-field
+discipline, the fact-chain ledger, or final MMR/context-budget selection; those remain
+application code in both implementations. This framework additionally now requires an
+explicit `MemoryAcceptance` human/policy decision before any candidate can be ingested,
+and records digest-only `MemoryOperationFact`s around every retrieval/context build.
+
+The 200-run equivalent demo scenario measured Framework Layer 9 at 0.849 ms median/
+0.944 ms p95 and custom Layer 10 at 10.285 ms median/11.88 ms p95 on the same arm64/
+Python 3.14.7 machine (custom repo measured in its own isolated virtual environment).
+This is not a throughput or retrieval-quality result: the custom path exercises its own
+async event/index machinery including the live SQL-shaped ANN scoring path, while the
+framework's demo scenario exercises strict Pydantic contracts and the in-memory hybrid
+index only — it does not call the separately store-tested `hybrid_candidates` query,
+which requires a live PostgreSQL connection and is exercised only by the PostgreSQL
+integration test, not this in-memory benchmark. Neither run includes PostgreSQL, Temporal,
+a real embedding provider, network, or process startup. Retrieval-quality parity
+(precision/recall on an equivalent corpus) is not measured by either benchmark and
+remains a candid gap in this comparison.
+
+Framework lock-in is limited: the raw pgvector SQL cast, forced RLS and immutability
+triggers are portable PostgreSQL/psycopg mechanics, not a vendor abstraction. Temporal
+history/task-queue/versioning lock-in from earlier layers applies unchanged to the memory
+workflow. Escape remains explicit: preserve immutable `memory_facts`, the neutral
+`EmbeddingPort`/`SummarizationPort`/`MemoryReadPort` seams, and pure `reduce_memory`
+replay; replace the derived index or embedding provider only after the new implementation
+passes the same tenancy/citation/legal-hold/erasure/instruction-boundary equivalence
+suite.

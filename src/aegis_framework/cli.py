@@ -40,6 +40,10 @@ def build_parser() -> argparse.ArgumentParser:
         "remediation-demo",
         help="run a redacted deterministic approval/effect scenario",
     )
+    subparsers.add_parser(
+        "memory-demo",
+        help="run deterministic three-tier memory ingestion and retrieval",
+    )
     remediation.add_argument(
         "--scenario",
         choices=[scenario.value for scenario in RemediationDemoScenario],
@@ -102,6 +106,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             RemediationDemoScenario(args.scenario)
         )
         print(remediation_result.model_dump_json(indent=2))
+        return 0
+    if args.command == "memory-demo":
+        from aegis_framework.memory_demo import run_memory_demo
+
+        memory_result = run_memory_demo()
+        print(
+            memory_result.context.model_dump_json(
+                indent=2,
+            )
+        )
         return 0
 
     uvicorn.run(

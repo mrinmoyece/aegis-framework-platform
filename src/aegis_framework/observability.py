@@ -30,7 +30,7 @@ class _SpanObservation:
 
 class OpenTelemetryObservability:
     def __init__(self, tracer: Tracer | None = None) -> None:
-        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.8.0")
+        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.9.0")
 
     def investigation(
         self,
@@ -100,6 +100,18 @@ class OpenTelemetryObservability:
             span_name="aegis.sandbox.activity",
         )
 
+    def memory(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._span(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "memory_activity"},
+            span_name="aegis.memory.activity",
+        )
+
     @contextmanager
     def _span(
         self,
@@ -164,6 +176,15 @@ class NoopObservability:
         return self._observation()
 
     def sandbox(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        del tenant_id, attributes
+        return self._observation()
+
+    def memory(
         self,
         *,
         tenant_id: str,

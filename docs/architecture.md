@@ -122,6 +122,48 @@ Temporal LangGraph plugin is not used: per-node Temporal Activities would overla
 ownership and increase framework coupling. Interrupts are not used for approval or
 effects; any future non-authoritative pause must resume only through application intent.
 
+## Layer 6 specialist graph
+
+The static graph is `coordinator -> four specialists -> critic -> optional remediation
+planner -> verification agent -> coordinator decision`. The coordinator creates exactly
+four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
+parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
+checkpoint history. Application code provides the fixed role set, deny-by-default
+capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
+dispatch intent, result fencing, terminal decision, and all tenant authority.
+
+Every artifact is a frozen strict neutral envelope with schema version, tenant,
+incident, run and optional task linkage, producer role, ordinal, provenance digests,
+bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
+artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
+resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
+
+Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
+Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
+ownership and increase framework coupling. Interrupts are not used for approval or
+effects; any future non-authoritative pause must resume only through application intent.
+
+## Layer 6 specialist graph
+
+The static graph is `coordinator -> four specialists -> critic -> optional remediation
+planner -> verification agent -> coordinator decision`. The coordinator creates exactly
+four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
+parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
+checkpoint history. Application code provides the fixed role set, deny-by-default
+capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
+dispatch intent, result fencing, terminal decision, and all tenant authority.
+
+Every artifact is a frozen strict neutral envelope with schema version, tenant,
+incident, run and optional task linkage, producer role, ordinal, provenance digests,
+bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
+artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
+resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
+
+Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
+Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
+ownership and increase framework coupling. Interrupts are not used for approval or
+effects; any future non-authoritative pause must resume only through application intent.
+
 ## Three durable owners
 
 | Owner | Owns | Never authoritative for |
@@ -285,7 +327,9 @@ workflow completion. Authorized routes expose a redacted run view and opaque
 HMAC-protected cursor timeline. Timeline entries contain only cursor, event type,
 timestamp, status, and bounded failure code. Payloads and tenant IDs are not returned.
 
-## Replaceability
+Checkpoint content can resume graph mechanics. It remains non-authoritative for
+identity, grants, policy, quota, approval, audit, idempotency, secrets, fencing, or
+effects.
 
 - `ActivityOperations` and the application outbox isolate the Temporal SDK/server.
 - `OrchestratorPort` isolates LangGraph.
@@ -413,3 +457,88 @@ path, Docker socket, arbitrary volume, service-account token, shell command, mut
 privilege, host namespace, capability add, or runtime fallback. Outputs are bounded,
 allowlisted, hashed, scanned, redacted or quarantined, retained by reference, and treated
 as untrusted data by every downstream consumer.
+
+# Layer 9 event-grounded memory and pgvector RAG architecture
+
+Layer 9 adds working/episodic/semantic memory grounded in the same application-event
+ledger pattern as every prior layer, plus a derived retrieval index feeding bounded
+LangGraph context. It adds no effect edge and no new stateful service: PostgreSQL 17
+already selected in ADR 004/006 gains a `vector` extension column, and Temporal already
+selected in ADR 007 gains one more workflow type.
+
+`MemoryRecord`/`MemoryFact`/`MemoryProjection` (`memory.py`) are immutable, canonically
+digested, schema-versioned contracts binding tenant/incident/run, citations, an ACL,
+classification/trust, the embedder/chunker version, a `RetentionBinding`, and an
+`ErasableBlobReference`. `MemoryFact` payloads never carry raw text, query, prompt,
+completion, tenant ID, or locator fields — only IDs, digests, and bounded counts cross the
+ledger boundary. `MemoryLifecycleService.ingest` appends intent-before-effect facts through
+`candidate_proposed` → `candidate_accepted`/`rejected` → `scan` → `chunk` → `embed` →
+`index`, each under the previous fact's expected version, so a crash mid-pipeline leaves an
+inspectable, resumable fact chain rather than a silent partial write.
+
+`EmbeddingPort` and `SummarizationPort` are neutral `Protocol`s. The only shipped adapters
+are `DeterministicEmbeddingAdapter` and a budget/concurrency/timeout-bounded
+`ControlledEmbeddingGateway`; no embedding-abstraction library or real provider is wired by
+default (a genuine, deferred gap — see [ADR 014](adr/014-pgvector-sql-event-grounded-memory.md)).
+`DeterministicChunker` performs bounded, versioned chunking so every chunk keeps a stable
+citation back to its source memory. Every ingest additionally requires a `MemoryAcceptance`
+— an explicit, digested human-or-policy decision (`disposition` accept/reject,
+`reviewer_kind` human/policy, policy ID/revision/digest, reason code) bound by tenant/memory
+ID — before `MemoryLifecycleService.ingest` appends any candidate/scan/chunk/embed/index
+fact; a missing or mismatched acceptance raises `IntegrityFailure`.
+
+`InMemoryHybridIndex` is the derived, non-authoritative read model: lexical (term overlap)
+plus vector (cosine) plus recency plus quality scoring, MMR diversification for
+non-redundant top-k, and a tenant-scoped bounded cache. It can be purged or rebuilt at any
+time without touching ledger truth. `PostgresMemoryStore` (`memory_postgres.py`) writes the
+same derived chunk embeddings durably via a raw `%s::vector` cast into the `vector(64)`
+HNSW-indexed column created by `migrations/0008_layer9.sql`, under forced RLS and
+immutability triggers matching every other Layer 3+ table. It additionally implements
+`hybrid_candidates`: a single forced-RLS SQL query combining cosine ANN distance
+(`embedding <=> %s::vector`), lexical `ts_rank_cd` full-text scoring, and recency/quality
+terms into one deterministic weighted score, prefiltered by tenant, projection status,
+classification, ACL roles/principals, and retention/time bounds, bounded by
+`RetrievalPolicy.maximum_candidates` with a stable `combined_score DESC, memory_id, ordinal,
+chunk_id` tie-break order. A PostgreSQL integration test exercises it, including a
+cross-tenant/classification isolation assertion. This is a proven store-level capability,
+not yet the production serving path: `MemoryRetrievalService`/`InMemoryMemoryControl` and
+the `/v1/memories/retrieve` API still read from `InMemoryHybridIndex` today, and final MMR
+diversification/`ContextBudget` selection remain an application-owned step regardless of
+candidate source. Wiring `hybrid_candidates` into the live retrieval control path remains
+explicit future work (see [ADR 014](adr/014-pgvector-sql-event-grounded-memory.md)).
+
+`LangGraphMemoryContextBuilder` converts a `RetrievalResult` into a bounded, JSON-compatible
+`MemoryContext` for LangGraph state, carrying a fixed `instruction_boundary` literal
+(`retrieved-memory-is-untrusted-data-not-instructions-or-authority`) on every context. A
+citation-coverage shortfall or a budget/quality gap sets `insufficient_context=true` rather
+than fabricating a hit. `MemoryCompactor`/`DeterministicSummarizer` require full citation
+coverage of their input hits and fail closed to a deterministic extractive summary on any
+gap; no summary claim is ever uncited.
+
+Temporal's `aegis.memory.v1` workflow (`memory_temporal.py`) schedules
+scan/chunk/embed/index Activities for ingest and separate compact/purge/rebuild
+operations, with the standard retry policy and non-retryable error types used by every
+other Layer 4+ workflow. It carries only opaque tenant/memory/record references — never
+memory text, citations, or embeddings — and owns cross-process retry/heartbeat/replay
+only. `TemporalMemoryActivities` sends an initial heartbeat immediately, then a periodic
+heartbeat every 10 seconds for the duration of any long-running Activity, against a
+30-second `heartbeat_timeout`, so a stalled worker is detected well before the timeout
+rather than only at Activity completion. `tombstone_and_erase` blocks on
+`MemoryProjection.legal_hold_count` or `RetentionBinding.held` before purging the derived
+index and invoking an injected `erase_blob` callback, which is a contract point, not a
+qualified KMS/blob integration.
+
+Retrieval and context-build now append digest-only ledger facts: `MemoryRetrievalService`
+wraps `InMemoryHybridIndex.retrieve()` and records `MemoryFactType.RETRIEVE_REQUESTED`
+(sequence 1) and `RETRIEVE_COMPLETED` (sequence 2, carrying only a `result_digest`), and a
+separate `record_context()` call records `CONTEXT_BUILT` (sequence 3, carrying only
+`MemoryContext.context_digest`). These `MemoryOperationFact`s are appended to
+`InMemoryMemoryOperationLedger`, or durably to the immutable, forced-RLS
+`aegis.memory_operation_facts` table (migration 0008), with strict per-operation sequencing
+and idempotent replay (same digest at the same sequence is a no-op; a different digest at
+an existing sequence raises `IdempotencyConflict`; an out-of-order sequence raises
+`ConcurrencyConflict`). This is a separate, purpose-built operation ledger from the primary
+`MemoryFact` ingest/lifecycle ledger — they share the `MemoryFactType` enum but not a
+table/class — so retrieval and context-build activity is now audit-observable alongside
+ingest, supersession, legal hold, and erasure, without ever carrying raw query text or
+content across the ledger boundary.

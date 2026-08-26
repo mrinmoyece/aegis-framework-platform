@@ -108,6 +108,34 @@ def test_langfuse_evaluation_publishes_aggregates_only() -> None:
     assert client.flushes == 1
 
 
+def test_langfuse_memory_observation_is_digest_and_count_only() -> None:
+    client = _FakeClient()
+    adapter = LangfuseObservability(client)
+    with adapter.memory(
+        tenant_id="tenant-secret-name",
+        attributes={
+            "memory_tier": "semantic",
+            "candidate_count": 4,
+            "query": "never-export",
+        },
+    ) as observation:
+        observation.finish(
+            status="complete",
+            attributes={
+                "chunk_count": 2,
+                "content": "never-export",
+            },
+        )
+    assert client.starts[0]["name"] == "aegis.memory.activity"
+    rendered = repr((client.starts, client.observations))
+    assert "tenant-secret-name" not in rendered
+    assert "never-export" not in rendered
+    assert client.observations[0].updates[0]["output"] == {
+        "chunk_count": 2,
+        "status": "complete",
+    }
+
+
 def test_langfuse_mask_is_defense_in_depth() -> None:
     assert _mask_langfuse_payload(
         data={"prompt": "secret", "safe": 1},

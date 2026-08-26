@@ -120,6 +120,18 @@ class LangfuseObservability:
             name="aegis.sandbox.activity",
         )
 
+    def memory(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._run(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "memory_activity"},
+            name="aegis.memory.activity",
+        )
+
     @contextmanager
     def _run(
         self,

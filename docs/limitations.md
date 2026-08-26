@@ -1,4 +1,4 @@
-# Layer 8 limitations
+# Layer 9 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -162,7 +162,34 @@
 - Docker socket/SDK, local subprocess, RestrictedPython, and raw Firecracker wrappers are
   deliberately absent: they do not provide the selected durable hostile-tenant boundary
   without substantial additional platform controls.
-- Memory/RAG, full UI/BFF, MCP/A2A, deployment/IaC and live runtime qualification remain
-  explicitly deferred.
+- `PostgresMemoryStore.hybrid_candidates` implements and integration-tests a live
+  forced-RLS pgvector query combining cosine ANN distance (`<=>`), lexical `ts_rank_cd`,
+  recency/quality scoring, and ACL/classification/time/retention prefilters with
+  deterministic tie-break ordering. This is proven at the store/repository layer,
+  including a cross-tenant/classification isolation assertion; it is not yet wired into
+  `MemoryRetrievalService`/`InMemoryMemoryControl` or the `/v1/memories/retrieve` API, so
+  production retrieval still serves from `InMemoryHybridIndex` today. Final MMR
+  diversification and `ContextBudget` selection also remain an explicit application-owned
+  step regardless of candidate source; index-tuning/relevance benchmarking against the
+  SQL path remains future work.
+- `EmbeddingPort`/`SummarizationPort` ship only a deterministic hash-based adapter and a
+  budget/concurrency/timeout-bounded gateway. No real embedding or summarization
+  provider is wired; live embedding-provider latency, rate limits, drift, and cost are
+  unqualified.
+- Retrieval and context-build now append digest-only `MemoryOperationFact`s
+  (`RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/`CONTEXT_BUILT`) via `MemoryRetrievalService`,
+  with strict per-operation sequencing and idempotent replay, to an in-memory or the
+  durable, immutable `aegis.memory_operation_facts` table — a separate, purpose-built
+  ledger from the primary `MemoryFact` ingest/lifecycle ledger. These facts carry only
+  policy/query/result digests, never raw query text or content.
+- Memory crypto-erasure calls an injected `erase_blob` callback after legal-hold checks
+  and derived-index purge. It is a contract point, not a qualified KMS or blob-storage
+  integration; key rotation, envelope encryption, and cross-region erasure durability
+  remain unqualified.
+- The deterministic memory demo/eval scenarios exercise one tenant, one incident, and a
+  small fixed corpus. Corpus-scale relevance quality, drift over time, and multi-tenant
+  concurrent-write throughput on the derived index are unmeasured.
+- Full operator UI/BFF, MCP/A2A, production deployment/IaC, and live provider/runtime
+  qualification remain explicitly deferred.
 
 These are explicit non-production boundaries, not implied capabilities.

@@ -53,6 +53,25 @@ from aegis_framework.fixtures import (
     demo_request,
 )
 from aegis_framework.graph import LangGraphInvestigator
+from aegis_framework.memory import (
+    DeterministicChunker,
+    DeterministicEmbeddingAdapter,
+    EmbeddingRequest,
+    EmbeddingSpec,
+    MemoryACL,
+    MemoryFactType,
+    MemoryOperationFact,
+    MemoryTier,
+    RetentionBinding,
+    RetrievalPolicy,
+    RetrievalQuery,
+    memory_record_from_evidence,
+)
+from aegis_framework.memory import (
+    canonical_digest as memory_digest,
+)
+from aegis_framework.memory_demo import demo_memory_evidence
+from aegis_framework.memory_postgres import PostgresMemoryStore
 from aegis_framework.model import DeterministicStructuredModel
 from aegis_framework.model_gateway import (
     BillingDisposition,
@@ -108,6 +127,7 @@ _LAYER5_MIGRATION = Path("migrations/0004_layer5.sql")
 _LAYER6_MIGRATION = Path("migrations/0005_layer6.sql")
 _LAYER7_MIGRATION = Path("migrations/0006_layer7.sql")
 _LAYER8_MIGRATION = Path("migrations/0007_layer8.sql")
+_LAYER9_MIGRATION = Path("migrations/0008_layer9.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -253,6 +273,222 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "fence_token text NOT NULL" in layer8
     assert "FORCE ROW LEVEL SECURITY" in layer8
     assert "PASSWORD" not in layer8
+    layer9 = _LAYER9_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "memory_records",
+        "memory_facts",
+        "memory_projections",
+        "memory_chunks",
+        "memory_jobs",
+        "memory_quotas",
+        "memory_cache",
+        "memory_operation_facts",
+        "memory_checkpoints",
+        "memory_rebuilds",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer9
+    assert "CREATE EXTENSION IF NOT EXISTS vector" in layer9
+    assert "memory_records_immutable" in layer9
+    assert "memory_facts_immutable" in layer9
+    assert "embedding vector(64) NOT NULL" in layer9
+    assert "(embedding <#> embedding) BETWEEN -1.000001 AND -0.999999" in layer9
+    assert "FORCE ROW LEVEL SECURITY" in layer9
+    assert "PASSWORD" not in layer9
+
+
+@pytest.mark.postgres
+def test_live_memory_rls_immutable_facts_and_projection_rebuild() -> None:
+    admin_dsn, pool, _repository = _repository_context()
+    suffix = uuid4().hex
+    base = demo_memory_evidence()
+    evidence = base.model_copy(
+        update={
+            "tenant_id": _TENANT_ALPHA,
+            "evidence_id": f"evidence:memory-{suffix}",
+            "provenance": base.provenance.model_copy(
+                update={"tenant_id": _TENANT_ALPHA}
+            ),
+        }
+    )
+    chunker = DeterministicChunker(maximum_tokens=32, overlap_tokens=4)
+    spec = EmbeddingSpec(
+        provider="fake",
+        model="deterministic-hash",
+        version="1.0.0",
+        dimensions=64,
+        timeout_seconds=2,
+        maximum_attempts=1,
+        maximum_batch_items=32,
+        maximum_batch_tokens=8_192,
+    )
+    record = memory_record_from_evidence(
+        evidence,
+        tier=MemoryTier.EPISODIC,
+        acl=MemoryACL(roles=("incident-responder",)),
+        schema_name="incident-lesson",
+        schema_revision=1,
+        chunker_version=chunker.version,
+        embedding_spec=spec,
+        quality=0.9,
+        confidence=0.8,
+        retention=RetentionBinding(
+            policy_ref="retention:memory-v1",
+            expires_at=DEMO_TIME + timedelta(days=30),
+        ),
+        blob_ref=f"blob:memory-{suffix}",
+        key_ref=f"key:memory-{suffix}",
+        key_version=1,
+        accepted_at=DEMO_TIME,
+    )
+    store = PostgresMemoryStore(pool=pool)
+    try:
+        store.put_record(record)
+        proposed = store.append(
+            tenant_id=_TENANT_ALPHA,
+            memory_id=record.memory_id,
+            expected_version=0,
+            fact_type=MemoryFactType.CANDIDATE_PROPOSED,
+            command_id=f"memory-command:{suffix}:proposed",
+            actor_ref=f"actor:{suffix}",
+            recorded_at=DEMO_TIME,
+            payload={
+                "record_digest": record.canonical_digest,
+                "tier": record.tier.value,
+                "trust": record.trust.value,
+            },
+        )
+        accepted = store.append(
+            tenant_id=_TENANT_ALPHA,
+            memory_id=record.memory_id,
+            expected_version=proposed.version,
+            fact_type=MemoryFactType.CANDIDATE_ACCEPTED,
+            command_id=f"memory-command:{suffix}:accepted",
+            actor_ref=f"actor:{suffix}",
+            recorded_at=DEMO_TIME,
+            payload={"record_digest": record.canonical_digest},
+        )
+        chunks = chunker.split(
+            tenant_id=record.tenant_id,
+            memory_id=record.memory_id,
+            text=evidence.canonical_text,
+            citation=record.citations[0],
+        )
+        embedding_material = {
+            "operation_id": f"embedding:{suffix}",
+            "tenant_id": record.tenant_id,
+            "run_id": record.run_id,
+            "reservation_id": f"reservation:{suffix}",
+            "fence_token": f"fence:{suffix}",
+            "spec": spec,
+            "chunks": chunks,
+        }
+        embedding = DeterministicEmbeddingAdapter().embed(
+            EmbeddingRequest(
+                **embedding_material,
+                request_digest=memory_digest(embedding_material),
+            )
+        )
+        store.put_derived_chunks(
+            record=record,
+            chunks=chunks,
+            vectors=embedding.vectors,
+            indexed_at=DEMO_TIME + timedelta(days=1),
+        )
+        query_text = evidence.canonical_text
+        query = RetrievalQuery(
+            query_id=f"memory-query:{suffix}",
+            tenant_id=_TENANT_ALPHA,
+            run_id=record.run_id,
+            incident_id=record.incident_id,
+            principal_ref=f"actor:{suffix}",
+            roles=("incident-responder",),
+            allowed_classifications=frozenset({EvidenceClassification.INTERNAL}),
+            text=query_text,
+            query_digest=sha256(query_text.encode()).hexdigest(),
+            requested_at=DEMO_TIME,
+            as_of=DEMO_TIME,
+            policy=RetrievalPolicy(
+                policy_id=f"memory-policy:{suffix}",
+                revision=1,
+                lexical_weight=0.35,
+                vector_weight=0.35,
+                recency_weight=0.15,
+                quality_weight=0.15,
+                mmr_lambda=0.7,
+                maximum_candidates=20,
+                top_k=5,
+                maximum_tokens=512,
+                maximum_bytes=8192,
+                cache_ttl_seconds=60,
+                freshness_seconds=604800,
+            ),
+        )
+        candidates = store.hybrid_candidates(
+            query,
+            embedding.vectors[0].values,
+        )
+        assert [candidate.memory_id for candidate in candidates] == [record.memory_id]
+        assert candidates[0].recency_score == 1.0
+        assert not store.hybrid_candidates(
+            query.model_copy(update={"tenant_id": _TENANT_BETA}),
+            embedding.vectors[0].values,
+        )
+        operation_material = {
+            "schema_version": 1,
+            "tenant_id": _TENANT_ALPHA,
+            "operation_id": f"memory-operation:{suffix}",
+            "run_id": record.run_id,
+            "incident_id": record.incident_id,
+            "sequence": 1,
+            "fact_type": MemoryFactType.RETRIEVE_REQUESTED,
+            "policy_digest": query.policy.digest,
+            "query_digest": query.query_digest,
+            "result_digest": None,
+            "recorded_at": DEMO_TIME,
+        }
+        operation_fact = MemoryOperationFact(
+            **operation_material,
+            fact_digest=memory_digest(operation_material),
+        )
+        store.append_operation(operation_fact)
+        store.append_operation(operation_fact)
+        assert store.operation_facts(
+            tenant_id=_TENANT_ALPHA,
+            operation_id=operation_fact.operation_id,
+        ) == (operation_fact,)
+        assert not store.operation_facts(
+            tenant_id=_TENANT_BETA,
+            operation_id=operation_fact.operation_id,
+        )
+        assert (
+            store.rebuild(
+                tenant_id=_TENANT_ALPHA,
+                memory_id=record.memory_id,
+                rebuilt_at=DEMO_TIME,
+            )
+            == accepted
+        )
+        assert (
+            store.projection(
+                tenant_id=_TENANT_BETA,
+                memory_id=record.memory_id,
+            )
+            is None
+        )
+        with (
+            Connection.connect(admin_dsn, autocommit=True) as admin,
+            pytest.raises(Error, match="immutable"),
+        ):
+            admin.execute(
+                """
+                UPDATE aegis.memory_facts
+                SET fact_type = 'memory.tampered'
+                WHERE tenant_id = %s AND memory_id = %s
+                """,
+                (_TENANT_ALPHA, record.memory_id),
+            )
+    finally:
+        pool.close()
 
 
 @pytest.mark.postgres
@@ -631,7 +867,7 @@ def test_live_orchestration_artifacts_are_rls_isolated_and_rebuildable() -> None
                 WHERE tenant_id = %s
                   AND run_id = %s
                   AND task_id = %s
-                  AND fact_type = 'task.dispatch'
+                  AND fact_type IN ('task.dispatch', 'task.fence_rotated')
                 ORDER BY recorded_at, (document->>'attempt')::int
                 """,
                 (_TENANT_ALPHA, run_id, "task:stale-worker"),
@@ -1580,7 +1816,6 @@ def test_live_model_reservation_reconciliation_rls_and_rebuild() -> None:
         pool.close()
 
 
-@pytest.mark.postgres
 @pytest.mark.postgres
 def test_live_checkpoint_rls_prevents_cross_tenant_reads_and_rebinding() -> None:
     _, pool, _ = _repository_context()

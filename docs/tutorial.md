@@ -355,3 +355,66 @@ Kubernetes Job and safe artifact boundary, `sandbox_temporal.py` for durable mec
 `sandbox_postgres.py` and migration 0007 for forced RLS/rebuild, the
 [sandbox runbook](sandbox-runbook.md), and [ADR 013](adr/013-kubernetes-job-sandbox.md).
 Tests are hermetic and execute no process, container, cluster, network, or credential.
+
+## Layer 9: event-grounded three-tier memory and pgvector RAG
+
+Start with accepted or redacted evidence, never raw text. `MemoryLifecycleService.ingest`
+binds a `MemoryRecord` candidate to a specific evidence ID/digest, current chunker/embedder
+versions, tenant/ACL/classification, an optional `ErasableBlobReference`, and an explicit
+`MemoryAcceptance` (human or policy `reviewer_kind`, `disposition` accept/reject, reason
+code) — a missing or mismatched acceptance raises `IntegrityFailure` before any fact is
+appended — then appends strictly ordered facts (`candidate_registered` through `scanned`,
+`chunked`, `embedded`, `indexed`) that carry only opaque digests/counts — never raw text,
+query, prompt, completion, tenant ID, or a locator.
+
+Run the deterministic demo directly:
+
+```bash
+uv run aegis-framework memory-demo
+```
+
+This prints a `MemoryContext`: bounded `ContextSnippet`s with a fixed
+`instruction_boundary` literal marking them as untrusted retrieved data, never
+instructions. The same demo is the basis for the `memory-retrieval`,
+`memory-tenant-cache`, `memory-context`, and `memory-retention` eval cases.
+
+Read status or retrieve through the authorized API:
+
+```bash
+AEGIS_MODE=demo make serve
+
+curl --fail-with-body \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: memory-status-001' \
+  http://127.0.0.1:8000/v1/memories/MEMORY_ID
+
+curl --fail-with-body -X POST \
+  -H 'Authorization: ******' \
+  -H 'X-Request-ID: memory-retrieve-001' \
+  -H 'Content-Type: application/json' \
+  -d '{"query_id": "q-1", "run_id": "run-1", "incident_id": "inc-1", "text": "incident summary"}' \
+  http://127.0.0.1:8000/v1/memories/retrieve
+```
+
+`Action.MEMORY_READ`/`MEMORY_RETRIEVE` authorize both endpoints under the same
+tenant/policy boundary as every other Layer 2+ action; cross-tenant reads return the
+same `404` used elsewhere.
+
+Supersession, legal hold, and `tombstone_and_erase` follow the same append-only,
+version-fenced pattern as remediation/sandbox: `set_legal_hold` blocks erasure while a
+hold is open, and erasure purges the derived index/cache before invoking an injected
+`erase_blob` callback — never a real KMS/blob integration.
+
+Read `memory.py` for contracts, the lifecycle service, `reduce_memory`, and the
+in-memory hybrid index/compactor/context-builder; `memory_postgres.py` and migration
+0008 for the durable pgvector-column chunk/fact schema, forced RLS, and the live
+`hybrid_candidates` hybrid SQL query; `memory_temporal.py` for the `aegis.memory.v1`
+durable ingest/compact/purge/rebuild Activities with periodic heartbeating;
+`memory_demo.py` for the deterministic scenario; the
+[memory runbook](memory-runbook.md); and
+[ADR 014](adr/014-pgvector-sql-event-grounded-memory.md). This repository implements and
+integration-tests a live forced-RLS pgvector `hybrid_candidates` SQL query and digest-only
+retrieval/context-build ledger facts (`MemoryOperationFact`), but the production
+`/v1/memories/retrieve` API and demo still serve from `InMemoryHybridIndex` — wiring the
+SQL query into that serving path is a documented gap, not an implicit capability. Tests
+are hermetic and use no live embedding provider, network call, or credential.

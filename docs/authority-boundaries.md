@@ -1,4 +1,4 @@
-# Layer 8 authority and retry ownership
+# Layer 9 authority and retry ownership
 
 ## Ownership matrix
 
@@ -40,6 +40,13 @@
 | Sandbox provider lifecycle | `SandboxBackend` observation | Temporal/Kubernetes may schedule and observe | Application reconciliation |
 | Sandbox artifact/manifest/attestation | Immutable scanned application facts | Provider output is untrusted input | PostgreSQL artifact facts/object reference |
 | Sandbox cleanup/orphan ownership | Application cleanup claim plus exact provider UID | Temporal schedules redrive | PostgreSQL cleanup claim |
+| Memory record/fact/projection | Immutable application ledger (`memory_facts`) | Opaque references/digests only | PostgreSQL memory facts |
+| Memory acceptance decision | `MemoryAcceptance` (human/policy `reviewer_kind`, disposition, reason code, digest) | No; required before any candidate/scan/chunk/embed/index fact | PostgreSQL `candidate_accepted`/`candidate_rejected` facts |
+| Derived vector/lexical index and cache, and `hybrid_candidates` SQL scoring | `InMemoryHybridIndex` / Postgres `memory_chunks`/`memory_cache` / `PostgresMemoryStore.hybrid_candidates` | Never authority; always rebuildable/purgeable; SQL returns scored, bounded candidates only, never a final context | Rebuild from ledger facts |
+| Retrieval/context-build operation record | `MemoryOperationFact` (digest-only, `RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/`CONTEXT_BUILT`) | Observational audit trail only; never a retrieval authorization grant | PostgreSQL `memory_operation_facts` (immutable) / in-memory ledger |
+| Retrieved memory context | `MemoryContext` with fixed `instruction_boundary` | LangGraph state only; never instructions or authority | Re-derived from current retrieval |
+| Memory retention/legal hold/erasure | `RetentionBinding` + `MemoryProjection.legal_hold_count` | No | PostgreSQL memory facts |
+| Erasable blob reference | `ErasableBlobReference` on the immutable record | Reference only; erasure via injected callback, not authority | PostgreSQL memory record |
 
 ## Retry matrix
 
@@ -66,6 +73,8 @@
 | Sandbox artifact capture | Temporal Activity + application bounds | One manifest per exact execution; quarantine on conflict |
 | Sandbox cleanup/orphan redrive | Temporal Activity + application cleanup claim | Observe exact UID before delete; ambiguity never success |
 | Projection | Application replay | Cursor/hash checkpoint; deterministic reducer |
+| Memory ingest Activity | Temporal `aegis.memory.v1` + application fact expected-version | Resume at next expected fact type; never re-append a completed fact |
+| Memory compact/purge/rebuild | Temporal Activity + application ledger | Fold `reduce_memory` in ordinal order; no blind retry of ambiguous erasure |
 
 ## Non-negotiable call order
 
@@ -105,6 +114,19 @@
     reject stale attempts/fences or ambiguous outcomes.
 22. Capture only expected bounded outputs, scan/redact/quarantine as untrusted data,
     persist manifest/attestation, then clean up by exact provider UID.
+23. Bind a memory candidate to accepted/redacted evidence, current chunker/embedder
+    versions, and an explicit human/policy `MemoryAcceptance` decision before any
+    scan/chunk/embed/index fact is appended.
+24. Persist intent-before-effect memory facts in fixed order; never re-append a fact type
+    the ledger has already advanced past.
+25. Treat the derived vector/lexical index, cache, and `hybrid_candidates` SQL scoring as
+    always-rebuildable and never authoritative for tenancy, retention, or audit; treat
+    digest-only retrieval/context-build operation facts as an audit record, never a
+    retrieval authorization grant.
+26. Frame every retrieved memory snippet with the fixed `instruction_boundary` literal;
+    it is LangGraph state, never an instruction, approval, or effect trigger.
+27. Block `tombstone_and_erase` on current legal hold before purging the derived index and
+    invoking the injected erase-blob callback.
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.

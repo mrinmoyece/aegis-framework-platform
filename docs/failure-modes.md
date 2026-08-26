@@ -1,4 +1,4 @@
-# Layer 8 failure modes
+# Layer 9 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -101,6 +101,20 @@
 | Secret/scanner finding | Redact or quarantine before artifact publication | Artifact boundary | unit |
 | Artifact/projection loss | Verify immutable facts/manifests and rebuild pure projection | PostgreSQL/application | unit/integration |
 | Orphan Job after workflow loss | Application cleanup claim owns observe/delete redrive | PostgreSQL + Temporal | documented/integration |
+| Quarantined/duplicate evidence proposed as memory | `ingest` rejects before any candidate fact; only accepted/redacted dispositions qualify | Application lifecycle service | unit/eval |
+| Chunker/embedder version mismatch | `IntegrityFailure` before embed/index; ledger stays at last valid fact | Application lifecycle service | unit |
+| Embedding provider timeout/exhaustion | `ControlledEmbeddingGateway` bounds concurrency/attempts/timeout; embed fact left incomplete, never silently retried past budget | Embedding gateway | unit/eval |
+| Crash mid-ingest fact chain | Resume at next expected fact type via `reduce_memory` replay; never re-append a completed fact | Application ledger | unit |
+| Erasure attempted under legal hold | `PolicyDenied` before tombstone/purge/erase-blob callback | Application lifecycle service | unit |
+| Insufficient citation coverage at retrieval/compaction | `insufficient_context=true` / deterministic extractive fallback; no uncited claim | Derived index + compactor | unit/eval |
+| Cross-tenant index/cache access attempt | Tenant-scoped bounded cache and index reject/omit foreign-tenant entries | Derived index | unit |
+| Superseded-memory set incomplete/stale | `PolicyDenied` before any superseded fact is appended | Application lifecycle service | unit |
+| Retrieved memory treated as instruction downstream | `MemoryContext.instruction_boundary` fixed literal; no graph edge to an effect | Application/graph contract | unit/documented |
+| Derived index/chunk table loss | Rebuild from immutable `memory_facts` via `reduce_memory`; ledger is never derived from the index | Application ledger | unit/documented |
+| Live pgvector query not yet wired to serving path | `hybrid_candidates` is implemented and integration-tested at the store layer; production retrieval still serves from `InMemoryHybridIndex` until wired into `MemoryRetrievalService` | Documented boundary | integration-tested (store) / documented (serving path) |
+| Retrieval/context-build unaudited | `MemoryRetrievalService` appends digest-only `RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/`CONTEXT_BUILT` `MemoryOperationFact`s with strict sequencing and idempotent replay | Application ledger | unit |
+| Memory ingested without explicit acceptance | `MemoryAcceptance` (human/policy disposition, digest, reason code) bound to tenant/memory ID is required before any candidate/scan/chunk/embed/index fact | Application lifecycle service | unit |
+| Temporal Activity heartbeat stalls silently | Initial heartbeat plus a periodic 10-second heartbeat under a 30-second `heartbeat_timeout` detects a stalled worker | Temporal Activity | unit |
 
 ## Retry rules
 
@@ -121,6 +135,11 @@ Provision always observes the deterministic Job identity before create. Ambiguou
 or delete never becomes success; reconciliation or orphan redrive observes the exact
 request digest, fence, and provider UID. The official Kubernetes client has no adapter
 retry loop.
+
+For memory, Temporal `aegis.memory.v1` retries ingest/compact/purge/rebuild Activities.
+Each retry resumes at the next expected ledger fact rather than replaying the whole
+ingest; an ambiguous embed/index step is resolved by replaying `reduce_memory`, never by
+blind re-embedding under a stale version.
 
 ## Operator rules
 
