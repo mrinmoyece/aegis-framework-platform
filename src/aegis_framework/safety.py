@@ -178,6 +178,19 @@ _SAFE_AUDIT_KEYS = frozenset(
         "request_ref",
     }
 )
+_SAFE_AUDIT_KEYS = frozenset(
+    {
+        "approval_required",
+        "attempt",
+        "citation_count",
+        "error_code",
+        "evidence_count",
+        "policy_id",
+        "policy_revision",
+        "reason",
+        "request_ref",
+    }
+)
 
 
 def contains_prompt_injection(evidence: Evidence) -> bool:

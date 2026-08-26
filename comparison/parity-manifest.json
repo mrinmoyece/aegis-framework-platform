@@ -2,7 +2,7 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 9,
+  "layer": 10,
   "generated_on": "2026-08-17",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
@@ -272,10 +272,18 @@
     {
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
-      "status": "partial",
+      "status": "delivered",
       "evidence": [
         "evals/cases.json",
+        "evals/suite.json",
+        "evals/dataset.json",
+        "evals/baseline.json",
+        "evals/waivers.json",
         "src/aegis_framework/evals.py",
+        "src/aegis_framework/evaluation.py",
+        "tests/test_evaluation_layer10.py",
+        "docs/adr/015-governed-deterministic-evaluation.md",
+        "docs/evaluation-runbook.md",
         "tests/test_model_gateway.py",
         "tests/test_evidence_layer5.py",
         "tests/test_orchestration_layer6.py",
@@ -284,14 +292,18 @@
         "tests/test_temporal_integration.py"
       ],
       "framework_owned": [
+        "pytest discovery, assertion reporting, JUnit and branch coverage",
         "Temporal replay",
-        "optional Langfuse evaluator observation"
+        "Temporal time-skipping test mechanics",
+        "optional sanitized Langfuse dataset/result publication"
       ],
       "enterprise_owned": [
-        "hermetic safety and approval/effect attack cases",
-        "equivalence",
-        "release thresholds",
-        "load/chaos qualification"
+        "neutral evaluation contracts and canonical digests",
+        "hermetic safety/adversarial/recovery corpus",
+        "dataset provenance, classification, scan, quarantine and deletion",
+        "domain scorers and non-waivable safety thresholds",
+        "reviewed baseline and scoped expiring waiver governance",
+        "redacted bounded reports and release policy"
       ]
     },
     {

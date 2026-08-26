@@ -1,11 +1,12 @@
-# Layer 9 local operations runbook
+# Layer 10 local operations runbook
 
 Evidence connector enablement, source-specific operations, cursor recovery and
 reconciliation are in the [connector runbook](connector-runbook.md). Connector code is
 disabled by default; this general runbook does not authorize enabling it. Sandbox
 activation and orphan cleanup are in the [sandbox runbook](sandbox-runbook.md). Memory
 ingestion, retrieval, compaction, legal hold, and erasure incidents are in the
-[memory runbook](memory-runbook.md).
+[memory runbook](memory-runbook.md). Evaluation baseline, dataset, waiver, replay and
+tamper procedures are in the [evaluation runbook](evaluation-runbook.md).
 
 ## Start application PostgreSQL
 
@@ -37,6 +38,11 @@ This is a compatibility environment, not a production topology.
 
 ```bash
 make ci
+make eval-safety
+make eval-adversarial
+make eval-recovery
+make eval-baseline
+make eval-meta
 make security
 make container
 docker compose config --quiet
@@ -142,9 +148,18 @@ See the [memory runbook](memory-runbook.md) for activation gate, normal lifecycl
 legal-hold/erasure, embedding-provider incident, ambiguous-ingestion, retrieval/context,
 and rebuild procedures. In summary: never authorize a memory candidate outside
 `accepted`/`redacted` evidence dispositions, never bypass an open legal hold to erase,
-never treat the derived index/cache as authoritative, and remember that retrieval and
-context-build activity does not yet append ledger facts — do not claim it is
-ledger-audited in an incident report.
+never treat the derived index/cache as authoritative. Retrieval and context-build
+append digest-only `MemoryOperationFact`s; those facts do not contain raw query or
+content and do not make the derived index authoritative.
+
+## Evaluation release incident
+
+Follow the [evaluation runbook](evaluation-runbook.md). Stop promotion on suite,
+dataset/source, baseline, case-set or scorer mismatch; nondeterministic replay; shard
+gaps/overlap; report overflow/redaction failure; expired waiver; hard-safety waiver;
+or evaluator error. Preserve bounded digests/reason codes. Never regenerate a
+baseline to make a failure disappear and never treat an evaluator or Langfuse trace
+as production truth.
 
 ## Model call and billing reconciliation
 

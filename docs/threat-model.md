@@ -1,4 +1,4 @@
-# Layer 9 threat model
+# Layer 10 threat model
 
 ## Assets and trust boundaries
 
@@ -107,6 +107,15 @@ trusted to provide their documented mechanics, not enterprise authority.
 | pgvector retrieval treated as production-qualified serving path | `PostgresMemoryStore.hybrid_candidates` implements and integration-tests a live forced-RLS ANN/lexical/recency/quality query, but `/v1/memories/retrieve` and the demo still serve from `InMemoryHybridIndex`; the SQL path is not yet wired into production retrieval | Documentation/operator misreading |
 | Memory acceptance bypassed | `MemoryLifecycleService.ingest` requires a `MemoryAcceptance` bound by tenant/memory ID with an explicit human/policy disposition before any candidate/scan/chunk/embed/index fact | Application wiring defect |
 | Retrieved memory content escalated to instruction/effect | `MemoryContext.instruction_boundary` fixed literal; no graph edge from memory context to an effect | Downstream consumer defect |
+| Evaluation dataset contains production data/secret/PII | Repository-local synthetic provenance, source hash, classification/consent/retention checks and pre-run scan | Detector false negative or dishonest metadata |
+| Baseline edited to bless regression | Suite/dataset/case/scorer digests, explicit reviewer/reason and complete passing update command | Colluding reviewer or source compromise |
+| Quality score hides safety failure | Exact per-scorer hard thresholds; every real case failure lowers every required hard dimension; hard controls are non-waivable | Incorrect scorer-to-case applicability |
+| Expired/broad/mismatched waiver | Exact baseline/scorer/case scope and fail-closed expiry; hard-safety waiver is rejected | Clock/configuration defect |
+| Malicious evaluator opens network/process | Hermetic guard denies DNS/socket helper and subprocess/system entry points; no arbitrary fixture callable | Native extension or unwrapped low-level syscall |
+| Nondeterministic ordering/sharding/replay | Sorted IDs, digest hash shards, fixed seed/clock and byte-stable replay meta-test | Hidden framework/global entropy |
+| Report leaks prompt/evidence/identity | Bounded digest/count/status/reason-only JSON/Markdown/JUnit plus redaction/meta-tests | New report field/exporter without review |
+| Hosted evaluator becomes release authority | Required CI is local/offline; Langfuse is optional sanitized publication only | Operator bypass outside CI |
+| Model judge becomes sole safety gate | Judge contract cannot be hard safety and is disabled/unimplemented in required CI | Future adapter misconfiguration |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.
@@ -149,6 +158,8 @@ replication, load limits, and disaster recovery are not proven. PostgreSQL HA/PI
 external event witnessing, retention/erasure execution, live connector/model/Kubernetes
 qualification, DNS-rebinding egress enforcement, live Kata/gVisor/admission/CNI,
 external reconciliation evidence, UI, MCP/A2A, and deployment are also unproven.
+Production model/connector qualification, independent penetration/human labeling,
+the observability/SLO layer, and final load/chaos certification remain unproven.
 Official adapters are present, but live credentials, regional data
 handling, model/version qualification, tokenizer accuracy, pricing feed freshness,
 provider retention/abuse policy, and load/failover are unproven. `PostgresMemoryStore

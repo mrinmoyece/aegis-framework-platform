@@ -26,6 +26,13 @@ from aegis_framework.domain import (
 )
 
 if TYPE_CHECKING:
+    from aegis_framework.evals import EvalCase
+    from aegis_framework.evaluation import (
+        CaseResult,
+        DatasetContract,
+        EvaluationReport,
+        ExecutionObservation,
+    )
     from aegis_framework.remediation import (
         ActionIntent,
         ActionObservation,
@@ -314,3 +321,19 @@ class FindingValidatorPort(Protocol):
     def validate(
         self, finding: SpecialistFinding, evidence: Sequence[Evidence]
     ) -> bool: ...
+
+
+class EvaluationExecutorPort(Protocol):
+    """Provider-neutral case execution boundary."""
+
+    def execute(self, case: EvalCase) -> ExecutionObservation: ...
+
+
+class EvaluationPublisherPort(Protocol):
+    """Optional sanitized result publisher; never a CI authority."""
+
+    def publish_evaluation_report(self, report: EvaluationReport) -> None: ...
+
+    def publish_case_result(self, result: CaseResult) -> None: ...
+
+    def publish_dataset_manifest(self, dataset: DatasetContract) -> None: ...

@@ -1,4 +1,4 @@
-# Layer 9 qualification status
+# Layer 10 qualification status
 
 ## Delivered
 
@@ -114,10 +114,25 @@
 - authorized redacted memory status/retrieval API endpoints and a deterministic
   `memory-demo` CLI scenario under the same tenant/policy authorization boundary as every
   other Layer 2+ action.
+- frozen neutral evaluation suite/scenario/case/dataset/scorer/result/baseline/
+  comparison/waiver/report contracts with canonical digests, provenance,
+  fingerprints, fixed seed/clock/IDs, bounded trace references and strict limits;
+- hermetic execution of all 44 real cross-layer cases with denied network/process
+  helpers, hard timeout, stable order/filter/shard/replay behavior and separate
+  environment-gated PostgreSQL/pgvector/Temporal qualification;
+- adversarial taxonomy covering injection, Unicode/bidi/schema/citation, tenant/role/
+  approval/confused-deputy, SSRF/path/archive/shell/secret/output, replay/fencing/
+  idempotency/wallet, malicious adapter and framework-state poisoning;
+- all 17 named deterministic fault cut points with convergence, authorization,
+  duplicate/stale-effect, reconciliation, cleanup, audit and isolation assertions;
+- reviewed exact baseline, non-waivable hard safety, scoped expiring waivers,
+  missing/new/tamper detection, governed synthetic dataset lifecycle, deterministic
+  JSON/Markdown/JUnit, six CLI operations, five dedicated CI eval gates, and optional
+  sanitized Langfuse dataset/report publication.
 
 ## Qualification snapshot
 
-- 352 deterministic tests pass with 90.17% meaningful branch coverage;
+- 368 deterministic tests pass with 90.24% meaningful branch coverage;
 - 44 deterministic evals pass, including pagination, poisoning, source revocation,
   deterministic non-causal correlation, private-destination rejection, and memory
   retrieval/tenant-cache/context/retention cases;
@@ -133,7 +148,7 @@
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer9-metrics.json`.
+`comparison/layer10-metrics.json`.
 
 ## Not proven
 
@@ -150,3 +165,6 @@ control path (`MemoryRetrievalService`/`InMemoryMemoryControl`, `/v1/memories/re
 a real embedding/summarization provider, and KMS/blob-qualified crypto-erasure are not
 proven. Final MMR diversification and `ContextBudget` selection also remain an
 application-owned step regardless of candidate source.
+Production model/connector qualification, independent penetration testing and human
+labeling, observability/SLOs, UI, MCP/A2A, deployment, and final load/chaos
+certification are explicitly deferred.

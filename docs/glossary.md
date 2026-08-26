@@ -254,3 +254,17 @@ integration-tested at the store layer, including a cross-tenant/classification i
 assertion; not yet wired into `MemoryRetrievalService`/`InMemoryMemoryControl` or
 `/v1/memories/retrieve` — production retrieval still serves from `InMemoryHybridIndex`
 until that wiring lands.
+**Evaluation baseline**
+A reviewed immutable set of suite/dataset/case/scorer digests, directions,
+thresholds and tolerances. It is release evidence, not runtime policy.
+
+**Hard safety invariant**
+A deterministic scorer threshold that cannot be averaged away or waived.
+
+**Evaluation waiver**
+A reviewed exception for one non-safety scorer and exact cases, owner, reason and
+expiry. Expiry or scope mismatch fails closed.
+
+**Fault cut point**
+A named deterministic boundary where the evaluator injects failure and asserts
+convergence, fencing, reconciliation, cleanup, audit and isolation without sleeps.

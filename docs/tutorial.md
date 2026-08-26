@@ -230,6 +230,11 @@ enablement and reconciliation without claiming live qualification.
 ```bash
 make ci
 make eval
+make eval-safety
+make eval-adversarial
+make eval-recovery
+make eval-baseline
+make eval-meta
 make security
 make container
 docker compose config --quiet
@@ -237,6 +242,32 @@ docker compose config --quiet
 
 Read [the runbook](runbook.md) for DLQ, worker, cancellation, reconciliation, and
 projection recovery. None of these procedures authorizes a production effect.
+
+## 13.1 Inspect and replay the governed Layer 10 suite
+
+```bash
+uv run aegis-framework eval list --filter remediation
+uv run aegis-framework eval run --filter safe-failure
+uv run aegis-framework eval replay
+uv run aegis-framework eval compare
+```
+
+Inspect `evals/suite.json`, `dataset.json`, `baseline.json`, and `waivers.json`.
+Change a copy of the dataset source hash, remove a baseline case, expire a soft
+waiver, and attempt to waive `privacy-isolation`; each must fail closed. Reverse the
+case file and shard it four ways; canonical results stay ordered and the shard union
+is exact.
+
+Baseline updates are explicit reviewed changes:
+
+```bash
+uv run aegis-framework eval update-baseline \
+  --reviewed-by REVIEWER \
+  --reason "Reviewed change reference and expected metric movement."
+```
+
+The command requires a complete passing run. Do not use it to accept an unexplained
+regression. See the [evaluation runbook](evaluation-runbook.md).
 
 ## 14. Trace the Layer 6 artifact chain
 

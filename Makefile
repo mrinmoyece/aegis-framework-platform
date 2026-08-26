@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help bootstrap format lint type test integration temporal-integration eval docs security demo serve measure container compose-config ci
+.PHONY: help bootstrap format lint type test integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security demo serve measure container compose-config ci
 
 help:
 	@printf '%s\n' \
@@ -13,7 +13,12 @@ help:
 	  'test            Run branch coverage tests (minimum 90%%)' \
 	  'integration     Run configured local PostgreSQL/Keycloak integration tests' \
 	  'temporal-integration Run configured local Temporal workflow tests' \
-	  'eval            Run deterministic safety evals' \
+	  'eval            Run the complete governed deterministic evaluation suite' \
+	  'eval-safety     Run non-waivable safety invariants' \
+	  'eval-adversarial Run adversarial attack packs' \
+	  'eval-recovery   Run deterministic recovery/chaos scenarios' \
+	  'eval-baseline   Compare current results with the reviewed baseline' \
+	  'eval-meta       Test evaluator repeatability, sharding, waivers, and redaction' \
 	  'docs            Validate documentation and manifests' \
 	  'security        Run static and dependency vulnerability checks' \
 	  'demo            Run the successful checkout investigation' \
@@ -47,7 +52,22 @@ temporal-integration:
 	$(UV) run pytest -m temporal --no-cov
 
 eval:
-	$(UV) run aegis-framework eval --cases evals/cases.json
+	$(UV) run aegis-framework eval run --report-dir build/evals
+
+eval-safety:
+	$(UV) run aegis-framework eval run --filter safe-failure --filter deny-adversarial-input
+
+eval-adversarial:
+	$(UV) run aegis-framework eval run --filter deny-adversarial-input
+
+eval-recovery:
+	$(UV) run aegis-framework eval run --filter deterministic-recovery --filter durable-cancellation --filter ambiguous-effects
+
+eval-baseline:
+	$(UV) run aegis-framework eval compare
+
+eval-meta:
+	$(UV) run pytest tests/test_evaluation_layer10.py --no-cov
 
 docs:
 	$(UV) run python tools/docs_check.py
@@ -63,12 +83,12 @@ serve:
 	$(UV) run aegis-framework serve
 
 measure:
-	$(UV) run python tools/measure.py --write comparison/layer9-metrics.json --runs 200
+	$(UV) run python tools/measure.py --write comparison/layer10-metrics.json --runs 200
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer9 .
+	docker build --pull --tag aegis-framework-platform:layer10 .
 
 compose-config:
 	docker compose config --quiet
 
-ci: lint type test eval docs
+ci: lint type test eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs

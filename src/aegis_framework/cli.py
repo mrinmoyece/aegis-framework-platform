@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -50,16 +51,53 @@ def build_parser() -> argparse.ArgumentParser:
         default=RemediationDemoScenario.SUCCESS.value,
     )
 
-    evaluate = subparsers.add_parser("eval", help="run deterministic eval cases")
+    evaluate = subparsers.add_parser("eval", help="run governed deterministic evals")
     evaluate.add_argument(
         "--cases",
         type=Path,
         default=Path("evals/cases.json"),
     )
+    evaluate.add_argument("--suite", type=Path, default=Path("evals/suite.json"))
+    evaluate.add_argument("--dataset", type=Path, default=Path("evals/dataset.json"))
+    evaluate.add_argument("--baseline", type=Path, default=Path("evals/baseline.json"))
+    evaluate.add_argument("--waivers", type=Path, default=Path("evals/waivers.json"))
     evaluate.add_argument(
         "--publish-langfuse",
         action="store_true",
         help="publish only aggregate results using standard Langfuse environment keys",
+    )
+    eval_actions = evaluate.add_subparsers(dest="eval_action")
+    eval_list = eval_actions.add_parser("list", help="list canonical evaluation cases")
+    eval_run = eval_actions.add_parser("run", help="run and report evaluation cases")
+    eval_compare = eval_actions.add_parser(
+        "compare",
+        help="compare current deterministic results with the reviewed baseline",
+    )
+    eval_replay = eval_actions.add_parser(
+        "replay",
+        help="run twice and require byte-stable result identity",
+    )
+    eval_update = eval_actions.add_parser(
+        "update-baseline",
+        help="write an explicitly reviewed baseline",
+    )
+    for command in (eval_list, eval_run, eval_compare, eval_replay):
+        command.add_argument("--filter", action="append", default=[])
+        command.add_argument("--shard-index", type=int, default=0)
+        command.add_argument("--shard-count", type=int, default=1)
+    for command in (eval_run, eval_compare, eval_replay):
+        command.add_argument(
+            "--mode",
+            choices=("offline", "postgres", "temporal"),
+            default="offline",
+        )
+    eval_run.add_argument("--report-dir", type=Path)
+    eval_update.add_argument("--reviewed-by", required=True)
+    eval_update.add_argument("--reason", required=True)
+    eval_update.add_argument(
+        "--output",
+        type=Path,
+        default=Path("evals/baseline.json"),
     )
 
     serve = subparsers.add_parser("serve", help="run the FastAPI adapter")
@@ -85,6 +123,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(result.model_dump_json(indent=2))
         return 0
     if args.command == "eval":
+        if args.eval_action is not None:
+            return _run_governed_eval(args)
         report = run_eval_suite(load_cases(args.cases))
         if args.publish_langfuse:
             try:
@@ -111,11 +151,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from aegis_framework.memory_demo import run_memory_demo
 
         memory_result = run_memory_demo()
-        print(
-            memory_result.context.model_dump_json(
-                indent=2,
-            )
-        )
+        print(memory_result.context.model_dump_json(indent=2))
         return 0
 
     uvicorn.run(
@@ -125,3 +161,115 @@ def main(argv: Sequence[str] | None = None) -> int:
         access_log=False,
     )
     return 0
+
+
+def _run_governed_eval(args: argparse.Namespace) -> int:
+    from aegis_framework.evaluation import (
+        EvaluationRunner,
+        create_baseline,
+        load_baseline,
+        load_dataset,
+        load_suite,
+        load_waivers,
+        write_baseline,
+        write_reports,
+    )
+
+    suite = load_suite(args.suite)
+    dataset = load_dataset(args.dataset)
+    baseline = load_baseline(args.baseline)
+    cases = load_cases(args.cases)
+    runner = EvaluationRunner(
+        suite=suite,
+        dataset=dataset,
+        baseline=baseline,
+        waivers=load_waivers(args.waivers),
+    )
+    filters = tuple(getattr(args, "filter", ()))
+    shard_index = getattr(args, "shard_index", 0)
+    shard_count = getattr(args, "shard_count", 1)
+    if args.eval_action == "list":
+        contracts = runner.list_cases(
+            cases,
+            filters=filters,
+            shard_index=shard_index,
+            shard_count=shard_count,
+        )
+        print(
+            json.dumps(
+                [
+                    item.model_dump(mode="json", exclude_computed_fields=True)
+                    for item in contracts
+                ],
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+    if args.eval_action == "update-baseline":
+        previous = load_baseline(args.output) if args.output.exists() else None
+        reviewed = create_baseline(
+            suite=suite,
+            dataset=dataset,
+            case_ids=(case.case_id for case in cases),
+            reviewed_by=args.reviewed_by,
+            review_reason=args.reason,
+            previous=previous,
+        )
+        candidate_runner = EvaluationRunner(
+            suite=suite,
+            dataset=dataset,
+            baseline=reviewed,
+        )
+        candidate_report = candidate_runner.run(cases)
+        if not candidate_report.passed:
+            print(candidate_report.model_dump_json(indent=2))
+            return 1
+        write_baseline(args.output, reviewed)
+        print(reviewed.model_dump_json(indent=2))
+        return 0
+    report = runner.run(
+        cases,
+        filters=filters,
+        shard_index=shard_index,
+        shard_count=shard_count,
+        mode=args.mode,
+    )
+    if args.eval_action == "replay":
+        replayed = runner.run(
+            tuple(reversed(cases)),
+            filters=filters,
+            shard_index=shard_index,
+            shard_count=shard_count,
+            mode=args.mode,
+        )
+        stable = report.canonical_digest == replayed.canonical_digest
+        print(
+            json.dumps(
+                {
+                    "stable": stable,
+                    "first": report.canonical_digest,
+                    "replay": replayed.canonical_digest,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0 if stable and report.passed else 1
+    if args.eval_action == "compare":
+        print(report.comparison.model_dump_json(indent=2))
+        return 0 if report.comparison.passed else 1
+    if args.report_dir is not None:
+        write_reports(
+            report,
+            args.report_dir,
+            maximum_bytes=suite.bounds.maximum_report_bytes,
+        )
+    if args.publish_langfuse:
+        from aegis_framework.langfuse_adapter import build_langfuse_observability
+
+        publisher = build_langfuse_observability()
+        publisher.publish_dataset_manifest(dataset)
+        publisher.publish_evaluation_report(report)
+    print(report.model_dump_json(indent=2))
+    return 0 if report.passed else 1

@@ -126,7 +126,7 @@ def load_cases(path: Path) -> tuple[EvalCase, ...]:
 
 
 def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
-    outcomes = tuple(_run_case(case) for case in cases)
+    outcomes = tuple(run_eval_case(case) for case in cases)
     succeeded = sum(outcome.passed for outcome in outcomes)
     return EvalReport(
         passed=succeeded == len(outcomes),
@@ -136,7 +136,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
     )
 
 
-def _run_case(case: EvalCase) -> EvalOutcome:
+def run_eval_case(case: EvalCase) -> EvalOutcome:
+    """Execute one canonical case for the governed Layer 10 runner."""
     if case.kind.startswith("memory-"):
         return _run_memory_case(case)
     if case.kind.startswith("sandbox-"):

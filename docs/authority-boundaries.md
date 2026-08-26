@@ -1,4 +1,4 @@
-# Layer 9 authority and retry ownership
+# Layer 10 authority and retry ownership
 
 ## Ownership matrix
 
@@ -130,3 +130,8 @@
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.
+A Layer 10 suite, dataset, baseline, waiver, score, comparison, report, trace
+reference, Langfuse record, pytest result, or CI status is release evidence only.
+None authorizes a run/checkpoint read, grants tenant access, approves an action,
+fences an effect, proves reconciliation, verifies production recovery, or becomes
+an audit record.

@@ -528,3 +528,35 @@ workflow. Escape remains explicit: preserve immutable `memory_facts`, the neutra
 replay; replace the derived index or embedding provider only after the new implementation
 passes the same tenancy/citation/legal-hold/erasure/instruction-boundary equivalence
 suite.
+## Layer 10 evaluation tool decision
+
+Required evaluation remains neutral Python contracts plus pytest. It executes
+offline and publishes nothing unless an operator explicitly selects the sanitized
+Langfuse adapter.
+
+| Tool | Decision | Enterprise rationale |
+|---|---|---|
+| pytest | Selected | Existing exact-pinned runner, strict assertions/JUnit/coverage, no hosted service, and Temporal's recommended Python test harness |
+| Hypothesis | Comparison/future additive use | Strong local generation and shrinking; generated failures still need reviewed promotion into the immutable corpus, so Layer 10 does not add it solely to restate finite cases |
+| Temporal `WorkflowEnvironment` | Selected, environment-gated | Time skipping and replay are proven SDK mechanics; `test_server_existing_path` prevents an implicit binary download and Compose provides the pinned CI path |
+| Langfuse datasets/evals | Selected only as optional publisher | MIT core and self-hosting are available, but deterministic gates stay local; no code-evaluator dispatcher, hosted dataset authority, or automatic graph capture |
+| LangSmith | Rejected | Self-hosting is an Enterprise add-on and brings a proprietary evaluation/control plane; automatic LangGraph capture conflicts with the repository privacy boundary |
+| DeepEval | Rejected for CI | Most built-in metrics are LLM-as-judge; using only custom deterministic metrics duplicates the neutral scorer contracts |
+| Ragas | Rejected for CI | Core RAG/agent metrics are judge-driven; BLEU/ROUGE/string metrics do not establish tenant, citation, approval, effect, or recovery safety |
+| promptfoo | Rejected | Adds Node, subprocess/provider configuration, and another test DSL; its main multi-provider value requires network/model calls |
+| OpenAI eval tooling | Rejected | Provider/network dependent; the hosted Evals platform is read-only from 2026-10-31 and scheduled to shut down on 2026-11-30 |
+
+Primary references: [LangSmith evaluation concepts](https://docs.langchain.com/langsmith/evaluation-concepts),
+[LangSmith self-hosting](https://docs.langchain.com/langsmith/self-hosted),
+[Langfuse datasets](https://langfuse.com/docs/evaluation/experiments/datasets),
+[Langfuse SDK experiments](https://langfuse.com/docs/evaluation/experiments/experiments-via-sdk),
+[Langfuse licensing](https://langfuse.com/self-hosting/license-key),
+[DeepEval metrics](https://deepeval.com/docs/metrics-introduction),
+[Ragas metrics](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/),
+[promptfoo deterministic assertions](https://www.promptfoo.dev/docs/configuration/expected-outputs/deterministic/),
+[OpenAI evals](https://developers.openai.com/api/docs/guides/evals),
+[Hypothesis](https://hypothesis.readthedocs.io/en/latest/), and
+[Temporal Python testing](https://docs.temporal.io/develop/python/best-practices/testing-suite).
+
+The full decision and authority boundary are in
+[ADR 015](adr/015-governed-deterministic-evaluation.md).
