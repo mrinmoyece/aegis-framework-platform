@@ -60,17 +60,12 @@ class AuthorizationStart(StrictModel):
     nonce: str = Field(min_length=32, max_length=128)
     code_challenge: str = Field(min_length=43, max_length=128)
     code_challenge_method: Literal["S256"] = "S256"
-    # Demo-only: the server-generated verifier is returned so the client can
-    # complete the PKCE exchange without a separate out-of-band flow.
-    code_verifier: str = Field(min_length=43, max_length=128)
     expires_at: AwareDatetime
 
 
 class AuthorizationCallback(StrictModel):
     code: str = Field(min_length=1, max_length=256)
     state: str = Field(min_length=32, max_length=128)
-    # PKCE code_verifier (RFC 7636 §4.1): 43-128 unreserved chars from the client.
-    code_verifier: str = Field(min_length=43, max_length=128)
 
 
 class TenantSwitchRequest(StrictModel):
@@ -295,8 +290,6 @@ class ProtocolTrustMutationRequest(StrictModel):
 
 @dataclass(frozen=True)
 class _Handshake:
-    verifier_digest: str
-    code_challenge: str  # S256 challenge to validate the PKCE code_verifier on exchange
     nonce: str
     origin_digest: str
     expires_at: datetime
@@ -331,8 +324,6 @@ class InMemoryOperatorSessions:
             if len(self._handshakes) >= _MAX_HANDSHAKES:
                 raise ValueError("handshake capacity exceeded; try again shortly")
             self._handshakes[_digest(state)] = _Handshake(
-                verifier_digest=_digest(verifier),
-                code_challenge=challenge,
                 nonce=nonce,
                 origin_digest=_digest(origin),
                 expires_at=now + _HANDSHAKE_LIFETIME,
@@ -345,12 +336,11 @@ class InMemoryOperatorSessions:
             state=state,
             nonce=nonce,
             code_challenge=challenge,
-            code_verifier=verifier,
             expires_at=now + _HANDSHAKE_LIFETIME,
         )
 
     def exchange(
-        self, *, state: str, code: str, code_verifier: str, origin: str, now: datetime
+        self, *, state: str, code: str, origin: str, now: datetime
     ) -> tuple[str, _Session]:
         with self._lock:
             self._prune(now)
@@ -360,10 +350,6 @@ class InMemoryOperatorSessions:
                 or handshake.expires_at <= now
                 or not hmac.compare_digest(_digest(origin), handshake.origin_digest)
                 or not hmac.compare_digest(code, "deterministic-demo-code")
-                # PKCE S256: SHA-256(code_verifier) base64url-encoded == challenge.
-                or not hmac.compare_digest(
-                    _b64_digest(code_verifier), handshake.code_challenge
-                )
             ):
                 raise ValueError("authorization response is invalid")
             token = secrets.token_urlsafe(48)
@@ -588,7 +574,6 @@ def install_operator_routes(app: FastAPI, *, production: bool) -> None:
             token, record = sessions.exchange(
                 state=payload.state,
                 code=payload.code,
-                code_verifier=payload.code_verifier,
                 origin=request_origin(request),
                 now=now,
             )
