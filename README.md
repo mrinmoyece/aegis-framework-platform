@@ -8,10 +8,10 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
-**Layer 5 investigates through durable secure evidence connectors and a governed model
-gateway. It still cannot approve, execute, or verify a production effect.**
+**Layer 6 adds governed fixed-role specialist orchestration and typed reasoning
+artifacts. It still cannot approve, execute, or verify a production effect.**
 
-## Delivered Layer 5
+## Delivered Layer 6
 
 - additive strict application events with aggregate sequence, commit-order tenant
   cursor, expected-version concurrency, aggregate/tenant hash chains, legacy upcast,
@@ -52,6 +52,20 @@ gateway. It still cannot approve, execute, or verify a production effect.**
 - deterministic non-LLM timeline/link/conflict/freshness/missing-source correlation with
   non-causal links and provenance-bound graph/model citations;
 - forced-RLS evidence projections/rebuild and authorized redacted query/cursor APIs.
+- immutable schema-versioned plan, task, evidence-assessment, hypothesis/alternative,
+  contradiction/critique, timeline/causal-reference, proposal-only remediation,
+  verification-plan, coordinator-decision, and final-assessment artifacts;
+- fixed coordinator, telemetry/change/runtime/knowledge specialists, critic,
+  remediation planner, and verification agent with code-enforced capabilities and
+  artifact transitions—no peer chat, dynamic roles, or self-granted authority;
+- static LangGraph `StateGraph` fan-out/fan-in with deterministic reducers, critic
+  routing, eight checkpoint super-steps, recursion/iteration/fan-out bounds, duplicate
+  suppression, graph-version binding, and safe complete/abstain/escalate outcomes;
+- application-ledger dispatch intent, fenced task result, artifact and decision facts
+  with forced-RLS PostgreSQL projections/rebuild, while Temporal retains one bounded
+  graph Activity and owns cross-process retry/cancellation;
+- authorized redacted artifact cursor API plus fixed-name OTel/Langfuse graph-node and
+  model spans that export counts/status only.
 
 ## Ownership
 
@@ -59,7 +73,7 @@ gateway. It still cannot approve, execute, or verify a production effect.**
 |---|---|---|
 | PostgreSQL application ledger | Events, idempotency, inbox/outbox, run/timeline/audit facts | Framework scheduling/checkpoints |
 | Temporal | Cross-process schedule, Activities, timers, signals, replay/recovery | Tenant grants, policy, audit, API status, effects |
-| LangGraph | Cognitive nodes, fan-out/join, reducers, graph checkpoints | Workflow lifecycle, authorization, audit, effects |
+| LangGraph | Fixed cognitive topology, fan-out/join, reducers, routing, graph checkpoints | Roles/capabilities, artifacts, dispatch/result facts, authorization, audit, effects |
 | Official provider SDKs | OpenAI/Anthropic wire protocol and decoding | Model policy, routing, budget, pricing, usage, safety, retry truth |
 | Connector libraries | HTTPX transport, Kubernetes decoding, PyYAML syntax | Tenant/source policy, SSRF, secrets, provenance, pagination truth, quarantine |
 
@@ -130,9 +144,9 @@ make integration
 AEGIS_TEST_TEMPORAL_ADDRESS=127.0.0.1:57233 make temporal-integration
 ```
 
-The six PostgreSQL tests prove forced RLS/pool reset, immutable audit/events, quota/model
-races, checkpoint isolation, ledger/outbox atomicity, projection rebuild, and tenant
-isolation. The Temporal test proves no-worker recovery, Activity retry, duplicate
+The eight PostgreSQL tests prove forced RLS/pool reset, immutable audit/events/artifacts,
+quota/model races, checkpoint isolation, ledger/outbox atomicity, projection rebuild,
+and tenant isolation. The Temporal test proves no-worker recovery, Activity retry, duplicate
 signal, cancellation signal, timer timeout, completion, and deterministic replay.
 
 Production delivery additionally requires a private
@@ -159,12 +173,12 @@ never the repository or workflow history.
 
 ## Qualification status
 
-- 215 deterministic tests pass at 90.11% meaningful branch coverage;
-- 26 deterministic evals cover cognitive/model safety, durable recovery,
+- 226 deterministic tests pass at 90.01% meaningful branch coverage;
+- 31 deterministic evals cover cognitive/model safety, durable recovery,
   routing, budgets, malformed output, fallback/circuit, timeout/cancellation, duplicate
   and ambiguous billing, revocation, tenant isolation, connector pagination, poisoning,
   source revocation, non-causal correlation and SSRF;
-- six PostgreSQL and three Temporal integration tests pass locally;
+- eight PostgreSQL and three Temporal integration tests pass locally;
 - one Keycloak compatibility test remains environment-gated;
 - tests/evals use no live credentials, real models, or cloud services.
 
@@ -173,13 +187,13 @@ these as production evidence.
 
 ## Framework comparison
 
-`comparison/layer5-metrics.json` pins custom Aegis Layer 6 at `7a685bc` and records LOC,
+`comparison/layer6-metrics.json` pins custom Aegis Layer 7 at `dce0054` and records LOC,
 dependencies, incremental effort, retained controls, operational cost and escape paths.
-An equivalent three-record correlation benchmark measured 0.048 ms median for Framework
-Layer 5 versus 0.015 ms custom. It excludes ingestion, databases, worker systems,
-networks, serialization and process boundaries. The conclusion is deliberately critical:
-connector libraries remove wire/object/syntax mechanics but little enterprise control
-code.
+The 200-run in-memory specialist benchmark measured the framework path separately from
+the custom async event-repository path; it is not a service benchmark and excludes
+PostgreSQL, Temporal, Redis, networks, and process boundaries. The conclusion is
+deliberately critical: LangGraph removes scheduler/fan-in/checkpoint mechanics, not
+governance, tenant controls, artifact facts, citations, or recovery policy.
 
 ## Commands
 
@@ -192,12 +206,13 @@ code.
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 5 comparison metrics |
+| `make measure` | Refresh Layer 6 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
 [ADR 007](docs/adr/007-temporal-durable-workflow.md),
 [ADR 010](docs/adr/010-secure-evidence-connectors.md),
+[ADR 011](docs/adr/011-governed-specialist-orchestration.md),
 [connector runbook](docs/connector-runbook.md), [runbook](docs/runbook.md),
 [threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).

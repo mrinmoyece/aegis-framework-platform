@@ -1,16 +1,38 @@
-# Layer 5 durable evidence connector and correlation architecture
+# Layer 6 governed specialist orchestration architecture
 
 ## Product boundary
 
-Layer 5 accepts a tenant-authorized investigation command, records immutable
+Layer 6 accepts a tenant-authorized investigation command, records immutable
 application intent, schedules a crash-resilient lifecycle, runs the existing bounded
-connector pagination and LangGraph investigation, optionally waits for a signal, and
-publishes application-owned evidence, status, and timeline projections.
+connector pagination and one bounded LangGraph specialist investigation, optionally
+waits for a signal, and publishes application-owned evidence, artifact, status, and
+timeline projections.
 
 It still cannot approve, execute, or verify a production change. Production-shaped
 Dynatrace, GitHub App, Kubernetes, and runbook adapters are disabled by default; live
 provider qualification and credential brokering remain deferred, as do controlled
 effects/approvals, sandboxing, memory/RAG, UI/BFF, MCP/A2A, and deployment.
+
+## Layer 6 specialist graph
+
+The static graph is `coordinator -> four specialists -> critic -> optional remediation
+planner -> verification agent -> coordinator decision`. The coordinator creates exactly
+four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
+parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
+checkpoint history. Application code provides the fixed role set, deny-by-default
+capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
+dispatch intent, result fencing, terminal decision, and all tenant authority.
+
+Every artifact is a frozen strict neutral envelope with schema version, tenant,
+incident, run and optional task linkage, producer role, ordinal, provenance digests,
+bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
+artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
+resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
+
+Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
+Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
+ownership and increase framework coupling. Interrupts are not used for approval or
+effects; any future non-authoritative pause must resume only through application intent.
 
 ## Three durable owners
 

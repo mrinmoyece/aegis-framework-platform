@@ -152,7 +152,9 @@ class InvestigationService:
                     units=_INVESTIGATION_BUDGET_UNITS,
                 )
                 if not budget.allowed:
-                    result = _budget_abstention(identity, request, thread_ref)
+                    result = _budget_abstention(
+                        identity, request, thread_ref, thread_ref
+                    )
                     self._idempotency.complete(
                         tenant_id=identity.tenant_id,
                         request_id=identity.request_id,
@@ -183,6 +185,7 @@ class InvestigationService:
                     tenant_id=identity.tenant_id,
                     request=request,
                     request_id=identity.request_id,
+                    run_id=thread_ref,
                     thread_ref=thread_ref,
                     evidence=collected,
                 )
@@ -295,12 +298,14 @@ class InvestigationService:
 def _budget_abstention(
     identity: IdentityContext,
     request: InvestigationRequest,
+    run_id: str,
     thread_ref: str,
 ) -> InvestigationResult:
     return InvestigationResult(
         status=InvestigationStatus.ABSTAINED,
         tenant_id=identity.tenant_id,
         incident_id=request.incident_id,
+        run_id=run_id,
         request_id=identity.request_id,
         thread_ref=thread_ref,
         hypotheses=(),

@@ -1,4 +1,4 @@
-# Layer 5 failure modes
+# Layer 6 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -57,6 +57,15 @@
 | Missing/stale telemetry/change | Critic abstains; missing runbook prevents proposal | Correlation + critic | unit |
 | Evidence projection loss | Verify ledger, deterministic rebuild, record rebuild fact | Application ledger/PostgreSQL | unit/integration |
 | Cursor/status cross-tenant read | Current authorization plus forced RLS/404 | Policy/PostgreSQL | API/integration |
+| Unknown role/capability | Closed enum and deny-by-default write policy reject before dispatch | Application orchestration policy | unit/eval |
+| Illegal artifact provenance/transition | Strict envelope/digest/transition validation rejects artifact | Application artifact boundary | unit/eval |
+| Duplicate task while intent unresolved | Rotate attempt fence; no second model call; explicit reconciliation-required abstention rejects the abandoned result | Application orchestration ledger | unit/eval/PostgreSQL |
+| Concurrent first run intent | Conflict-safe insert and locked reread return one binding; changed input fails as orchestration failure | Application orchestration ledger | PostgreSQL |
+| Stale fenced task/artifact after cancel | Reject result and preserve cancelled application state | Application orchestration ledger | unit/eval/PostgreSQL |
+| Incompatible graph checkpoint | Reject graph-version/run/input mismatch; rebuild from application facts | Application compatibility gate | unit/eval |
+| Specialist/provider exception | Convert at node boundary to named abstention; worker remains alive | Graph adapter | unit |
+| Critic rejection/low confidence | Deterministic abstain/escalate; no proposal/effect path | Application critic gate | unit/eval |
+| Artifact projection loss | Rebuild from immutable orchestration facts/artifacts under tenant RLS | Application ledger | unit/PostgreSQL |
 
 ## Retry rules
 

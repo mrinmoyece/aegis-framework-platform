@@ -1,4 +1,4 @@
-# Layer 5 qualification status
+# Layer 6 qualification status
 
 ## Delivered
 
@@ -45,16 +45,23 @@
   authorized redacted query/cursor endpoints, and application-ledger projection rebuild;
 - fixed-name OTel/Langfuse evidence observations containing only source kind,
   status/counts and reconciliation flags.
+- immutable typed reasoning artifacts and fixed-role capability/transition policy;
+- four-specialist LangGraph fan-out/fan-in, critic/planner/verification routing,
+  graph-version replay binding, deterministic duplicate suppression and safe terminals;
+- application-ledger run/task/artifact/decision facts, fencing, forced-RLS projections,
+  deterministic rebuild and authorized redacted cursor reads;
+- one Temporal-owned bounded graph Activity with no graph/provider retry overlap;
+- fixed-name redacted graph-node and model observations.
 
 ## Qualification snapshot
 
-- 215 deterministic tests pass with 90.11% meaningful branch coverage;
-- 26 deterministic evals pass, including pagination, poisoning, source revocation,
+- 226 deterministic tests pass with 90.01% meaningful branch coverage;
+- 31 deterministic evals pass, including pagination, poisoning, source revocation,
   deterministic non-causal correlation and private-destination rejection;
-- six local PostgreSQL integration tests cover the prior controls plus evidence
-  forced RLS, tenant isolation, application-event replay and projection rebuild;
-  reservation races, crash-window ambiguity, reconciliation, RLS, immutability and
-  projection rebuild;
+- eight local PostgreSQL integration tests cover forced RLS/tenant isolation,
+  immutable audit/events/model/evidence/orchestration facts, quota/model races,
+  checkpoint isolation, dedicated-pool concurrency, crash ambiguity/reconciliation
+  and deterministic rebuild;
 - three local Temporal integration tests cover no-worker recovery, Activity retry,
   duplicate signal, cancellation, timeout, replay, opaque evidence pagination, and the
   real application outbox/Activity/projection path;

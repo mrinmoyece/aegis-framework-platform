@@ -49,6 +49,7 @@ from aegis_framework.fixtures import (
     demo_identity,
     demo_request,
 )
+from aegis_framework.graph import LangGraphInvestigator
 from aegis_framework.model import DeterministicStructuredModel
 from aegis_framework.model_gateway import (
     BillingDisposition,
@@ -69,6 +70,13 @@ from aegis_framework.model_gateway import (
     TextContent,
 )
 from aegis_framework.model_postgres import PostgresModelControlStore
+from aegis_framework.orchestration import (
+    GRAPH_VERSION,
+    AgentRole,
+    GovernanceArtifact,
+    InvestigationTaskPayload,
+)
+from aegis_framework.orchestration_postgres import PostgresOrchestrationLedger
 from aegis_framework.postgres import (
     PostgresRepository,
     RuntimePool,
@@ -85,6 +93,7 @@ _MIGRATION = Path("migrations/0001_layer2.sql")
 _LAYER3_MIGRATION = Path("migrations/0002_layer3.sql")
 _LAYER4_MIGRATION = Path("migrations/0003_layer4.sql")
 _LAYER5_MIGRATION = Path("migrations/0004_layer5.sql")
+_LAYER6_MIGRATION = Path("migrations/0005_layer6.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -168,6 +177,163 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "aegis-layer5-schema" in layer5
     assert "FORCE ROW LEVEL SECURITY" in layer5
     assert "PASSWORD" not in layer5
+    layer6 = _LAYER6_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "orchestration_runs",
+        "orchestration_facts",
+        "orchestration_tasks",
+        "orchestration_artifacts",
+        "orchestration_projection_rebuilds",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer6
+    assert "orchestration_facts_immutable" in layer6
+    assert "orchestration_artifacts_immutable" in layer6
+    assert "aegis-layer6-schema" in layer6
+    assert "UNIQUE (tenant_id, run_id, ordinal)" in layer6
+    assert "FORCE ROW LEVEL SECURITY" in layer6
+    assert "PASSWORD" not in layer6
+
+
+@pytest.mark.postgres
+def test_live_orchestration_artifacts_are_rls_isolated_and_rebuildable() -> None:
+    _admin_dsn, pool, _repository = _repository_context()
+    run_id = f"run:orchestration-{uuid4().hex}"
+    thread_ref = f"thread:orchestration-{uuid4().hex}"
+    try:
+        ledger = PostgresOrchestrationLedger(
+            pool=pool,
+            clock=FixedClock(DEMO_TIME),
+        )
+        investigator = LangGraphInvestigator(
+            DeterministicStructuredModel(),
+            ledger=ledger,
+        )
+        source = build_demo_bundle()
+        evidence = tuple(
+            item.model_copy(update={"tenant_id": _TENANT_ALPHA})
+            for item in source.service._evidence.collect(
+                demo_identity(),
+                demo_request(),
+            )
+        )
+        result = investigator.run(
+            tenant_id=_TENANT_ALPHA,
+            request=demo_request(),
+            request_id="postgres-orchestration",
+            run_id=run_id,
+            thread_ref=thread_ref,
+            evidence=evidence,
+        )
+        assert len(result.artifacts) == 16
+        projection = ledger.projection(tenant_id=_TENANT_ALPHA, run_id=run_id)
+        assert projection is not None
+        assert projection.artifact_count == 16
+        assert ledger.projection(tenant_id=_TENANT_BETA, run_id=run_id) is None
+        assert (
+            ledger.rebuild_projection(
+                tenant_id=_TENANT_ALPHA,
+                run_id=run_id,
+            )
+            == projection
+        )
+        first_claim = ledger.claim_task(
+            tenant_id=_TENANT_ALPHA,
+            run_id=run_id,
+            task_id="task:stale-worker",
+            role=AgentRole.TELEMETRY_SPECIALIST,
+            input_digest=projection.input_digest,
+        )
+        reconciliation = ledger.claim_task(
+            tenant_id=_TENANT_ALPHA,
+            run_id=run_id,
+            task_id="task:stale-worker",
+            role=AgentRole.TELEMETRY_SPECIALIST,
+            input_digest=projection.input_digest,
+        )
+        assert reconciliation.fence_token != first_claim.fence_token
+        with tenant_transaction(pool, tenant_id=_TENANT_ALPHA) as connection:
+            rows = connection.execute(
+                """
+                SELECT document
+                FROM aegis.orchestration_facts
+                WHERE tenant_id = %s
+                  AND run_id = %s
+                  AND task_id = %s
+                  AND fact_type = 'task.dispatch'
+                ORDER BY recorded_at, (document->>'attempt')::int
+                """,
+                (_TENANT_ALPHA, run_id, "task:stale-worker"),
+            ).fetchall()
+        assert tuple(row["document"]["status"] for row in rows) == (
+            "started",
+            "reconciliation_required",
+        )
+        assert tuple(row["document"]["attempt"] for row in rows) == (1, 2)
+        assert str(rows[1]["document"]["fence_token"]) == reconciliation.fence_token
+        with pytest.raises(IntegrityFailure, match="fence is stale"):
+            ledger.complete_task(
+                tenant_id=_TENANT_ALPHA,
+                run_id=run_id,
+                task_id="task:stale-worker",
+                fence_token=first_claim.fence_token,
+                result={"finding_id": "stale"},
+            )
+        plan = GovernanceArtifact.model_validate(result.artifacts[0])
+        duplicate_ordinal = GovernanceArtifact.issue(
+            tenant_id=_TENANT_ALPHA,
+            incident_id=demo_request().incident_id,
+            run_id=run_id,
+            task_id="task:duplicate-ordinal",
+            ordinal=10,
+            producer_role=AgentRole.COORDINATOR,
+            payload=InvestigationTaskPayload(
+                task_id="task:duplicate-ordinal",
+                assigned_role=AgentRole.TELEMETRY_SPECIALIST,
+                objective="Prove duplicate ordinal denial.",
+                allowed_evidence_kinds=("telemetry",),
+            ),
+            sources=(plan,),
+        )
+        with pytest.raises(IntegrityFailure, match="ordinal/digest conflict"):
+            ledger.append_artifacts(
+                tenant_id=_TENANT_ALPHA,
+                run_id=run_id,
+                fence_token=projection.fence_token,
+                artifacts=(duplicate_ordinal,),
+            )
+        ledger.cancel(tenant_id=_TENANT_ALPHA, run_id=run_id)
+        cancelled = ledger.projection(tenant_id=_TENANT_ALPHA, run_id=run_id)
+        assert cancelled is not None
+        assert cancelled.cancelled
+        assert cancelled.decision is projection.decision
+        assert (
+            ledger.rebuild_projection(
+                tenant_id=_TENANT_ALPHA,
+                run_id=run_id,
+            )
+            == cancelled
+        )
+        with pytest.raises(IntegrityFailure, match="artifact fence is stale"):
+            ledger.append_artifacts(
+                tenant_id=_TENANT_ALPHA,
+                run_id=run_id,
+                fence_token=projection.fence_token,
+                artifacts=(GovernanceArtifact.model_validate(result.artifacts[0]),),
+            )
+        with (
+            pytest.raises(RepositoryUnavailable),
+            tenant_transaction(pool, tenant_id=_TENANT_ALPHA) as connection,
+        ):
+            connection.execute(
+                """
+                UPDATE aegis.orchestration_artifacts
+                SET artifact_kind = 'tampered'
+                WHERE tenant_id = %s AND run_id = %s
+                """,
+                (_TENANT_ALPHA, run_id),
+            )
+    finally:
+        pool.close()
 
 
 def _integration_dsns() -> tuple[str, str]:
@@ -1044,26 +1210,49 @@ def test_live_model_reservation_reconciliation_rls_and_rebuild() -> None:
 @pytest.mark.postgres
 def test_live_checkpoint_rls_prevents_cross_tenant_reads_and_rebinding() -> None:
     _, pool, _ = _repository_context()
+    _, runtime_dsn = _integration_dsns()
+    ledger_pool = open_runtime_pool(
+        dsn=runtime_dsn,
+        minimum_size=1,
+        maximum_size=8,
+    )
     orchestrator = TenantPostgresOrchestrator(
         pool=pool,
         model=DeterministicStructuredModel(),
+        ledger=PostgresOrchestrationLedger(
+            pool=ledger_pool,
+            clock=FixedClock(DEMO_TIME),
+        ),
     )
     thread_ref = f"thread:{uuid4().hex}"
+    request_id = f"postgres-checkpoint-{uuid4().hex}"
+    run_id = f"run:postgres-checkpoint-{uuid4().hex}"
     try:
         result = orchestrator.run(
             tenant_id=_TENANT_ALPHA,
             request=demo_request(),
-            request_id="postgres-checkpoint",
+            request_id=request_id,
+            run_id=run_id,
             thread_ref=thread_ref,
             evidence=(),
         )
         assert result.status.value == "abstained"
+        replayed = orchestrator.run(
+            tenant_id=_TENANT_ALPHA,
+            request=demo_request(),
+            request_id=request_id,
+            run_id=run_id,
+            thread_ref=thread_ref,
+            evidence=(),
+        )
+        assert replayed.replayed
+        assert replayed.artifacts == result.artifacts
         assert (
             orchestrator.checkpoint_count(
                 tenant_id=_TENANT_ALPHA,
                 thread_ref=thread_ref,
             )
-            == 5
+            == 6
         )
         assert (
             orchestrator.checkpoint_count(
@@ -1081,7 +1270,78 @@ def test_live_checkpoint_rls_prevents_cross_tenant_reads_and_rebinding() -> None
                 evidence=(),
             )
     finally:
+        ledger_pool.close()
         pool.close()
+
+
+@pytest.mark.postgres
+def test_dedicated_orchestration_pool_avoids_checkpoint_pool_deadlock() -> None:
+    admin_dsn, runtime_dsn = _integration_dsns()
+    _prepare_database(admin_dsn)
+    checkpoint_pool = open_runtime_pool(
+        dsn=runtime_dsn,
+        minimum_size=1,
+        maximum_size=2,
+    )
+    ledger_pool = open_runtime_pool(
+        dsn=runtime_dsn,
+        minimum_size=1,
+        maximum_size=10,
+    )
+    orchestrator = TenantPostgresOrchestrator(
+        pool=checkpoint_pool,
+        model=DeterministicStructuredModel(),
+        ledger=PostgresOrchestrationLedger(
+            pool=ledger_pool,
+            clock=FixedClock(DEMO_TIME),
+        ),
+    )
+    ledger = PostgresOrchestrationLedger(
+        pool=ledger_pool,
+        clock=FixedClock(DEMO_TIME),
+    )
+
+    def begin(_index: int) -> object:
+        return ledger.begin_run(
+            tenant_id=_TENANT_ALPHA,
+            incident_id="concurrent-begin",
+            run_id="run:concurrent-begin",
+            thread_ref="thread:concurrent-begin",
+            graph_version=GRAPH_VERSION,
+            input_digest="c" * 64,
+        )
+
+    def run(index: int) -> str:
+        return orchestrator.run(
+            tenant_id=_TENANT_ALPHA,
+            request=demo_request(),
+            request_id=f"concurrent-checkpoint-{index}",
+            run_id=f"run:concurrent-checkpoint-{index}",
+            thread_ref=f"thread:concurrent-checkpoint-{index}",
+            evidence=(),
+        ).status.value
+
+    try:
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            projections = tuple(executor.map(begin, range(4)))
+        assert all(item == projections[0] for item in projections)
+        with pytest.raises(OrchestrationFailure, match="binding changed"):
+            ledger.begin_run(
+                tenant_id=_TENANT_ALPHA,
+                incident_id="changed-incident",
+                run_id="run:concurrent-begin",
+                thread_ref="thread:concurrent-begin",
+                graph_version=GRAPH_VERSION,
+                input_digest="c" * 64,
+            )
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            assert tuple(executor.map(run, range(2))) == (
+                "abstained",
+                "abstained",
+            )
+    finally:
+        ledger_pool.close()
+        checkpoint_pool.close()
 
 
 @pytest.mark.postgres

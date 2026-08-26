@@ -30,7 +30,7 @@ class _SpanObservation:
 
 class OpenTelemetryObservability:
     def __init__(self, tracer: Tracer | None = None) -> None:
-        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.5.0")
+        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.6.0")
 
     def investigation(
         self,
@@ -50,6 +50,30 @@ class OpenTelemetryObservability:
             tenant_id=tenant_id,
             attributes={**attributes, "operation": "evidence_query"},
             span_name="aegis.evidence.query",
+        )
+
+    def graph_node(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._span(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "graph_node"},
+            span_name="aegis.graph.node",
+        )
+
+    def model_call(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._span(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "model_call"},
+            span_name="aegis.graph.model",
         )
 
     @contextmanager
@@ -80,6 +104,24 @@ class NoopObservability:
         return self._observation()
 
     def evidence_query(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        del tenant_id, attributes
+        return self._observation()
+
+    def graph_node(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        del tenant_id, attributes
+        return self._observation()
+
+    def model_call(
         self,
         *,
         tenant_id: str,

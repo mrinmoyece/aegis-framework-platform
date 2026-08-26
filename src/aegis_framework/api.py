@@ -53,6 +53,7 @@ from aegis_framework.errors import (
     ConcurrencyConflict,
     IdempotencyConflict,
     IdentityUnavailable,
+    IntegrityFailure,
     InvestigationInProgress,
     PayloadRejected,
     PolicyDenied,
@@ -75,6 +76,10 @@ from aegis_framework.model_gateway import (
     ModelUsageView,
     ProviderHealthView,
     TenantModelPolicy,
+)
+from aegis_framework.orchestration import (
+    ArtifactSummary,
+    OrchestrationArtifactReadPort,
 )
 from aegis_framework.ports import Action, PolicyDecision, PolicyPort
 from aegis_framework.references import TenantReferenceCodec
@@ -157,6 +162,11 @@ class ModelCatalogView(StrictModel):
     pricing_version: Identifier
 
 
+class OrchestrationArtifactPageView(StrictModel):
+    items: tuple[ArtifactSummary, ...]
+    next_cursor: str | None
+
+
 class BodySizeLimitMiddleware:
     """Reject request bodies over the bound even without Content-Length."""
 
@@ -231,6 +241,8 @@ class ApiRuntime:
     durable: DurableInvestigationService | None = None
     model_control: ModelControlStore | None = None
     evidence_control: EvidenceStatusPort | None = None
+    orchestration_control: OrchestrationArtifactReadPort | None = None
+    orchestration_cursor_codec: CursorCodec | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -292,8 +304,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.5.0",
-        description="Authenticated durable Layer 5 evidence investigation API.",
+        version="0.6.0",
+        description="Authenticated durable Layer 6 governed investigation API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -541,6 +553,60 @@ def create_app(
             _not_found()
         return result
 
+    @app.get(
+        "/v1/orchestrations/{run_id}/artifacts",
+        response_model=OrchestrationArtifactPageView,
+    )
+    def orchestration_artifacts(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+        cursor: Annotated[str | None, Query(max_length=1_024)] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+    ) -> OrchestrationArtifactPageView:
+        control = selected_runtime.orchestration_control
+        codec = selected_runtime.orchestration_cursor_codec
+        if control is None or codec is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="orchestration artifact store is unavailable",
+            )
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.ORCHESTRATION_ARTIFACT_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        try:
+            after_ordinal = (
+                codec.decode(
+                    cursor,
+                    tenant_id=identity.tenant_id,
+                    run_id=run_id,
+                )
+                if cursor is not None
+                else 0
+            )
+            page = control.artifact_page(
+                tenant_id=identity.tenant_id,
+                run_id=run_id,
+                after_ordinal=after_ordinal,
+                limit=limit,
+            )
+        except (IntegrityFailure, ValueError):
+            _not_found()
+        return OrchestrationArtifactPageView(
+            items=page.items,
+            next_cursor=(
+                codec.encode(
+                    tenant_id=identity.tenant_id,
+                    run_id=run_id,
+                    cursor=page.next_ordinal,
+                )
+                if page.next_ordinal is not None
+                else None
+            ),
+        )
+
     @app.post(
         "/v1/investigations",
         response_model=InvestigationResult,
@@ -762,6 +828,10 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         ),
         model_control=model_control,
         evidence_control=evidence_control,
+        orchestration_control=primary.orchestrator,
+        orchestration_cursor_codec=CursorCodec(
+            b"aegis-demo-artifact-cursor-test-only-01"
+        ),
     )
 
 
@@ -799,6 +869,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
         JwtAuthenticator,
     )
     from aegis_framework.model_postgres import PostgresModelControlStore
+    from aegis_framework.orchestration_postgres import PostgresOrchestrationLedger
     from aegis_framework.postgres import PostgresRepository, open_runtime_pool
 
     clock = SystemClock()
@@ -814,6 +885,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
             ),
         )
         pool = open_runtime_pool(dsn=str(required["dsn"]))
+        orchestration_pool = open_runtime_pool(dsn=str(required["dsn"]))
         repository = PostgresRepository(pool=pool, clock=clock)
         cursor_codec = CursorCodec(str(required["cursor_key"]).encode())
         tenant_references = TenantReferenceCodec(
@@ -855,6 +927,11 @@ def _production_runtime_from_environment() -> ApiRuntime:
             cursor_codec=cursor_codec,
         ),
         model_control=PostgresModelControlStore(pool=pool),
+        orchestration_control=PostgresOrchestrationLedger(
+            pool=orchestration_pool,
+            clock=clock,
+        ),
+        orchestration_cursor_codec=cursor_codec,
     )
 
 

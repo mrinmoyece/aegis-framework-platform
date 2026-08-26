@@ -1,4 +1,4 @@
-# Layer 5 threat model
+# Layer 6 threat model
 
 ## Assets and trust boundaries
 
@@ -59,6 +59,14 @@ trusted to provide their documented mechanics, not enterprise authority.
 | Temporal proximity treated as cause | Correlation links set `causal=false`; critic/model cannot elevate unsupported links | Human misinterpretation |
 | Quarantined evidence reaches model | Disposition gate plus extended citation validation | Application wiring defect |
 | Cursor/status cross-tenant read | Current policy, anti-enumeration and forced RLS | DBA/superuser boundary |
+| Dynamic/self-granted role or capability | Closed `AgentRole`, fixed role policy and artifact write set | Application policy defect |
+| Peer-agent prompt injection/chat | No peer chat channel; specialists receive bounded application tasks and allowlisted evidence | Model semantic defect |
+| Illegal artifact transition | Typed payload discriminator, provenance digest and transition matrix | Application wiring defect |
+| Duplicate/ambiguous specialist task | Durable dispatch intent before model call; completed result cache; unresolved intent requires reconciliation | Provider reconciliation gap |
+| Stale task/artifact result after retry/cancel | Attempt-scoped rotating task fence, run cancellation flag and terminal-state rejection | Database/operator compromise |
+| Checkpoint from old graph/input | Tenant/run/thread, graph version and canonical input digest compatibility check | Upgrade qualification defect |
+| Framework checkpoint treated as artifact truth | Artifact/status APIs read application ledger projection only | Operator misuse outside app |
+| Automatic graph trace leaks full state | Automatic capture disabled; fixed graph/node/model spans export allowlisted counts/status only | Exporter configuration drift |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.

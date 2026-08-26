@@ -1,6 +1,6 @@
 # Framework selection report
 
-Research was refreshed from official package/project sources on **2026-08-15**.
+Research was refreshed from official package/project sources on **2026-08-16**.
 Installed dependencies and Actions are exact-pinned; container images use digests.
 
 ## Selected and deferred stack
@@ -35,6 +35,7 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | LangChain Unstructured | 1.0.1 evaluated, not installed | External API or parser stack | Document extraction | Trust/provenance/sandbox remain | Reject: Python-range/privacy/footprint |
 | LlamaIndex readers / Unstructured | Evaluated, not installed | Overlapping ingestion/RAG stack | Broad format parsing | All enterprise controls remain | Reject: overlap without control removal |
 | UI, MCP/A2A, sandbox | Deferred | New runtimes/services | N/A | Session/tool/effect security | Later layers |
+| CrewAI / AutoGen | Not installed | Additional agent runtime | Agent chat/delegation abstractions | All Aegis authority/artifact/ledger controls | Reject: overlaps LangGraph and expands dynamic authority surface |
 
 ## Why Temporal now
 
@@ -234,3 +235,43 @@ Operationally, Framework Layer 5 trades the custom Redis worker for Temporal and
 official Kubernetes client's dependency/upgrade matrix. Escape paths are `HttpTransport`,
 `KubernetesApi`, `EvidenceConnector`, `EvidenceControlStore`, opaque Temporal messages,
 application events/SQL export, and canonical JSON/text. Loader lock-in is avoided.
+
+## Framework Layer 6 versus custom Aegis Layer 7
+
+The custom target is
+`mrinmoyece/aegis-agent-platform@dce0054a40c34ab4cc9d515aa753bc71d73fab57`.
+It has 21,581 production LOC, 9,975 test LOC, 31,556 total LOC, 221 test functions,
+12 runtime and six optional dependencies. Its Layer 7 increment from custom Layer 6 is
+6,749 additions and 177 deletions across 41 files in three commits.
+
+Framework Layer 6 keeps exact `langgraph==1.2.11`, transitive
+`langgraph-checkpoint==4.2.0`, `langgraph-checkpoint-postgres==3.1.2`, and
+`langchain-core==1.5.5`; it adds no new dependency or stateful service above Layer 5.
+Stable public APIs used are `StateGraph`, `TypedDict` state with annotated reducers,
+static parallel edges/list-edge fan-in, conditional edges, `InMemorySaver`/
+`PostgresSaver`, `get_state`, `get_state_history`, and invocation `recursion_limit`.
+Stable but unnecessary `Send`, `Command`, subgraphs, and `interrupt()` are deliberately
+absent. Beta `DeltaChannel` and the experimental `temporalio.contrib.langgraph` plugin
+are rejected.
+
+LangGraph eliminates custom DAG scheduler, synchronized fan-in, reducer engine,
+conditional router, checkpoint serialization and history traversal. Remaining custom
+controls are the majority of security-sensitive behavior: identity/policy/budget,
+fixed role capabilities, artifact schemas/transitions/digests, dispatch/result fencing,
+model/evidence safety, citation/confidence/critic gates, tenant RLS, immutable facts,
+projection rebuild, Temporal retry ownership, redaction, approval separation and effect
+absence.
+
+The 200-run local equivalent benchmark measured 25.922 ms median/29.305 ms p95 for the
+custom async coordinator/event-repository path. Framework values are generated in
+`comparison/layer6-metrics.json`. The methods are not identical: custom creates an event
+loop per sample and exercises its in-memory event repository; framework exercises strict
+Pydantic artifacts plus LangGraph checkpoints. Neither includes PostgreSQL, Temporal,
+Redis, model/connector networks, or process boundaries, so the figures are implementation
+cost indicators—not service throughput.
+
+Checkpoint lock-in includes Pregel super-step semantics, node names, channel reducers,
+saver schema/serialization, error behavior and upgrade testing. Escape is explicit:
+retain/rebuild from application orchestration facts and neutral artifact JSON, discard
+framework checkpoints, replace `OrchestratorPort`, and pass the same deterministic
+fan-out/order/replay/version/tenant/cancellation/critic suite.

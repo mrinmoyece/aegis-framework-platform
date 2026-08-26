@@ -143,5 +143,30 @@
     "case_id": "evidence-ssrf",
     "kind": "evidence-ssrf",
     "expected_reason": "private_destination_rejected"
+  },
+  {
+    "case_id": "orchestration-artifacts",
+    "kind": "orchestration-artifacts",
+    "expected_reason": "typed_artifact_chain"
+  },
+  {
+    "case_id": "orchestration-replay",
+    "kind": "orchestration-replay",
+    "expected_reason": "checkpoint_version_binding"
+  },
+  {
+    "case_id": "orchestration-role-denial",
+    "kind": "orchestration-role-denial",
+    "expected_reason": "fixed_role_capabilities"
+  },
+  {
+    "case_id": "orchestration-duplicate-task",
+    "kind": "orchestration-duplicate-task",
+    "expected_reason": "dispatch_intent_deduplicated"
+  },
+  {
+    "case_id": "orchestration-projection-rebuild",
+    "kind": "orchestration-projection-rebuild",
+    "expected_reason": "artifact_projection_rebuild"
   }
 ]

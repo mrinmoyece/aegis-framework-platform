@@ -1,6 +1,6 @@
 # Roadmap across the 16 Aegis capabilities
 
-| Layer | Capability | Layer 5 status | Framework-first direction |
+| Layer | Capability | Layer 6 status | Framework-first direction |
 |---:|---|---|---|
 | 1 | Platform foundation | **Delivered** | Strict Python, contracts, deterministic slice, CI/container/docs |
 | 2 | Tenant identity and authorization | **Delivered** | OIDC/JWT current grants, purpose/risk policy, forced RLS, quota, secret refs, audit |
@@ -8,7 +8,7 @@
 | 4 | Distributed worker runtime | **Delivered for investigation lifecycle** | Temporal scheduling, timers, signals, Activity retry/recovery; no effects |
 | 5 | Provider-neutral model gateway | **Delivered offline/adapter boundary** | Official SDK adapters, neutral contracts, policy/catalog, routing, budget/usage ledger, structured safety; live qualification deferred |
 | 6 | Durable evidence connectors and correlation | **Delivered offline/adapter boundary** | Durable page intent/cursor, secure disabled adapters, ingestion/provenance/quarantine and deterministic correlation; live qualification deferred |
-| 7 | Governed durable specialist orchestration | Partial | Existing two-specialist LangGraph inside Temporal Activity; multi-agent expansion deferred |
+| 7 | Governed durable specialist orchestration | **Delivered offline/adapter boundary** | Fixed eight roles, typed artifacts, critic/planner/verification gates, application ledger and bounded LangGraph inside one Temporal Activity |
 | 8 | Approval-gated remediation actions | Partial | Proposal/pending boundary only; decisions/effects/fencing absent |
 | 9 | Hardened sandbox execution | Planned | Egress/syscall/resource/artifact/credential isolation |
 | 10 | Event-grounded memory and pgvector RAG | Planned | Tenant/provenance/relevance policy and evals |
@@ -21,10 +21,10 @@
 
 ## Next layer boundary
 
-The next framework layer may deepen governed specialist orchestration only after Layer 5
-connector and parser operations are qualified. Multi-agent expansion beyond the existing
-graph, approvals/effects, sandboxing, memory/RAG, UI, MCP/A2A, and deployment are
-explicitly deferred. Do not add another orchestration or RAG framework for branding.
+The next framework layer may add approval records and effects only after Layer 6
+orchestration and connector/model operations are qualified. Dynamic agents/peer chat,
+sandboxing, memory/RAG, UI, MCP/A2A, and deployment remain explicitly deferred. Do not
+add CrewAI, AutoGen, or another overlapping orchestration framework.
 
 Live connector/provider qualification remains blocked on credential brokering, regional
 data policy, private network/CA/egress operations, source scopes, parser isolation,
