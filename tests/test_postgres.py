@@ -868,7 +868,7 @@ def test_live_orchestration_artifacts_are_rls_isolated_and_rebuildable() -> None
                   AND run_id = %s
                   AND task_id = %s
                   AND fact_type IN ('task.dispatch', 'task.fence_rotated')
-                ORDER BY recorded_at, (document->>'attempt')::int
+                ORDER BY (document->>'attempt')::int, recorded_at, fact_id
                 """,
                 (_TENANT_ALPHA, run_id, "task:stale-worker"),
             ).fetchall()

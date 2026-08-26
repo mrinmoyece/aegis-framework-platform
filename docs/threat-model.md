@@ -188,3 +188,20 @@ are exercised by tests today.
 
 Managed backend tenancy, exporter mTLS, production alert routing and external
 penetration testing remain unproven.
+
+# Layer 12 operator UI and BFF threats
+
+| Threat | Control | Residual/deferred |
+|---|---|---|
+| Browser bearer theft | Server-side HttpOnly `__Host-` session; no web storage token | Live exchange/store not delivered |
+| Login CSRF/code substitution | One-use state, nonce, PKCE S256 and short handshake expiry | Live IdP qualification deferred |
+| Session fixation/reuse | Rotate on callback and tenant switch; delete on logout/expiry | Distributed revocation deferred |
+| CSRF/cross-site mutation | SameSite=Strict, session CSRF and exact trusted Origin | TLS proxy qualification deferred |
+| Cross-tenant cache/data | Tenant key, cancel/remove/refetch, backend anti-enumeration | Multi-tab UX is not production-qualified |
+| Stale/revoked grants | UX deny-default; server reauthorizes; session expiry and `401` teardown | Push revocation not delivered |
+| XSS from evidence | Zod bounds, React text rendering, CSP, no HTML sink | Independent penetration deferred |
+| URL/download/CSV/clipboard abuse | Same-origin URL, MIME/size/name allowlist, formula neutralization, clipboard bound | External DLP deferred |
+| Double/stale approval | Review, typed risk confirmation, idempotency, expected status/digests, disabled pending submit | Demo principal is always denied |
+| Ambiguous effect shown healthy | Closed status enum and explicit alert styling/test | Operator training still required |
+| Poll replay/reorder | Runtime schema, generation watermark, dedupe, retry cap, tenant/auth teardown | Durable SSE cursor deferred |
+| Analytics/telemetry leak | No third-party analytics; fixed no-payload error handling | Browser RUM deliberately absent |

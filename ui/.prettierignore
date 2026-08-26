@@ -1,0 +1,6 @@
+coverage/
+dist/
+node_modules/
+playwright-report/
+src/contracts/backend-contract.json
+test-results/

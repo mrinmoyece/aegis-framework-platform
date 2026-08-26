@@ -107,6 +107,34 @@
     serves durable checkpoint needs; another state owner would add operations and
     licensing decisions without value.
 
+## Layer 12 operator UI and BFF
+
+**L12-1. Why reject a browser OIDC client?**
+The BFF keeps access/refresh tokens out of JavaScript and web storage. The browser has
+only a rotated HttpOnly same-origin session and session-bound CSRF value.
+
+**L12-2. Why is hiding a button not authorization?**
+Roles can be stale or revoked and DOM requests can be forged. UX is deny-default, but
+the server reloads current identity/policy and anti-enumerates unauthorized resources.
+
+**L12-3. What must tenant switch destroy?**
+In-flight requests, query data, polling watermark/retry state, review/confirmation
+state, and session/CSRF material before the new tenant fetch.
+
+**L12-4. Why use polling rather than SSE?**
+No durable server stream cursor exists. Bounded polling can validate schemas, dedupe by
+generation, reject out-of-order state, cap reconnect, and tear down safely. SSE should
+enter only with equivalent resume and tenant/auth semantics.
+
+**L12-5. Why can approval still be denied after complete review?**
+Review is presentation, not a grant. Current server policy, role, SoD, quorum, expiry,
+version and immutable digests remain authoritative.
+
+**L12-6. What is the candid framework trade-off?**
+TanStack removes generic query/router/table mechanics and reduces authored LOC, but adds
+three runtime dependencies and a larger bundle than custom Layer 13. All enterprise
+security and authority controls remain custom and framework-neutral.
+
 **L10-1. Why is an evaluation report not production truth?**
     It is versioned release evidence over synthetic fixtures and deterministic
     adapters. Runtime state, authorization, approval, effects and audit still come

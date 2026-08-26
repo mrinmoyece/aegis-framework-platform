@@ -22,7 +22,7 @@ from fastapi import (
     status,
 )
 from pydantic import Field, TypeAdapter, ValidationError
-from starlette.responses import PlainTextResponse
+from starlette.responses import JSONResponse, PlainTextResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from aegis_framework.access import (
@@ -89,6 +89,11 @@ from aegis_framework.model_gateway import (
     ModelUsageView,
     ProviderHealthView,
     TenantModelPolicy,
+)
+from aegis_framework.operator_api import (
+    OperatorSecurityHeadersMiddleware,
+    install_operator_routes,
+    install_operator_ui,
 )
 from aegis_framework.orchestration import (
     ArtifactSummary,
@@ -488,10 +493,12 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.11.0",
-        description="Authenticated Layer 11 operations, observability, and replay API.",
+        version="0.12.0",
+        description="Authenticated Layer 12 operations API and operator BFF.",
+        default_response_class=JSONResponse,
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
+    app.add_middleware(OperatorSecurityHeadersMiddleware)
     app.state.mode = mode
     app.state.runtime = selected_runtime
     metrics = selected_runtime.metrics or MetricRegistry()
@@ -1406,6 +1413,8 @@ def create_app(
             ) from exc
         return _durable_response(result)
 
+    install_operator_routes(app, production=mode is AppMode.PRODUCTION)
+    install_operator_ui(app)
     return app
 
 

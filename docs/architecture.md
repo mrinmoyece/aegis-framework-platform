@@ -629,3 +629,23 @@ provenance, license, consent, classification, retention, migration, quarantine,
 deletion and secret/PII scan are validated before execution. See
 [ADR 015](adr/015-governed-deterministic-evaluation.md) and the
 [evaluation runbook](evaluation-runbook.md).
+
+# Layer 12 operator workspace and BFF
+
+```text
+browser (no bearer token)
+  -> same-origin HttpOnly session + CSRF + Origin
+  -> FastAPI operator BFF
+  -> current IdentityContext / policy / tenant authorization
+  -> bounded redacted application projections and audited services
+  -> Pydantic response -> Zod runtime validation
+  -> tenant-keyed disposable TanStack cache -> semantic React views
+```
+
+The UI is never an authority. It cannot approve, widen scope, fence, execute,
+reconcile, verify, rebuild, or create audit truth. The BFF's deterministic PKCE/state/
+nonce adapter and in-memory sessions are demo/test-only; production returns not-ready.
+Tenant changes cancel requests, delete cached data, rotate session/CSRF state, and
+start from an empty tenant key. Bounded polling uses a generation watermark for
+deduplication/order, caps reconnect, stops on auth expiry, and tears down with tenant
+context. See [ADR 017](adr/017-secure-operator-bff.md).

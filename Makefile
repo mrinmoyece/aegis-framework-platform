@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help bootstrap format lint type test integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security demo serve measure container compose-config ci
+.PHONY: help bootstrap format lint type test integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security demo serve measure observability-config frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
 
 help:
 	@printf '%s\n' \
@@ -25,12 +25,15 @@ help:
 	  'serve           Start the local API on 127.0.0.1:8000' \
 	  'measure         Refresh Layer 11 framework comparison measurements' \
 	  'observability-config Validate Prometheus, Grafana, and OTel assets' \
+	  'frontend-ci     Run locked Layer 12 UI/BFF frontend gates' \
+	  'frontend-e2e    Run deterministic Chromium operator journeys' \
 	  'container       Build the digest-pinned non-root image' \
 	  'compose-config  Validate the local dependency topology' \
 	  'ci              Run all fast, network-free quality gates'
 
 bootstrap:
 	$(UV) sync --locked --all-extras
+	npm --prefix ui ci --ignore-scripts
 
 format:
 	$(UV) run ruff format .
@@ -76,6 +79,7 @@ docs:
 security:
 	$(UV) run bandit -q -r src
 	$(UV) run pip-audit --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
+	npm --prefix ui run audit
 
 demo:
 	$(UV) run aegis-framework demo --scenario success
@@ -89,10 +93,49 @@ measure:
 observability-config:
 	$(UV) run python tools/observability_check.py
 
+frontend-install:
+	npm --prefix ui ci --ignore-scripts
+
+frontend-lint:
+	npm --prefix ui run lint
+
+frontend-type:
+	npm --prefix ui run typecheck
+
+frontend-test:
+	npm --prefix ui run test
+
+frontend-axe:
+	npm --prefix ui run test:axe
+
+frontend-build:
+	npm --prefix ui run build
+
+frontend-e2e:
+	npm --prefix ui run e2e
+
+frontend-contracts:
+	$(UV) run python tools/export_operator_contracts.py --check
+	npm --prefix ui run contracts
+
+frontend-audit:
+	npm --prefix ui run audit
+
+frontend-licenses:
+	npm --prefix ui run licenses
+
+frontend-bundle:
+	npm --prefix ui run bundle
+
+frontend-csp:
+	npm --prefix ui run csp
+
+frontend-ci: frontend-lint frontend-type frontend-contracts frontend-test frontend-axe frontend-build frontend-bundle frontend-csp frontend-licenses frontend-audit
+
 container:
-	docker build --pull --tag aegis-framework-platform:layer11 .
+	docker build --pull --tag aegis-framework-platform:layer12 .
 
 compose-config:
 	docker compose config --quiet
 
-ci: lint type test eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config
+ci: lint type test eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config frontend-ci

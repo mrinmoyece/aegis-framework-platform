@@ -574,3 +574,24 @@ The full decision and authority boundary are in
 
 Prometheus and Grafana are local qualification services, not production deployment or
 SLO evidence. See [ADR 016](adr/016-provider-neutral-observability-replay.md).
+
+## Layer 12 operator UI and BFF decision
+
+| Tool | Version | Decision |
+|---|---:|---|
+| React / React DOM | 19.2.8 | Selected rendering boundary; text escaping and semantic HTML, no design system |
+| Vite | 8.2.1 | Selected reproducible build/dev boundary |
+| TanStack Query | 5.101.4 | Selected cancellation/cache/stale/reconnect mechanics |
+| TanStack Router | 1.170.29 | Selected single client router |
+| TanStack Table | 8.21.3 | Selected accessible headless table mechanics |
+| Zod | 4.4.3 | Selected runtime browser contract validation |
+| MSW / Vitest / Testing Library | 2.15.0 / 4.1.10 / 16.3.2 | Selected deterministic unit/component boundary |
+| Playwright / axe-core | 1.62.1 / 4.13.0 | Selected Chromium journey and automated accessibility evidence |
+| `oidc-client-ts` | Rejected | A browser OIDC client would expose token lifecycle to JavaScript; the BFF boundary is server-side |
+| Redux/design system/analytics/SSE | Deferred/rejected | No overlapping state or styling authority; no third-party telemetry; no durable stream contract yet |
+
+The pinned custom Layer 13 uses fewer runtime dependencies and builds a 291,588-byte
+JavaScript bundle versus 440,439 bytes here. This layer has materially less authored
+UI/BFF LOC because TanStack owns generic mechanics, but session, tenant, authorization,
+approval, XSS, accessibility and audit policy remain custom. See
+`comparison/layer12-metrics.json` and [ADR 017](adr/017-secure-operator-bff.md).

@@ -1,4 +1,4 @@
-# Layer 11 curriculum
+# Layer 12 curriculum
 
 ## Learning outcomes
 
@@ -83,12 +83,24 @@ After this layer, an engineer should be able to:
 60. debug and rebuild application state only from a verified ledger;
 61. compare optional Langfuse with LangSmith and preserve an OTLP/ledger escape;
 62. compare Framework Layer 11 candidly with pinned custom Aegis Layer 12.
+63. design a BFF authorization-code boundary without browser bearer storage;
+64. distinguish deny-default RBAC affordances from server authorization;
+65. tear down tenant cache, cancellation, polling and session state on tenant change;
+66. review exact digests/quorum/SoD/expiry while keeping approval server-owned;
+67. model stale, offline, conflict, denial and ambiguity without success fallbacks;
+68. build WCAG 2.2 AA semantic tables/forms/live regions and test them with axe/browser
+    journeys while retaining a manual audit checklist;
+69. enforce central XSS, URL, download, CSV, clipboard, redaction, CSP and no-analytics
+    policy;
+70. compare Framework Layer 12 candidly with pinned custom Aegis Layer 13.
 
 ## Suggested sequence
 
 | Module | Read | Lab | Qualification question |
 |---|---|---|---|
 | Identity boundary | ADR 005, `identity.py` | Forge algorithm/audience/time claims | Which token claims may establish authority? |
+| Operator BFF | ADR 017, `operator_api.py` | Replay state, forge Origin/CSRF, switch tenant | Why can no browser claim establish authority? |
+| Accessible workspace | `ui/src`, accessibility checklist | Keyboard/axe/injection/ambiguity journey | Which state is derived and disposable? |
 | Grant governance | `access.py`, `authorization.py` | Revoke a grant/version and retry | Why reload grants on every authentication? |
 | Delivery | `api.py` | Attempt tenant enumeration and oversized bodies | Why is readiness separate from liveness? |
 | PostgreSQL tenancy | ADR 006, migration | Run RLS and pool leakage probes | Why is `FORCE ROW LEVEL SECURITY` required? |

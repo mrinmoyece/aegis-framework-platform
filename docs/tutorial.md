@@ -482,3 +482,22 @@ call a model, connector, tool, sandbox or effect. Trace links are optional navig
 the ledger remains truth. Continue with [ADR 016](adr/016-provider-neutral-observability-replay.md),
 the [SLO catalog](slo-catalog.md), and the
 [observability runbook](observability-runbook.md).
+## Layer 12: operate the synthetic checkout without moving authority
+
+```bash
+npm --prefix ui ci --ignore-scripts
+npm --prefix ui run build
+AEGIS_MODE=demo make serve
+```
+
+Open `http://127.0.0.1:8000`, sign in to the deterministic demo, and follow Overview,
+Investigation, Approvals, Effects, Sandboxes, Memory, Evaluations, Audit, and Replay.
+Inspect the exact approval digests and server expiry; the responder lacks
+`approval:decide`, so the server denial remains visible and cannot be overridden. The
+prior ambiguous effect is never presented as success. Switch to `tenant-beta`: requests
+are cancelled, the old cache is removed, session/CSRF rotates, and the empty authorized
+tenant projection loads.
+
+The browser stores no bearer credential. Closing it does not stop or complete runtime
+work. Production operator readiness remains `503` until live IdP exchange and durable
+sessions are configured.

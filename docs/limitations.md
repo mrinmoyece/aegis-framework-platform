@@ -223,3 +223,23 @@ These are explicit non-production boundaries, not implied capabilities.
   rebuilders retain their existing capability-specific procedures.
 - UI, MCP/A2A, deployment/IaC, live model/connector/memory qualification, penetration,
   human labeling, load/chaos and managed telemetry remain deferred.
+
+# Layer 12 operator limitations
+
+- The OIDC authorization-code/PKCE/state/nonce boundary is deterministic fake behavior.
+  No live token exchange, refresh rotation, provider logout, key rotation, distributed
+  session persistence, or cross-node revocation is delivered; production readiness is
+  intentionally false.
+- Polling provides bounded validated generation-watermark refresh. There is no durable
+  SSE transport or server cursor/resume contract.
+- The canonical checkout workspace uses synthetic BFF view models. It demonstrates all
+  screens and invariants but does not claim production provider, cluster, audit-store,
+  or effect integration.
+- Automated axe/jsdom and Chromium journeys do not replace manual keyboard, VoiceOver,
+  NVDA, JAWS, zoom/reflow, contrast, forced-colors, or independent WCAG audit.
+- The production bundle is 440,439 uncompressed JavaScript bytes. TanStack reduces
+  authored lifecycle/router/table code but is larger than the pinned custom Layer 13
+  bundle; see `comparison/layer12-metrics.json`.
+- Live browser/IdP/TLS proxy qualification, penetration testing, deployment/IaC,
+  MCP/A2A, managed analytics/telemetry, load/chaos and compliance certification remain
+  deferred.
