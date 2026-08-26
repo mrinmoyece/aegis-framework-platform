@@ -143,6 +143,8 @@ class ApprovalItem(StrictModel):
     created_by_actor_ref: Identifier
     can_decide: bool
     denial_reason: str | None = Field(default=None, max_length=200)
+    target: str = Field(min_length=1, max_length=200)
+    rollback: Literal["not-required", "available", "running", "failed"]
 
 
 class EffectItem(StrictModel):
@@ -990,6 +992,8 @@ def _snapshot(
                 created_by_actor_ref="actor-remediation-planner",
                 can_decide=False,
                 denial_reason="Current grants do not include approval:decide.",
+                target="checkout-api / eu-west / exact deployment UID",
+                rollback="available",
             ),
         ),
         effects=(
