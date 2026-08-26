@@ -1,0 +1,81 @@
+{
+  "schema_version": 12,
+  "layer": 12,
+  "generated_on": "2026-08-17",
+  "comparison_basis": {
+    "framework_layer12": {
+      "repository": "mrinmoyece/aegis-framework-platform",
+      "base_sha": "1e370af6476f5c92121ae40c4e0eb0f17cf07094"
+    },
+    "custom_layer13": {
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "6e3d24cd56198f80f1c3190e7b485453ea1cfe7a"
+    }
+  },
+  "source_loc": {
+    "framework_frontend_non_test": 1971,
+    "framework_bff": 912,
+    "custom_frontend_non_test": 4066,
+    "custom_operator_bff": 1627,
+    "method": "physical lines in TypeScript/TSX/CSS under the UI source and Python under the operator BFF; generated assets, lockfiles, tests, and shared backend services excluded"
+  },
+  "runtime_dependencies": {
+    "framework_frontend_direct": 6,
+    "custom_frontend_direct": 3,
+    "framework_selected": [
+      "React",
+      "TanStack Query",
+      "TanStack Router",
+      "TanStack Table",
+      "Zod"
+    ],
+    "custom_selected": [
+      "React",
+      "Zod"
+    ]
+  },
+  "bundle_bytes": {
+    "framework_javascript_total": 440439,
+    "framework_largest_chunk": 340267,
+    "custom_javascript_total": 291588,
+    "custom_largest_chunk": 291588,
+    "method": "production Vite build, uncompressed fingerprinted JavaScript"
+  },
+  "framework_code_removed": [
+    "query cancellation, stale timing, reconnect triggers, retry policy and cache garbage collection",
+    "history-safe route matching and navigation",
+    "typed table row/header rendering",
+    "React DOM reconciliation and escaping",
+    "Vite module graph, production chunking and minification"
+  ],
+  "remaining_custom_controls": [
+    "OIDC state, nonce and PKCE lifecycle plus production fail-closed readiness",
+    "HttpOnly session rotation, CSRF and exact Origin policy",
+    "tenant teardown, deny-default permission UX and anti-enumeration",
+    "runtime Zod contracts, response bounds and typed error semantics",
+    "approval digest/quorum/SoD/expiry presentation and idempotency",
+    "ambiguity, reconciliation, verification and rollback semantics",
+    "XSS, URL, download, CSV, clipboard, redaction and telemetry policy",
+    "CSP, security headers, accessibility semantics and audit policy"
+  ],
+  "lock_in_and_escape": {
+    "lock_in": [
+      "TanStack query-key/cache lifecycle",
+      "TanStack route tree and table column definitions",
+      "Vite build configuration"
+    ],
+    "escape": [
+      "BFF contracts are plain JSON/Pydantic/Zod and framework-neutral",
+      "all enterprise authority remains in backend ports and ledgers",
+      "polling adapter accepts an injected fetch function",
+      "screens use semantic HTML/CSS without a design-system dependency",
+      "React/TanStack can be replaced without changing authoritative services"
+    ]
+  },
+  "equivalent_operator_benchmark": {
+    "journey": "synthetic checkout health -> cited investigation -> denied exact-scope approval -> explicit ambiguous effect -> tenant teardown -> runtime health",
+    "framework_result": "3 deterministic Chromium journeys passed in 9.3 seconds locally including server startup; axe reported zero violations on the canonical page",
+    "custom_result": "the pinned branch builds to 291588 JavaScript bytes and documents the equivalent deterministic checkout journey; its browser suite was not rerun in this repository",
+    "candid_assessment": "Framework Layer 12 is materially smaller in authored UI/BFF LOC but adds three TanStack runtime dependencies and a 50 percent larger uncompressed JavaScript bundle. The custom implementation has fewer runtime dependencies and more purpose-built polling/session/view code. Neither live-qualifies an IdP, browser fleet, assistive technology, or production deployment."
+  }
+}

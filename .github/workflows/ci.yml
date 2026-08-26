@@ -16,6 +16,7 @@ concurrency:
 
 env:
   UV_VERSION: "0.12.5"
+  NODE_VERSION: "24.15.0"
 
 jobs:
   lint:
@@ -223,6 +224,30 @@ jobs:
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: moderate
+
+  operator-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: uv sync --locked --all-extras
+      - run: npm install --global npm@11.12.1
+      - run: npm --prefix ui ci --ignore-scripts
+      - run: make frontend-ci
+      - run: npm --prefix ui exec -- playwright install --with-deps chromium
+      - run: make frontend-e2e
 
   container:
     runs-on: ubuntu-24.04

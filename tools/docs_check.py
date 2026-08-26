@@ -49,6 +49,10 @@ REQUIRED_DOCS = (
     "docs/observability-runbook.md",
     "docs/slo-catalog.md",
     "docs/adr/016-provider-neutral-observability-replay.md",
+    "docs/adr/017-secure-operator-bff.md",
+    "docs/operator-runbook.md",
+    "docs/operator-accessibility.md",
+    "docs/operator-security.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -79,7 +83,10 @@ def main() -> int:
 def _broken_markdown_links() -> list[str]:
     errors: list[str] = []
     for document in ROOT.rglob("*.md"):
-        if any(part.startswith(".") for part in document.relative_to(ROOT).parts):
+        parts = document.relative_to(ROOT).parts
+        if any(part.startswith(".") for part in parts) or any(
+            part in {"build", "node_modules"} for part in parts
+        ):
             continue
         for target in MARKDOWN_LINK.findall(document.read_text(encoding="utf-8")):
             clean = target.split("#", 1)[0]
@@ -197,6 +204,29 @@ def _measurement_errors() -> list[str]:
         errors.append("Layer 10 metrics must include the evaluation benchmark")
     if not payload.get("equivalent_observability_benchmark"):
         errors.append("Layer 11 metrics must include the observability benchmark")
+    layer12_path = ROOT / "comparison/layer12-metrics.json"
+    if not layer12_path.is_file():
+        errors.append("missing comparison/layer12-metrics.json")
+    else:
+        layer12 = json.loads(layer12_path.read_text(encoding="utf-8"))
+        if layer12.get("schema_version") != 12 or layer12.get("layer") != 12:
+            errors.append("Layer 12 metrics schema/layer is invalid")
+        custom = layer12.get("comparison_basis", {}).get("custom_layer13", {})
+        if custom.get("sha") != "6e3d24cd56198f80f1c3190e7b485453ea1cfe7a":
+            errors.append("Layer 13 custom comparison SHA is not pinned")
+        errors.extend(
+            f"Layer 12 metrics missing {field}"
+            for field in (
+                "source_loc",
+                "runtime_dependencies",
+                "bundle_bytes",
+                "framework_code_removed",
+                "remaining_custom_controls",
+                "lock_in_and_escape",
+                "equivalent_operator_benchmark",
+            )
+            if not layer12.get(field)
+        )
     return errors
 
 

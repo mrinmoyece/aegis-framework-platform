@@ -350,25 +350,37 @@
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
-      "status": "partial",
+      "status": "delivered",
       "evidence": [
         "src/aegis_framework/api.py",
-        "tests/test_durability.py",
-        "tests/test_api_and_cli.py",
-        "tests/test_evidence_layer5.py",
-        "tests/test_orchestration_layer6.py",
-        "tests/test_remediation_layer7.py",
-        "tests/test_sandbox_layer8.py"
+        "src/aegis_framework/operator_api.py",
+        "tests/test_operator_layer12.py",
+        "ui/src",
+        "ui/e2e/operator.spec.ts",
+        "docs/adr/017-secure-operator-bff.md",
+        "docs/operator-runbook.md",
+        "docs/operator-accessibility.md",
+        "docs/operator-security.md",
+        "comparison/layer12-metrics.json"
       ],
       "framework_owned": [
-        "FastAPI delivery"
+        "FastAPI HTTP/static delivery",
+        "React rendering and escaping",
+        "TanStack query/cache/router/table mechanics",
+        "Zod runtime parsing",
+        "Vite build",
+        "Vitest/Testing Library/MSW/Playwright/axe test mechanics"
       ],
       "enterprise_owned": [
-        "authorized redacted status/timeline/model/evidence/artifact/approval operations",
+        "server-side session, CSRF, Origin and production readiness",
+        "authorized bounded redacted view models",
         "anti-enumeration",
-        "opaque/encrypted cursor",
-        "session security",
-        "review UX"
+        "tenant teardown and deny-default RBAC UX",
+        "approval review, digest, quorum, SoD, expiry and idempotency UX",
+        "ambiguity/reconciliation/verification/rollback semantics",
+        "polling bounds, ordering, reconnect and auth expiry",
+        "XSS/URL/download/CSV/clipboard/redaction/error policy",
+        "CSP/security headers/accessibility policy"
       ]
     },
     {

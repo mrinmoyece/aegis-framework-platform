@@ -178,3 +178,39 @@ application-owned step regardless of candidate source.
 Production model/connector qualification, independent penetration testing and human
 labeling, UI, MCP/A2A, deployment, managed telemetry backends, live SLO/on-call
 evidence, and final load/chaos certification are explicitly deferred.
+
+# Layer 12 qualification status
+
+## Delivered
+
+- exact-pinned npm workspace with strict TypeScript, ESLint/Prettier, Vitest/Testing
+  Library/MSW, axe, Playwright, deterministic Vite build, contract/license/audit/bundle/
+  CSP gates, and digest-pinned container build stage;
+- same-origin FastAPI BFF with one-use PKCE/state/nonce demo, rotated HttpOnly Secure
+  SameSite session, CSRF/Origin checks, expiry/logout, anti-enumeration, CSP and browser
+  headers, plus production fail-closed readiness;
+- runtime Pydantic/Zod contract drift, typed failures, response/collection bounds,
+  cancellation, stale/server-time indicators and tenant-keyed cache teardown;
+- responsive semantic screens for health/SLO, incidents, cited timeline/evidence,
+  specialist/critic/hypotheses, model usage, approval scope/quorum/SoD, effect ambiguity/
+  reconciliation/verification/rollback, sandbox/quarantine, memory provenance/retention,
+  eval regression, audit and replay/support;
+- safe review/typed confirmation, idempotency header, conflict/error UX, no self-approval,
+  and no ambiguity-to-success mapping;
+- bounded schema-validated polling with generation resume watermark, dedupe/out-of-order
+  rejection, reconnect cap, offline/visibility handling, auth expiry and tenant teardown;
+- central URL/download/CSV/clipboard/error/CSP controls, no HTML sink or analytics;
+- 93.36% frontend line and 69.40% branch coverage across safety-critical modules,
+  automated axe, and three deterministic Chromium journeys.
+- 393 backend tests pass with 90.07% branch coverage overall and 90% coverage for the
+  operator BFF module; 29 frontend tests, 13 dedicated axe cases, and three Chromium
+  journeys pass; the final bundle is 440,439 uncompressed JavaScript bytes.
+
+## Not proven
+
+Live OIDC exchange/session persistence/logout/rotation, production browsers/assistive
+technology, TLS proxy, independent security/accessibility audit, deployment, MCP/A2A,
+load/chaos, managed telemetry, and production runtime integration remain deferred.
+Credentialed PostgreSQL/Keycloak and Temporal integration suites were selected locally
+but skipped because their required environment variables/services were absent; CI keeps
+the existing environment-backed jobs.

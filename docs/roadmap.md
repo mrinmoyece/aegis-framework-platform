@@ -14,20 +14,19 @@
 | 10 | Event-grounded memory and pgvector RAG | **Delivered offline/adapter boundary** | Immutable three-tier ledger, deterministic chunk/embed/compact pipeline, live forced-RLS pgvector hybrid SQL query (store-tested), digest-only retrieval/context ledger facts, explicit `MemoryAcceptance` decision contract, LangGraph-bounded untrusted context; production wiring of the SQL query into the serving path, real embedding providers, and KMS/blob erasure remain deferred |
 | 11 | Deterministic enterprise evaluation gates | **Delivered offline/adapter boundary** | Governed artifacts, 50 real cross-layer cases, 20 named fault cuts, adversarial/recovery/baseline/meta gates, deterministic reports and optional sanitized Langfuse publication |
 | 12 | Observability and replay | **Delivered offline/adapter boundary** | Neutral semantics/OTel, bounded logs/metrics, Prometheus SLOs, Grafana provisioning, authenticated support and ledger replay; live backends/SLO evidence deferred |
-| 13 | Secure operator workspace and BFF | Partial | Authenticated redacted APIs; browser session/CSRF/review UX deferred |
+| 13 | Secure operator workspace and BFF | **Delivered offline/demo boundary** | React/TanStack/Zod workspace, fail-closed BFF session boundary, tenant teardown, safe mutation review, polling, accessibility/security/build gates; live IdP/session store/browser qualification deferred |
 | 14 | Secure MCP and A2A interoperability | Planned | Capability/tool/effect policies |
 | 15 | Production deployment foundations | Partial | Digest images and CI; IaC/KMS/admission/HA/DR pending |
 | 16 | Final enterprise qualification | Partial | Threat/limitations/review gates; chaos/load/legal/privacy sign-off pending |
 
 ## Next layer boundary
 
-Layer 11 delivers portable observability and ledger replay as operational evidence,
-not runtime truth. The next capability is the secure operator workspace/BFF. Memory
-serving-path wiring, production model/connector qualification, independent
-penetration/human labeling, operator UI implementation, MCP/A2A, deployment/IaC, and final
-load/chaos certification remain explicitly deferred. Do not add another hosted
-evaluation authority, orchestration/workflow framework, or model judge to required
-CI.
+Layer 12 delivers the secure operator workspace/BFF as deterministic delivery evidence,
+not a production identity or browser qualification. The next capability is secure
+MCP/A2A interoperability. Live OIDC exchange, durable sessions, TLS/browser/assistive
+technology qualification, memory serving-path wiring, production model/connector
+qualification, independent penetration/human labeling, deployment/IaC, and final
+load/chaos certification remain explicitly deferred.
 
 Live connector/provider qualification remains blocked on credential brokering, regional
 data policy, private network/CA/egress operations, source scopes, parser isolation,

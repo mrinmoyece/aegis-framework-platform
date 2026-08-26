@@ -8,6 +8,13 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
+**Layer 12 adds a secure accessible React/TypeScript operator workspace and same-origin
+FastAPI BFF over those authorities: runtime-validated bounded views, deterministic
+checkout demo, fail-closed OIDC/session readiness, tenant cache teardown, safe approval
+review, explicit ambiguity, polling, CSP, axe, Playwright, dependency/license/audit and
+bundle gates. Live IdP/session-store and production browser qualification remain
+deferred.**
+
 **Layer 8 adds approval-bound ephemeral sandbox execution through hardened Kubernetes
 Jobs while keeping policy, ledger, claims, artifacts, and attestations outside Temporal,
 Kubernetes, and LangGraph.**
@@ -200,7 +207,8 @@ runtime authority or production certification.**
   sequence, schema, compare, causal-chain and bounded support-report validation;
 - nine measurable SLOs and non-budgetable safety alerts. Langfuse remains optional
   trace/evaluation UX; OTel and the application ledger preserve portability and truth.
-  UI, MCP/A2A, deployment, live managed telemetry/SLO/on-call evidence remain deferred.
+  live OIDC/session persistence/browser qualification, MCP/A2A, deployment, and live
+  managed telemetry/SLO/on-call evidence remain deferred.
 
 ## Ownership
 
