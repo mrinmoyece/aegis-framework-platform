@@ -131,7 +131,7 @@ describe("typed BFF client", () => {
     const peer = fixtureSnapshot.protocol_peers[0];
     if (peer === undefined) throw new Error("fixture missing protocol peer");
     server.use(
-      http.post(`*/operator/api/protocol-peers/${encodeURIComponent(peer.peer_id)}/trust`, async (req) => {
+      http.post(`*/operator/api/protocol-peers/${encodeURIComponent(peer.peer_id)}/trust`, (req) => {
         expect(req.request.headers.get("idempotency-key")).toBe("trust-command-1");
         return HttpResponse.json({
           command_id: "trust-command-1",
