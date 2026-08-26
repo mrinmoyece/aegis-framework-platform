@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -115,6 +116,41 @@ def build_parser() -> argparse.ArgumentParser:
     serve = subparsers.add_parser("serve", help="run the FastAPI adapter")
     serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8000)
+    worker = subparsers.add_parser(
+        "worker",
+        help="run one fail-closed enterprise Temporal worker profile",
+    )
+    worker.add_argument(
+        "--profile",
+        required=True,
+        choices=(
+            "outbox",
+            "reconciler",
+            "investigation",
+            "cognitive",
+            "evidence",
+            "remediation",
+            "memory",
+            "sandbox",
+            "protocol",
+            "protocol-gateway",
+        ),
+    )
+    worker.add_argument("--task-queue", required=True)
+    worker_health = subparsers.add_parser(
+        "worker-health",
+        help="check worker startup, readiness, or liveness",
+    )
+    worker_health.add_argument(
+        "--kind",
+        required=True,
+        choices=("startup", "ready", "live"),
+    )
+    worker_drain = subparsers.add_parser(
+        "worker-drain",
+        help="remove readiness and request graceful worker drain",
+    )
+    worker_drain.add_argument("--timeout-seconds", type=int, default=90)
     return parser
 
 
@@ -218,6 +254,43 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 2
         print(json.dumps(replay_result, indent=2, sort_keys=True))
         return 0
+    if args.command == "worker":
+        from aegis_framework.worker_runtime import run_production_worker
+
+        try:
+            return run_production_worker(
+                profile=args.profile,
+                task_queue=args.task_queue,
+                runtime_directory=_worker_runtime_directory(),
+            )
+        except (OSError, RuntimeError, ValueError):
+            print(
+                json.dumps(
+                    {"status": "not_ready", "reason": "worker_bootstrap_unavailable"},
+                    sort_keys=True,
+                )
+            )
+            return 78
+    if args.command == "worker-health":
+        from aegis_framework.worker_runtime import WorkerControl
+
+        try:
+            healthy = WorkerControl(_worker_runtime_directory()).healthy(args.kind)
+        except (OSError, ValueError):
+            healthy = False
+        return 0 if healthy else 1
+    if args.command == "worker-drain":
+        from aegis_framework.worker_runtime import WorkerControl
+
+        if args.timeout_seconds < 1 or args.timeout_seconds > 120:
+            return 2
+        try:
+            control = WorkerControl(_worker_runtime_directory())
+            control.request_drain()
+            drained = control.wait_for_drain(timeout_seconds=args.timeout_seconds)
+        except OSError:
+            return 1
+        return 0 if drained else 1
 
     uvicorn.run(
         "aegis_framework.api:app",
@@ -226,6 +299,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         access_log=False,
     )
     return 0
+
+
+def _worker_runtime_directory() -> Path:
+    return Path(os.getenv("AEGIS_WORKER_RUNTIME_DIR", "/var/run/aegis"))
 
 
 def _run_governed_eval(args: argparse.Namespace) -> int:

@@ -19,8 +19,10 @@ runtime without coupling the application contract to gVisor or Kata.
 ## Decision
 
 Keep `SandboxBackend` provider-neutral and ship one disabled-by-default official
-Kubernetes Python client adapter. It creates one fixed `batch/v1` Job and a default-deny
-NetworkPolicy from an immutable request. Activation requires:
+Kubernetes Python client adapter. It creates one fixed `batch/v1` Job. Production uses
+the precreated namespace default-deny NetworkPolicy and gives the controller read-only
+NetworkPolicy access; optional per-execution policy management remains off by default
+for legacy/test adapters. Activation requires:
 
 1. an allowlisted RuntimeClass, with Kata recommended for mutually distrustful tenants;
 2. admission policies for digest images and hardened Pod shape;

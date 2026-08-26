@@ -1,0 +1,132 @@
+{
+  "schema_version": 14,
+  "layer": 14,
+  "generated_on": "2026-08-18",
+  "comparison_basis": {
+    "framework_layer14": {
+      "repository": "mrinmoyece/aegis-framework-platform",
+      "base_sha": "adb8783dde0decd295a37460a4a8ab24ced4640c"
+    },
+    "custom_layer15": {
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "2756da792038e60ee764262c6d9e66059da155e5",
+      "pull_request": 17,
+      "status": "open-unmerged-unsigned"
+    }
+  },
+  "source_loc": {
+    "framework_new_production_contracts": 462,
+    "framework_new_contract_tests": 459,
+    "framework_deployment_and_workflow_config": 3239,
+    "framework_new_focused_docs": 474,
+    "custom_repository_python_production": 66115,
+    "custom_repository_python_tests": 31354,
+    "custom_repository_python_scripts": 2657,
+    "method": "Framework counts are physical lines in the two new runtime contract modules, their two focused tests, deployment YAML/HCL/new workflows, and focused new docs. Custom counts are the complete pinned Layer 15 repository reported by a read-only audit; scopes are not equivalent and must not be treated as a code-efficiency ratio."
+  },
+  "runtime_dependencies": {
+    "framework_direct_python": 14,
+    "framework_locked_python_packages": 151,
+    "framework_new_direct_python": 0,
+    "custom_direct_python": 14,
+    "framework_required_stateful_services": [
+      "PostgreSQL/pgvector",
+      "Temporal Cloud"
+    ],
+    "custom_required_stateful_services": [
+      "PostgreSQL/pgvector",
+      "Redis"
+    ],
+    "candid_note": "Framework delegates workflow queue/history/timer/signal/retry mechanics to managed Temporal and adds a managed control-plane dependency. Custom keeps Redis transport non-authoritative but owns queue leases, heartbeat, redelivery, and workflow recovery code."
+  },
+  "configuration_and_topology": {
+    "framework_rendered_kubernetes_resources": 81,
+    "framework_deployments": 13,
+    "framework_hpas": 9,
+    "framework_pdbs": 13,
+    "framework_network_policies": 12,
+    "framework_namespaces": 2,
+    "custom_kubernetes_yaml_files": 18,
+    "custom_deployments": 9,
+    "custom_namespaces": 4,
+    "custom_compose_services": 9,
+    "assessment": "Framework has more queue-specific Deployments and disruption/scaling objects because Temporal/LangGraph/evidence/remediation/memory/sandbox/protocol workers are isolated. Custom has an explicit data and egress namespace plus Redis and a separate UI image."
+  },
+  "custom_increment": {
+    "files_changed": 139,
+    "additions": 16081,
+    "deletions": 118,
+    "commits": 1
+  },
+  "framework_code_removed_or_avoided": [
+    "custom Redis Streams queue, consumer groups, leases, heartbeat, redelivery and stale-worker recovery",
+    "self-hosted Temporal frontend/history/matching/worker services and their persistence/visibility databases",
+    "Temporal server schema upgrade, shard sizing, replication and control-plane patch automation",
+    "custom graph scheduler, synchronized fan-in, reducer and checkpoint mechanics",
+    "hand-written infrastructure module dependency code by using direct exact-pinned Terraform resources"
+  ],
+  "remaining_custom_controls": [
+    "identity, tenant, current purpose/RBAC and forced RLS",
+    "application ledger, dual hashes, idempotency, inbox/outbox and projections",
+    "budget reservation, provider/connector quotas, retry ownership and backpressure",
+    "approval, fencing, receipts, verification, reconciliation and compensation",
+    "evidence/memory provenance, citations, retention, legal hold and archive policy",
+    "sandbox policy, artifact trust, cleanup and isolation readiness",
+    "MCP/A2A trust, workload identity, content bounds and proposal-only effects",
+    "migration compatibility, restore acceptance, generation fencing and routing",
+    "release approval, admission exceptions, SLO/error-budget policy and compliance evidence"
+  ],
+  "temporal_tradeoff": {
+    "framework": "Temporal Cloud through PrivateLink; namespace/task-queue isolation, payload codec, API key/mTLS, Worker Deployment/build IDs, replay, rate/concurrency, retention, schedule-to-start, drain and reconciliation remain explicit.",
+    "custom": "No workflow framework. PostgreSQL ledger plus Redis Streams and custom workers/reconciler own transport, leases, heartbeat, redelivery and durable workflow semantics.",
+    "assessment": "Managed Temporal removes substantial server and queue mechanics but adds usage cost, vendor/region/DPA/retention qualification, history/versioning APIs, payload privacy, namespace operations and managed failover assumptions. Neither option replaces application truth or effect controls."
+  },
+  "supply_chain_comparison": {
+    "shared": [
+      "digest images",
+      "multi-architecture build",
+      "SPDX SBOM",
+      "vulnerability/license/secret gates",
+      "keyless signing",
+      "provenance attestations",
+      "immutable promotion",
+      "admission policy"
+    ],
+    "framework_difference": "Framework reuses the custom Layer 15 GitHub/Sigstore pattern with existing uv/npm locks and one combined application/BFF/UI image. Protected-branch enforcement and commit signing remain external and unproven."
+  },
+  "cost_and_capacity": {
+    "framework_reference": "Three system and three Kata nodes minimum, three NAT gateways, Multi-AZ db.r7g.xlarge RDS, interface endpoints, S3/KMS/Backup/logs/AMP, plus Temporal Cloud usage.",
+    "custom_reference": "Three m7g.large system nodes, sandbox scale-to-zero, db.t4g.medium RDS, two cache.t4g.small Redis nodes, NAT/log/backup/telemetry.",
+    "assessment": "Framework defaults favor stronger sandbox and database headroom but likely cost more at idle. Neither repository contains prices, storage-growth measurements, provider quotas, load curves, budget alerts, or a validated capacity model."
+  },
+  "lock_in_and_escape": {
+    "lock_in": [
+      "AWS EKS/RDS/S3/KMS/Backup/PrivateLink direct resources",
+      "Temporal Cloud namespace/history/Worker Deployment APIs",
+      "GitHub Actions OIDC, attestations and Environment approvals",
+      "Sigstore policy-controller CRD",
+      "Kubernetes and Kustomize operational APIs"
+    ],
+    "escape": [
+      "OCI digests and registry mirroring",
+      "standard Kustomize manifests and PostgreSQL SQL/JSON export",
+      "provider-neutral application ports and one attested worker entry point",
+      "application outbox plus opaque Temporal messages",
+      "OTLP/Prometheus-neutral telemetry",
+      "ledger-grounded rebuild independent of Temporal and LangGraph",
+      "separate regional Terraform states and replaceable cloud adapters"
+    ]
+  },
+  "deferred": [
+    "real cloud apply and drift operation",
+    "live enterprise worker bootstrap and credentials",
+    "production PKI, OIDC exchange, durable sessions and secret rotation",
+    "Temporal Cloud account, PrivateLink, managed backup/failover and capacity",
+    "RDS PITR, cross-account/cross-region restore and measured RPO/RTO",
+    "second-region failover/failback and split-brain chaos",
+    "live admission/CNI/proxy/Kata/CSI/workload-identity enforcement",
+    "provider, connector and protocol partner qualification",
+    "load, chaos, SLO, on-call and cost evidence",
+    "penetration, accessibility, legal/privacy and compliance certification"
+  ]
+}

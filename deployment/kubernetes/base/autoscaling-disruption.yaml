@@ -1,0 +1,155 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-api, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: api}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-operator, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: operator}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-outbox, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: outbox}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-reconciler, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: reconciler}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-investigation-worker, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: investigation}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-cognitive-worker, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: cognitive}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-evidence-worker, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: evidence}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-remediation-worker, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: remediation}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-memory-worker, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: memory}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-sandbox-controller, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: sandbox}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-protocol-gateway, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: protocol-gateway}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-protocol-worker, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: protocol}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-api, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-api}
+  minReplicas: 3
+  maxReplicas: 12
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-operator, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-operator}
+  minReplicas: 3
+  maxReplicas: 8
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-investigation-worker, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-investigation-worker}
+  minReplicas: 3
+  maxReplicas: 20
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-cognitive-worker, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-cognitive-worker}
+  minReplicas: 3
+  maxReplicas: 20
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-evidence-worker, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-evidence-worker}
+  minReplicas: 3
+  maxReplicas: 20
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-remediation-worker, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-remediation-worker}
+  minReplicas: 2
+  maxReplicas: 8
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-memory-worker, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-memory-worker}
+  minReplicas: 2
+  maxReplicas: 12
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-protocol-gateway, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-protocol-gateway}
+  minReplicas: 3
+  maxReplicas: 16
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: aegis-protocol-worker, namespace: aegis-system}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: aegis-protocol-worker}
+  minReplicas: 3
+  maxReplicas: 16

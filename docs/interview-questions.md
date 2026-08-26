@@ -670,3 +670,44 @@ packages as presence markers and hand-writes the wire mapping.
      `heartbeat_timeout`. A worker that stops heartbeating — crash, stuck adapter call —
      is detected and the Activity retried well before the timeout, not only discovered at
      Activity completion.
+
+113. **Why Kustomize rather than Helm?**
+     The product has one fixed topology. Kustomize gives reviewable base/overlay patches
+     without a second template/value language or unsupported combinations. Helm becomes
+     justified only for a real third-party distribution requirement.
+
+114. **What does Temporal Cloud remove, and what remains?**
+     It removes server persistence/visibility, shard/schema/replication, and control-plane
+     operations. Namespace/task-queue policy, payload encryption, mTLS/API keys, Worker
+     Versioning, replay, retention, capacity, application idempotency, reconciliation,
+     and ledger recovery remain ours.
+
+115. **Why is CPU-only worker autoscaling unsafe?**
+     Temporal saturation is visible in schedule-to-start and poller/backlog signals.
+     Raising replicas/concurrency can exhaust DB pools or provider quotas and multiply
+     retries. Scale within one capacity budget and preserve queue isolation.
+
+116. **How do you roll back after an additive migration?**
+     Keep the expanded schema, route histories to a replay-compatible prior worker, roll
+     stateless workloads to a previously verified digest, and reconcile. Never reverse a
+     destructive migration during an incident.
+
+117. **What is the recovery source after losing Temporal history and LangGraph checkpoints?**
+     Verified application events plus retained objects and current authority. Rebuild
+     projections/vector/checkpoints and reissue/reconcile stable outbox intent; never
+     invent completion, approval, receipt, or verification.
+
+118. **How does regional fencing prevent split brain?**
+     Fence source ingress/writer/effects, verify target restore, advance one monotonic
+     generation, require that generation on writes/effects, then route. DNS or Temporal
+     namespace state alone is insufficient. Failback advances again.
+
+119. **Does a keyless signature prove a production release is authorized?**
+     No. It binds an artifact to a workflow identity/transparency record. Change approval,
+     protected-branch/environment policy, admission, deployment, application authority,
+     and operational verification are separate.
+
+120. **Why is Layer 14 not production-ready evidence?**
+     Render, mock plan, unit/integration, and deterministic drills prove structure and
+     contracts. They do not prove cloud apply, live PKI/IdP/CNI/Kata/Temporal/RDS failover,
+     load/chaos, SLO/on-call, penetration/accessibility, or compliance effectiveness.

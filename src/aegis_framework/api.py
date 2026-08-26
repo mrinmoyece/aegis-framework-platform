@@ -493,8 +493,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.13.0",
-        description="Authenticated Layer 13 operations and interoperability API.",
+        version="0.14.0",
+        description="Authenticated Layer 14 operations and interoperability API.",
         default_response_class=JSONResponse,
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)

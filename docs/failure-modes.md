@@ -169,6 +169,28 @@ blind re-embedding under a stale version.
 - Treat hash failure, cross-tenant access, stale results, and framework defects as
   platform/security incidents.
 
+## Layer 14 deployment and recovery failures
+
+| Failure | Fail-closed behavior | Evidence |
+|---|---|---|
+| Missing enterprise worker bootstrap | Pod never becomes ready; no fake Activity implementation | worker runtime tests |
+| Temporal TLS/API key/mTLS/codec/namespace absent | bootstrap exits configuration failure before polling | unit/config |
+| Worker build incompatible | replay/promotion stops; old pinned worker remains | replay + rollout runbook |
+| Queue schedule-to-start rises | stop low-priority admission, preserve cleanup/remediation capacity, scale within DB/provider limits | objective/runbook; production metric adapter and load deferred |
+| DB pool exceeds headroom | strict `CapacityPlan` rejects configuration | unit |
+| Migration checksum/lock failure | PreSync Job fails; application digest is not promoted | migration runner/integration |
+| Admission/signature policy unavailable | production readiness/promotion blocked | policy/render; live enforcement deferred |
+| CNI/proxy/private endpoint unavailable | dependent workload remains unready; no direct egress fallback | NetworkPolicy/runbook |
+| Node drain/rollout | readiness removed, polls drain for 90 seconds, Temporal reschedules | probe/control tests |
+| Backup hash/sequence mismatch | target remains isolated; security/data-loss incident | deterministic restore verifier |
+| Projection/vector/checkpoint loss | rebuild from verified ledger/objects; cache discarded | restore contract |
+| Temporal history missing after restore | reconcile same workflow/outbox IDs; never infer completion | DR runbook |
+| Ambiguous provider/effect/sandbox state | observe and reconcile under current fence before routing | application ledger |
+| Stale regional generation | writer transition denied | failover contract test |
+| Source writer not fenced | target writer/routing denied | failover contract/runbook |
+| DNS routes early | readiness does not override generation/ledger fence | runbook |
+| Telemetry unavailable | correctness continues; operations readiness degrades | existing containment |
+
 ## Layer 13 protocol failures
 
 | Failure | Fail-closed behavior | Durable owner |

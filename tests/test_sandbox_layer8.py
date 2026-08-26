@@ -1044,6 +1044,7 @@ def _kubernetes_backend(
             ),
             enabled=True,
             external_egress_proxy_enforced=proxy,
+            manage_network_policy=True,
         ),
         clock=FixedClock(NOW),
     )
@@ -1361,6 +1362,33 @@ def test_kubernetes_cleanup_absence_config_and_static_builder_validation() -> No
             ),
             clock=FixedClock(NOW),
         )
+
+
+def test_kubernetes_production_mode_uses_namespace_default_deny() -> None:
+    backend, _, networking, _ = _kubernetes_backend()
+    backend._config.manage_network_policy = False
+    networking.policy = {
+        "spec": {
+            "podSelector": {},
+            "policyTypes": ["Ingress", "Egress"],
+        }
+    }
+    request = _request()
+    execution = backend.provision(request)
+    backend.cleanup(request, execution)
+    assert networking.created == []
+    assert networking.deleted == []
+    networking.policy = {
+        "spec": {
+            "podSelector": {"matchLabels": {"unsafe": "true"}},
+            "policyTypes": ["Ingress", "Egress"],
+        }
+    }
+    with pytest.raises(SandboxRejected, match="incomplete"):
+        backend.provision(request.model_copy(update={"execution_id": "execution:bad"}))
+    networking.policy = None
+    with pytest.raises(SandboxUnavailable, match="default-deny"):
+        backend.provision(request.model_copy(update={"execution_id": "execution:two"}))
 
 
 def test_kubernetes_rejects_unapproved_apparmor_and_delete_uid_change() -> None:

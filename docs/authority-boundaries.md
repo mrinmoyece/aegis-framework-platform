@@ -150,3 +150,11 @@ reference, Langfuse record, pytest result, or CI status is release evidence only
 None authorizes a run/checkpoint read, grants tenant access, approves an action,
 fences an effect, proves reconciliation, verifies production recovery, or becomes
 an audit record.
+
+A Kubernetes admission, Terraform plan/state, AWS Backup job, Temporal namespace,
+Worker Deployment/build ID, SBOM, signature, provenance attestation, GitHub Environment
+approval, GitOps sync, SLO, restore report, or regional route is likewise operational or
+release evidence only. Application identity/policy, immutable facts, exact approval,
+fencing, receipts, verification, and reconciliation retain their existing owners.
+The `aegis_operations` database role is a separate deployment/DR evidence writer and is
+never granted to `aegis_app`; its records do not authorize an application effect.

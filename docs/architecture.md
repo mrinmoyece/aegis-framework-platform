@@ -1,5 +1,8 @@
 # Layer 7 approval-gated remediation architecture
 
+> Layer 14 deployment, recovery, and regional architecture is summarized at the end of
+> this document and detailed in [production deployment](production-deployment.md).
+
 ## Product boundary
 
 Layer 7 accepts a tenant-authorized investigation command, records immutable
@@ -503,7 +506,8 @@ forced-RLS projections, and deterministic replay. Kubernetes Job status and Temp
 history are provider observations only.
 
 `SandboxBackend` is neutral. The production-shaped adapter uses the official Kubernetes
-client to create a fixed Job and default-deny NetworkPolicy. Activation fails closed unless
+client to create a fixed Job inside a precreated namespace default-deny NetworkPolicy.
+The production controller cannot mutate NetworkPolicies. Activation fails closed unless
 the configured RuntimeClass, admission policies, NetworkPolicy enforcement, and workload
 identity are ready. Exact DNS egress additionally requires an external enforcing proxy;
 base Kubernetes NetworkPolicy is not represented as FQDN enforcement. Exact-destination
@@ -678,3 +682,43 @@ status reads and safe investigation/proposal submission. The A2A Agent Card expo
 four bounded skills. A proposal remains a Layer 7 candidate; no protocol path opens
 approval or invokes an effect. See [ADR 018](adr/018-official-mcp-a2a-interoperability.md),
 [compatibility](protocol-compatibility.md), and the [protocol runbook](protocol-runbook.md).
+
+# Layer 14 production foundation architecture
+
+Layer 14 packages the existing application boundaries; it does not move authority into
+Kubernetes, Terraform, Temporal Cloud, GitHub Actions, Sigstore, AWS Backup, or an
+observability backend.
+
+```mermaid
+flowchart LR
+  E[Regional stateless edge] --> H[Home-region API/BFF]
+  H --> L[(RDS application ledger)]
+  L --> O[Outbox]
+  O --> T[Temporal Cloud namespace]
+  T --> W[Queue-isolated versioned workers]
+  W --> G[Bounded LangGraph Activity]
+  W --> L
+  G --> C[(LangGraph saver)]
+  W --> B[Approved boundary proxies]
+  W --> S[Kata sandbox namespace]
+  L --> A[S3 archive/backup]
+  L --> R[Projection/vector/checkpoint rebuild]
+```
+
+Kustomize renders thirteen long-running workloads plus one migration Job. Native
+restricted policy, CEL admission, explicit service accounts/RBAC, default-deny
+networking, PDB/HPA/spread, probes/drain, digest images, and the dedicated Kata
+namespace shape the cluster boundary. Terraform references private EKS, Multi-AZ RDS,
+Temporal PrivateLink, KMS/Secrets/Pod Identity, immutable ECR/S3, backup lock, DNS/TLS,
+and telemetry. See [ADR 019](adr/019-production-deployment-foundations.md).
+
+Temporal Cloud owns workflow mechanics and managed server availability. Each image is a
+Worker Deployment/build ID with pinned compatibility; `connect_temporal` supports API
+key, mTLS, TLS server verification, identity, and the encrypted payload codec. The
+application still owns tenant partitioning, current authorization, rate/concurrency,
+budget, idempotency, fencing, reconciliation, and every accepted result.
+
+The ledger has one writer region and monotonic generation. Regional failover first
+fences the source, restores/verifies dual chains and sequences, advances generation,
+rebuilds derived state, reconciles Temporal/outbox/effects, and only then routes.
+Active-active writes and exact global spend are excluded.

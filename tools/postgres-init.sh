@@ -53,6 +53,11 @@ psql --set=ON_ERROR_STOP=1 \
     --file /opt/aegis/migrations/0009_layer13.sql
 
 psql --set=ON_ERROR_STOP=1 \
+    --username "${POSTGRES_USER}" \
+    --dbname "${POSTGRES_DB}" \
+    --file /opt/aegis/migrations/0010_layer14.sql
+
+psql --set=ON_ERROR_STOP=1 \
     --set=runtime_password="${AEGIS_POSTGRES_RUNTIME_PASSWORD}" \
     --username "${POSTGRES_USER}" \
     --dbname "${POSTGRES_DB}" <<'SQL'

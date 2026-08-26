@@ -257,6 +257,5 @@ jobs:
       - run: docker build --pull --tag aegis-framework-platform:ci .
       - name: Verify runtime user and import
         run: |
-          test "$(docker run --rm --entrypoint id aegis-framework-platform:ci -u)" = "10001"
           docker run --rm --entrypoint python aegis-framework-platform:ci \
-            -c "from aegis_framework.api import app; assert app.title == 'Aegis Framework Platform'"
+            -c "import os; from aegis_framework.api import app; assert os.getuid() == 10001; assert app.title == 'Aegis Framework Platform'"

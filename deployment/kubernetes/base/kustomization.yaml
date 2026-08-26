@@ -1,0 +1,135 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespaces.yaml
+  - configuration.yaml
+  - serviceaccounts-rbac.yaml
+  - deployments.yaml
+  - services-ingress.yaml
+  - migration-job.yaml
+  - autoscaling-disruption.yaml
+  - network-policies.yaml
+  - sandbox-foundation.yaml
+  - admission-policies.yaml
+  - signature-policy.yaml
+  - observability.yaml
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: aegis-framework-platform
+      app.kubernetes.io/managed-by: kustomize
+patches:
+  - target:
+      kind: Deployment
+      namespace: aegis-system
+    patch: |-
+      - op: add
+        path: /spec/minReadySeconds
+        value: 30
+      - op: add
+        path: /spec/progressDeadlineSeconds
+        value: 600
+      - op: add
+        path: /spec/revisionHistoryLimit
+        value: 5
+      - op: add
+        path: /spec/strategy
+        value:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 1
+            maxUnavailable: 0
+      - op: add
+        path: /spec/template/spec/terminationGracePeriodSeconds
+        value: 120
+      - op: add
+        path: /spec/template/spec/automountServiceAccountToken
+        value: false
+      - op: add
+        path: /spec/template/spec/securityContext
+        value:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          fsGroup: 10001
+          fsGroupChangePolicy: OnRootMismatch
+          seccompProfile:
+            type: RuntimeDefault
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext
+        value:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          privileged: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          seccompProfile:
+            type: RuntimeDefault
+      - op: add
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: 250m
+            memory: 384Mi
+            ephemeral-storage: 64Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+            ephemeral-storage: 256Mi
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: aegis
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: aegis
+      - op: add
+        path: /spec/template/spec/affinity
+        value:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels:
+                      app.kubernetes.io/name: aegis
+  - target:
+      kind: HorizontalPodAutoscaler
+      namespace: aegis-system
+    patch: |-
+      - op: add
+        path: /spec/behavior
+        value:
+          scaleUp:
+            stabilizationWindowSeconds: 60
+            policies:
+              - {type: Percent, value: 50, periodSeconds: 60}
+              - {type: Pods, value: 2, periodSeconds: 60}
+            selectPolicy: Min
+          scaleDown:
+            stabilizationWindowSeconds: 600
+            policies:
+              - {type: Percent, value: 20, periodSeconds: 120}
+      - op: add
+        path: /spec/metrics
+        value:
+          - type: Resource
+            resource:
+              name: cpu
+              target: {type: Utilization, averageUtilization: 65}
+          - type: Resource
+            resource:
+              name: memory
+              target: {type: Utilization, averageUtilization: 70}

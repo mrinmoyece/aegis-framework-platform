@@ -11,6 +11,12 @@ Telemetry outage, SLO response, dashboard use and ledger replay are in the
 [observability runbook](observability-runbook.md) and [SLO catalog](slo-catalog.md).
 MCP/A2A onboarding, quarantine, revocation, ambiguity and incident response are in the
 [protocol runbook](protocol-runbook.md).
+Layer 14 promotion, migrations, worker rollouts, restore, and regional fencing are in
+[production deployment](production-deployment.md),
+[deployment promotion](runbooks/deployment-promotion.md),
+[database migration](runbooks/database-migration.md),
+[Temporal worker rollout](runbooks/temporal-worker-rollout.md), and
+[restore/failover](runbooks/restore-failover.md).
 
 ## Start application PostgreSQL
 
@@ -51,6 +57,11 @@ python3 -m uv run aegis-framework eval run --filter secure-protocol-interoperabi
 make security
 make container
 docker compose config --quiet
+make deployment-check
+make kubernetes-render
+make terraform-check
+make restore-drill
+make restore-drill-db
 
 export AEGIS_TEST_POSTGRES_ADMIN_DSN="postgresql://aegis_admin:${AEGIS_POSTGRES_ADMIN_PASSWORD}@127.0.0.1:55432/aegis"
 export AEGIS_TEST_POSTGRES_RUNTIME_DSN="postgresql://aegis_app:${AEGIS_POSTGRES_RUNTIME_PASSWORD}@127.0.0.1:55432/aegis"

@@ -8,6 +8,13 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
+**Layer 14 adds a renderable Kustomize production reference, direct AWS Terraform,
+Temporal Cloud/private-endpoint and Worker Deployment Versioning boundaries, signed
+multi-arch supply chain, additive deployment/restore/retention schema, HA/capacity,
+backup/restore/DR, and fenced single-writer multi-region contracts. These are tested
+foundations, not evidence of a cloud apply, live failover, production PKI/SLO/on-call,
+load/chaos, or compliance certification.**
+
 **Layer 13 adds secure MCP and A2A interoperability through the current official
 `mcp==2.0.0` and `a2a-sdk==1.1.2` adapters. A tenant trust registry, workload identity,
 capability/schema/card/certificate pins, SSRF and content bounds, quotas, digest-only
@@ -41,7 +48,7 @@ safety baselines, deterministic JSON/Markdown/JUnit, dedicated CI gates, and an
 optional sanitized Langfuse publisher. Evaluation remains release evidence, never
 runtime authority or production certification.**
 
-## Delivered Layer 8
+## Delivered foundations
 
 - additive strict application events with aggregate sequence, commit-order tenant
   cursor, expected-version concurrency, aggregate/tenant hash chains, legacy upcast,

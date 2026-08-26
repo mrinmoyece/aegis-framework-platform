@@ -1,0 +1,94 @@
+name: Infrastructure foundations
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/infrastructure.yml"
+      - "deployment/**"
+      - "migrations/**"
+      - "src/aegis_framework/production.py"
+      - "src/aegis_framework/worker_runtime.py"
+      - "tools/deployment_check.py"
+      - "tests/test_production_layer14.py"
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/infrastructure.yml"
+      - "deployment/**"
+      - "migrations/**"
+      - "tools/deployment_check.py"
+      - "tests/test_production_layer14.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: infrastructure-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kubernetes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+      - run: uv sync --locked --all-extras
+      - run: uv run python tools/deployment_check.py
+      - name: Render production evidence
+        run: |
+          mkdir -p build/deployment
+          kubectl kustomize deployment/kubernetes/overlays/production \
+            > build/deployment/production.yaml
+      - name: Validate Kubernetes schemas
+        run: |
+          docker run --rm --volume "${PWD}:/workspace:ro" \
+            ghcr.io/yannh/kubeconform@sha256:85dbef6b4b312b99133decc9c6fc9495e9fc5f92293d4ff3b7e1b30f5611823c \
+            -strict -summary -ignore-missing-schemas \
+            -kubernetes-version 1.32.0 \
+            /workspace/build/deployment/production.yaml
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: deployment/kubernetes
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layer14-kubernetes-render
+          path: build/deployment/production.yaml
+          if-no-files-found: error
+          retention-days: 30
+
+  terraform:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: deployment/terraform/aws
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.13.3
+      - uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1
+        with:
+          tflint_version: v0.56.0
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - run: tflint --recursive
+      - run: terraform test
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: deployment/terraform/aws
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          hide-progress: true

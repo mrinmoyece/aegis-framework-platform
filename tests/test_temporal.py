@@ -12,6 +12,7 @@ from temporalio.exceptions import (
     WorkflowAlreadyStartedError,
 )
 from temporalio.testing import ActivityEnvironment
+from temporalio.worker import WorkerDeploymentConfig
 
 from aegis_framework.activity_runtime import CallbackActivityOperations
 from aegis_framework.adapters import FixedClock
@@ -36,6 +37,8 @@ from aegis_framework.temporal import (
     TemporalOutboxDispatcher,
     TemporalSignal,
     TemporalWorkflowInput,
+    build_temporal_worker,
+    connect_temporal,
     temporal_data_converter,
 )
 
@@ -69,6 +72,91 @@ def test_payload_codec_enforces_count_item_and_total_bounds() -> None:
         BoundedPayloadCodec(100)
     converter = temporal_data_converter(maximum_payload_bytes=2_048)
     assert isinstance(converter.payload_codec, BoundedPayloadCodec)
+
+
+def test_production_temporal_connection_requires_paired_mtls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: dict[str, object] = {}
+
+    async def connect(target_host: str, **kwargs: object) -> object:
+        observed.update(target_host=target_host, **kwargs)
+        return object()
+
+    monkeypatch.setattr("aegis_framework.temporal.Client.connect", connect)
+    client = asyncio.run(
+        connect_temporal(
+            target_host="private.example.invalid:7233",
+            namespace="aegis-production",
+            api_key="injected",
+            tls_server_name="private.example.invalid",
+            client_certificate=b"certificate",
+            client_private_key=b"private-key",
+            identity="aegis-worker-build-001",
+            tracing=False,
+        )
+    )
+    assert client is not None
+    assert observed["namespace"] == "aegis-production"
+    assert observed["api_key"] == "injected"
+    assert observed["identity"] == "aegis-worker-build-001"
+    assert observed["tls"] is not None
+    with pytest.raises(ValueError, match="paired"):
+        asyncio.run(
+            connect_temporal(
+                target_host="private.example.invalid:7233",
+                tls_server_name="private.example.invalid",
+                client_certificate=b"certificate",
+            )
+        )
+    with pytest.raises(ValueError, match="verified server name"):
+        asyncio.run(
+            connect_temporal(
+                target_host="private.example.invalid:7233",
+                api_key="injected",
+            )
+        )
+    with pytest.raises(ValueError, match="verified server name"):
+        asyncio.run(
+            connect_temporal(
+                target_host="private.example.invalid:7233",
+                client_certificate=b"certificate",
+                client_private_key=b"private-key",
+            )
+        )
+
+
+def test_production_worker_uses_pinned_deployment_version_and_rate_bounds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def worker(client: object, **kwargs: object) -> object:
+        captured.update(client=client, **kwargs)
+        return object()
+
+    monkeypatch.setattr("aegis_framework.temporal.Worker", worker)
+    built = build_temporal_worker(
+        client=object(),  # type: ignore[arg-type]
+        operations=CallbackActivityOperations({}),
+        task_queue="aegis-production-investigation-v1",
+        identity="worker:investigation:001",
+        deployment_name="aegis-investigation",
+        build_id="aegis-0.14.0-build-001",
+        maximum_activities_per_second=50,
+        maximum_task_queue_activities_per_second=100,
+    )
+    assert built is not None
+    deployment = captured["deployment_config"]
+    assert isinstance(deployment, WorkerDeploymentConfig)
+    assert deployment.version.build_id == "aegis-0.14.0-build-001"
+    assert captured["max_activities_per_second"] == 50
+    with pytest.raises(ValueError, match="paired"):
+        build_temporal_worker(
+            client=object(),  # type: ignore[arg-type]
+            operations=CallbackActivityOperations({}),
+            deployment_name="aegis-investigation",
+        )
 
 
 def test_temporal_models_are_strict_bounded_and_opaque() -> None:

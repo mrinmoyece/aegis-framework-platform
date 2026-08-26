@@ -530,3 +530,24 @@ tenant projection loads.
 The browser stores no bearer credential. Closing it does not stop or complete runtime
 work. Production operator readiness remains `503` until live IdP exchange and durable
 sessions are configured.
+
+## 14. Inspect the production foundation without applying cloud resources
+
+```bash
+make deployment-check
+make kubernetes-render
+make terraform-check
+make restore-drill
+make restore-drill-db
+```
+
+Trace one command through the production design: ingress establishes identity; API
+commits application intent/outbox in the home-region ledger; a versioned worker polls
+its isolated Temporal queue; the bounded LangGraph Activity may create only cited
+proposals; results return as application facts. Framework completion never becomes API
+truth.
+
+Now simulate regional recovery with `build/restore-drill.json`. It verifies contiguous
+cursor/aggregate sequence, dual hashes, a one-step generation advance, derived-state
+rebuild requirements, and Temporal/outbox/effect reconciliation. It deliberately reports
+`cloud_apply_performed=false` and `live_managed_failover_performed=false`.

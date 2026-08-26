@@ -1,0 +1,236 @@
+name: Signed supply chain
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/supply-chain.yml"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "ui/**"
+      - "src/**"
+      - "security/**"
+      - "tools/vulnerability_check.py"
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/aegis-framework-platform
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: mkdir -p build
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+        with:
+          node-version: "24.15.0"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: uv sync --locked --all-extras
+      - run: npm install --global npm@11.12.1
+      - run: npm --prefix ui ci --ignore-scripts
+      - run: make security python-licenses frontend-licenses
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          image: tonistiigi/binfmt:qemu-v9.2.2@sha256:1b804311fe87047a4c96d38b4b3ef6f62fca8cd125265917a9e3dc3c996c39e6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          load: true
+          platforms: linux/amd64
+          push: false
+          tags: aegis-framework-platform:ci
+          provenance: false
+      - uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: aegis-framework-platform:ci
+          format: spdx-json
+          output-file: build/aegis-framework-platform.spdx.json
+          upload-artifact: false
+      - uses: anchore/scan-action@df395807f4554463d4455b8047cf58e37b6acaae # v6.5.0
+        with:
+          image: aegis-framework-platform:ci
+          grype-version: v0.117.0
+          severity-cutoff: high
+          fail-build: false
+          only-fixed: false
+          output-format: json
+          output-file: build/aegis-framework-platform.grype.json
+      - name: Enforce no-waiver vulnerability policy
+        run: python3 tools/vulnerability_check.py --report build/aegis-framework-platform.grype.json --output build/vulnerability-policy.json
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          exit-code: "1"
+          hide-progress: true
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: layer14-supply-chain-evidence
+          path: |
+            build/aegis-framework-platform.spdx.json
+            build/aegis-framework-platform.grype.json
+            build/vulnerability-policy.json
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: mkdir -p build
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+        with:
+          image: tonistiigi/binfmt:qemu-v9.2.2@sha256:1b804311fe87047a4c96d38b4b3ef6f62fca8cd125265917a9e3dc3c996c39e6
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          provenance: mode=max
+          sbom: true
+      - name: Resolve exact platform digests
+        id: platforms
+        env:
+          INDEX_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          manifest="$(docker buildx imagetools inspect --raw "${IMAGE}@${INDEX_DIGEST}")"
+          amd64="$(jq --raw-output '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "amd64") | .digest' <<<"${manifest}")"
+          arm64="$(jq --raw-output '.manifests[] | select(.platform.os == "linux" and .platform.architecture == "arm64") | .digest' <<<"${manifest}")"
+          for digest in "${amd64}" "${arm64}"; do
+            printf '%s\n' "${digest}" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          done
+          {
+            echo "amd64=${amd64}"
+            echo "arm64=${arm64}"
+          } >> "${GITHUB_OUTPUT}"
+      - name: Scan published amd64 image
+        uses: anchore/scan-action@df395807f4554463d4455b8047cf58e37b6acaae # v6.5.0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.platforms.outputs.amd64 }}
+          grype-version: v0.117.0
+          severity-cutoff: high
+          fail-build: false
+          only-fixed: false
+          output-format: json
+          output-file: build/aegis-framework-platform-amd64.grype.json
+      - name: Scan published arm64 image
+        uses: anchore/scan-action@df395807f4554463d4455b8047cf58e37b6acaae # v6.5.0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.platforms.outputs.arm64 }}
+          grype-version: v0.117.0
+          severity-cutoff: high
+          fail-build: false
+          only-fixed: false
+          output-format: json
+          output-file: build/aegis-framework-platform-arm64.grype.json
+      - name: Enforce published-platform vulnerability policy
+        run: |
+          python3 tools/vulnerability_check.py \
+            --report build/aegis-framework-platform-amd64.grype.json \
+            --report build/aegis-framework-platform-arm64.grype.json \
+            --output build/vulnerability-policy.json
+      - name: Generate amd64 SPDX SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.platforms.outputs.amd64 }}
+          format: spdx-json
+          output-file: build/aegis-framework-platform-amd64.spdx.json
+          upload-artifact: false
+      - name: Generate arm64 SPDX SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.platforms.outputs.arm64 }}
+          format: spdx-json
+          output-file: build/aegis-framework-platform-arm64.spdx.json
+          upload-artifact: false
+      - name: Validate SPDX mandatory fields
+        run: |
+          python3 tools/spdx_check.py \
+            --sbom build/aegis-framework-platform-amd64.spdx.json \
+            --sbom build/aegis-framework-platform-arm64.spdx.json
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+      - name: Keyless-sign immutable digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes --registry-referrers-mode oci-1-1 "${IMAGE}@${DIGEST}"
+      - uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: build/aegis-framework-platform-index.spdx.json
+          upload-artifact: false
+      - name: Validate index SPDX mandatory fields
+        run: |
+          python3 tools/spdx_check.py \
+            --sbom build/aegis-framework-platform-index.spdx.json
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          predicate-type: https://spdx.dev/Document/v2.3
+          predicate-path: build/aegis-framework-platform-index.spdx.json
+          push-to-registry: true
+      - name: Attest amd64 SPDX SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.platforms.outputs.amd64 }}
+          predicate-type: https://spdx.dev/Document/v2.3
+          predicate-path: build/aegis-framework-platform-amd64.spdx.json
+          push-to-registry: true
+      - name: Attest arm64 SPDX SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.platforms.outputs.arm64 }}
+          predicate-type: https://spdx.dev/Document/v2.3
+          predicate-path: build/aegis-framework-platform-arm64.spdx.json
+          push-to-registry: true
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: published-layer14-supply-chain-evidence
+          path: build/*.json
+          if-no-files-found: error
+          retention-days: 30
