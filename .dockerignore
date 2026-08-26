@@ -5,6 +5,8 @@
 !uv.lock
 !src/
 !src/**
+!migrations/
+!migrations/**
 !ui/
 !ui/.npmrc
 !ui/index.html

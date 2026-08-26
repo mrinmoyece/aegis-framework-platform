@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help bootstrap format lint type test protocol integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security demo serve measure observability-config frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
+.PHONY: help bootstrap format lint type test protocol integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security python-licenses demo serve measure observability-config deployment-check kubernetes-render terraform-check restore-drill restore-drill-db frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
 
 help:
 	@printf '%s\n' \
@@ -22,10 +22,16 @@ help:
 	  'eval-meta       Test evaluator repeatability, sharding, waivers, and redaction' \
 	  'docs            Validate documentation and manifests' \
 	  'security        Run static and dependency vulnerability checks' \
+	  'python-licenses Enforce reviewed Python dependency licenses' \
 	  'demo            Run the successful checkout investigation' \
 	  'serve           Start the local API on 127.0.0.1:8000' \
 	  'measure         Refresh Layer 11 framework comparison measurements' \
 	  'observability-config Validate Prometheus, Grafana, and OTel assets' \
+	  'deployment-check Validate Layer 14 deployment and supply-chain controls' \
+	  'kubernetes-render Render the production Kustomize evidence overlay' \
+	  'terraform-check Format, initialize, validate, and mock-plan AWS Terraform' \
+	  'restore-drill    Emit deterministic restore/failover contract evidence' \
+	  'restore-drill-db Run an isolated PostgreSQL logical restore and rebuild' \
 	  'frontend-ci     Run locked Layer 12 UI/BFF frontend gates' \
 	  'frontend-e2e    Run deterministic Chromium operator journeys' \
 	  'container       Build the digest-pinned non-root image' \
@@ -86,6 +92,9 @@ security:
 	$(UV) run pip-audit --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
 	npm --prefix ui run audit
 
+python-licenses:
+	$(UV) run python tools/license_check.py
+
 demo:
 	$(UV) run aegis-framework demo --scenario success
 
@@ -97,6 +106,24 @@ measure:
 
 observability-config:
 	$(UV) run python tools/observability_check.py
+
+deployment-check:
+	$(UV) run python tools/deployment_check.py
+
+kubernetes-render:
+	kubectl kustomize deployment/kubernetes/overlays/production >/dev/null
+
+terraform-check:
+	terraform -chdir=deployment/terraform/aws fmt -check -recursive
+	terraform -chdir=deployment/terraform/aws init -backend=false -input=false
+	terraform -chdir=deployment/terraform/aws validate
+	terraform -chdir=deployment/terraform/aws test
+
+restore-drill:
+	$(UV) run python tools/restore_drill.py --output build/restore-drill.json
+
+restore-drill-db:
+	sh tools/restore_drill.sh
 
 frontend-install:
 	npm --prefix ui ci --ignore-scripts
@@ -138,9 +165,9 @@ frontend-csp:
 frontend-ci: frontend-lint frontend-type frontend-contracts frontend-test frontend-axe frontend-build frontend-bundle frontend-csp frontend-licenses frontend-audit
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer13 .
+	docker build --pull --tag aegis-framework-platform:layer14 .
 
 compose-config:
 	docker compose config --quiet
 
-ci: lint type test protocol eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config frontend-ci
+ci: lint type test protocol eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config deployment-check kubernetes-render restore-drill frontend-ci

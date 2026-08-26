@@ -1,0 +1,84 @@
+name: Immutable GitOps promotion evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_digest:
+        description: Signed multi-platform sha256 digest
+        required: true
+        type: string
+      change_reference:
+        description: Approved change reference
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/aegis-framework-platform
+  DIGEST: ${{ inputs.image_digest }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+      - name: Validate immutable inputs
+        env:
+          CHANGE_REFERENCE: ${{ inputs.change_reference }}
+        run: |
+          printf '%s\n' "${DIGEST}" | grep -Eq '^sha256:[0-9a-f]{64}$'
+          printf '%s\n' "${CHANGE_REFERENCE}" | grep -Eq '^change-ref://[A-Za-z0-9._:/-]{1,200}$'
+      - name: Verify keyless identity and transparency log
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity-regexp '^https://github.com/${{ github.repository }}/.github/workflows/supply-chain.yml@refs/heads/master$' \
+            "${IMAGE}@${DIGEST}"
+      - name: Verify GitHub provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh attestation verify "oci://${IMAGE}@${DIGEST}" \
+            --repo "${{ github.repository }}" \
+            --predicate-type "https://slsa.dev/provenance/v1"
+      - name: Materialize digest-only candidate
+        run: |
+          mkdir -p build/promotion
+          # Rewrite the relative base reference so it resolves correctly from
+          # the promotion output directory, then pin the image digest.
+          sed \
+            -e "s|../../base|$GITHUB_WORKSPACE/deployment/kubernetes/base|g" \
+            -e "s#digest: sha256:[0-9a-f]\\{64\\}#digest: ${DIGEST}#" \
+            deployment/kubernetes/overlays/production/kustomization.yaml \
+            > build/promotion/kustomization.yaml
+          cp deployment/kubernetes/overlays/production/production-settings.yaml \
+            build/promotion/production-settings.yaml
+          printf '{"change_reference":"%s","digest":"%s","rollback_digest_required":true}\n' \
+            '${{ inputs.change_reference }}' "${DIGEST}" \
+            > build/promotion/evidence.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: verified-gitops-candidate
+          path: build/promotion/
+          if-no-files-found: error
+          retention-days: 30
+
+  staging:
+    needs: verify
+    environment: staging
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "staging approval records the immutable digest; the GitOps repository remains the deployment authority"
+
+  production:
+    needs: staging
+    environment: production
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo "production approval records the same digest; rollback requires a previously verified digest"
+

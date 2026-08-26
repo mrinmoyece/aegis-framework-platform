@@ -1,0 +1,349 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegis-api
+  namespace: aegis-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aegis
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aegis
+        app.kubernetes.io/component: api
+    spec:
+      serviceAccountName: aegis-api
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: aegis
+          image: ghcr.io/mrinmoyece/aegis-framework-platform@sha256:adb8783dde0decd295a37460a4a8ab24ced4640cadb8783dde0decd295a37460
+          args: ["serve", "--host", "0.0.0.0", "--port", "8000"]
+          envFrom:
+            - configMapRef: {name: aegis-runtime}
+            - secretRef: {name: aegis-runtime-secrets}
+          ports:
+            - {name: http, containerPort: 8000, protocol: TCP}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 20
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["python", "-c", "import time; time.sleep(20)"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 32Mi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegis-operator
+  namespace: aegis-system
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aegis
+      app.kubernetes.io/component: operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aegis
+        app.kubernetes.io/component: operator
+    spec:
+      serviceAccountName: aegis-operator
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: aegis
+          image: ghcr.io/mrinmoyece/aegis-framework-platform@sha256:adb8783dde0decd295a37460a4a8ab24ced4640cadb8783dde0decd295a37460
+          args: ["serve", "--host", "0.0.0.0", "--port", "8000"]
+          envFrom:
+            - configMapRef: {name: aegis-runtime}
+            - secretRef: {name: aegis-runtime-secrets}
+          ports:
+            - {name: http, containerPort: 8000, protocol: TCP}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: {path: /operator/readyz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 20
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["python", "-c", "import time; time.sleep(20)"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 32Mi}
+---
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-outbox, namespace: aegis-system}
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: &outboxLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: outbox
+      template:
+        metadata: {labels: *outboxLabels}
+        spec:
+          serviceAccountName: aegis-outbox
+          containers:
+            - &workerContainer
+              name: aegis
+              image: ghcr.io/mrinmoyece/aegis-framework-platform@sha256:adb8783dde0decd295a37460a4a8ab24ced4640cadb8783dde0decd295a37460
+              args: ["worker", "--profile", "outbox", "--task-queue", "aegis-production-outbox-v1"]
+              envFrom:
+                - configMapRef: {name: aegis-runtime}
+                - secretRef: {name: aegis-runtime-secrets}
+              startupProbe:
+                exec: {command: ["aegis-framework", "worker-health", "--kind", "startup"]}
+                failureThreshold: 30
+                periodSeconds: 5
+              readinessProbe:
+                exec: {command: ["aegis-framework", "worker-health", "--kind", "ready"]}
+                periodSeconds: 10
+                failureThreshold: 3
+              livenessProbe:
+                exec: {command: ["aegis-framework", "worker-health", "--kind", "live"]}
+                periodSeconds: 20
+                failureThreshold: 3
+              lifecycle:
+                preStop:
+                  exec:
+                    command: ["aegis-framework", "worker-drain", "--timeout-seconds", "90"]
+              volumeMounts:
+                - {name: tmp, mountPath: /tmp}
+                - {name: runtime, mountPath: /var/run/aegis}
+          volumes: &workerVolumes
+            - name: tmp
+              emptyDir: {medium: Memory, sizeLimit: 32Mi}
+            - name: runtime
+              emptyDir: {medium: Memory, sizeLimit: 8Mi}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-protocol-gateway, namespace: aegis-system}
+    spec:
+      replicas: 3
+      selector:
+        matchLabels: &protocolGatewayLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: protocol-gateway
+      template:
+        metadata: {labels: *protocolGatewayLabels}
+        spec:
+          serviceAccountName: aegis-protocol-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "protocol-gateway", "--task-queue", "aegis-production-protocol-gateway-v1"]
+              ports:
+                - {name: protocol, containerPort: 8001, protocol: TCP}
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-reconciler, namespace: aegis-system}
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: &reconcilerLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: reconciler
+      template:
+        metadata: {labels: *reconcilerLabels}
+        spec:
+          serviceAccountName: aegis-reconciler
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "reconciler", "--task-queue", "aegis-production-reconciler-v1"]
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-investigation-worker, namespace: aegis-system}
+    spec:
+      replicas: 3
+      selector:
+        matchLabels: &investigationLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: investigation
+      template:
+        metadata: {labels: *investigationLabels}
+        spec:
+          serviceAccountName: aegis-investigation-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "investigation", "--task-queue", "aegis-production-investigation-v1"]
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-cognitive-worker, namespace: aegis-system}
+    spec:
+      replicas: 3
+      selector:
+        matchLabels: &cognitiveLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: cognitive
+      template:
+        metadata: {labels: *cognitiveLabels}
+        spec:
+          serviceAccountName: aegis-cognitive-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "cognitive", "--task-queue", "aegis-production-cognitive-v1"]
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-evidence-worker, namespace: aegis-system}
+    spec:
+      replicas: 3
+      selector:
+        matchLabels: &evidenceLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: evidence
+      template:
+        metadata: {labels: *evidenceLabels}
+        spec:
+          serviceAccountName: aegis-evidence-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "evidence", "--task-queue", "aegis-production-evidence-v1"]
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-remediation-worker, namespace: aegis-system}
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: &remediationLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: remediation
+      template:
+        metadata: {labels: *remediationLabels}
+        spec:
+          serviceAccountName: aegis-remediation-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "remediation", "--task-queue", "aegis-production-remediation-v1"]
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-memory-worker, namespace: aegis-system}
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: &memoryLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: memory
+      template:
+        metadata: {labels: *memoryLabels}
+        spec:
+          serviceAccountName: aegis-memory-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "memory", "--task-queue", "aegis-production-memory-v1"]
+          volumes: *workerVolumes
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-sandbox-controller, namespace: aegis-system}
+    spec:
+      replicas: 2
+      selector:
+        matchLabels: &sandboxLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: sandbox
+      template:
+        metadata: {labels: *sandboxLabels}
+        spec:
+          serviceAccountName: aegis-sandbox-controller
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "sandbox", "--task-queue", "aegis-production-sandbox-v1"]
+              volumeMounts:
+                - {name: tmp, mountPath: /tmp}
+                - {name: runtime, mountPath: /var/run/aegis}
+                - {name: service-account, mountPath: /var/run/secrets/aegis, readOnly: true}
+          volumes:
+            - name: tmp
+              emptyDir: {medium: Memory, sizeLimit: 32Mi}
+            - name: runtime
+              emptyDir: {medium: Memory, sizeLimit: 8Mi}
+            - name: service-account
+              projected:
+                defaultMode: 0440
+                sources:
+                  - serviceAccountToken:
+                      audience: https://kubernetes.default.svc
+                      expirationSeconds: 3600
+                      path: token
+                  - configMap:
+                      name: kube-root-ca.crt
+                      items:
+                        - {key: ca.crt, path: ca.crt}
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata: {name: aegis-protocol-worker, namespace: aegis-system}
+    spec:
+      replicas: 3
+      selector:
+        matchLabels: &protocolLabels
+          app.kubernetes.io/name: aegis
+          app.kubernetes.io/component: protocol
+      template:
+        metadata: {labels: *protocolLabels}
+        spec:
+          serviceAccountName: aegis-protocol-worker
+          containers:
+            - <<: *workerContainer
+              args: ["worker", "--profile", "protocol", "--task-queue", "aegis-production-protocol-v1"]
+          volumes: *workerVolumes

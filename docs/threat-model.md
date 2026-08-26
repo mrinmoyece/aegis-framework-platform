@@ -225,3 +225,25 @@ penetration testing remain unproven.
 
 Public federation, production PKI/token brokerage, partner qualification, deployment,
 and independent conformance/security certification remain unproven.
+
+## Layer 14 deployment threats
+
+| Threat | Control | Residual/unproven boundary |
+|---|---|---|
+| Mutable/substituted release | OCI digest, SPDX, vulnerability/license/secret gates, keyless signature/provenance, admission identity | Registry/GitHub/Sigstore compromise; protected branch configuration |
+| Privileged workload/host escape | restricted PSS/CEL, non-root/read-only/drop-all/seccomp, no host resources | Node/runtime/CNI/admission operation not live-qualified |
+| Broad Kubernetes authority | explicit tokenless accounts; one narrow sandbox Role; projected audience-bound controller token | Cloud/IAM/RBAC drift and break-glass |
+| Egress bypass/DNS rebinding | namespace default deny and named boundary proxies/private endpoints | Enforcing CNI/proxy/firewall evidence required |
+| Temporal payload/history leak | opaque bounded values, codec required, TLS server name, API key/mTLS refs, no custom search attributes | Key/namespace/vendor operations and traffic analysis |
+| Incompatible workflow rollout | patch markers, replay fixtures, pinned Worker Deployment/build ID, old worker drain | Long-lived production history corpus unproven |
+| Retry/scale storm | queue isolation, Activity/task-queue rate and concurrency, slow scale-down, DB headroom | Workload capacity/load and external quota behavior unmeasured |
+| Migration lock/rewrite outage | checksum/advisory lock, additive expand-contract, separate backfill | Large production tables/replication lag unmeasured |
+| Backup silently unusable | vault/object lock reference, isolated chain/sequence verification and rebuild runbook | Live RDS PITR/cross-account/cross-region restore unproven |
+| Split brain | one writer, source fence, monotonic generation, restore verification before route | Second region and partition/clock/DNS chaos unproven |
+| Framework recovery treated as truth | rebuild/reconcile from application ledger; checkpoints/history never audit | Operator bypass outside application |
+| Telemetry/UI/protocol leaks | fixed allowlists, automatic tracing disabled, TLS ingress, boundary proxies | Live IdP/session/PKI/partner/SLO operations unproven |
+
+The checked-in production digest is an offline render fixture and must not be promoted.
+No source commit signature, real cloud apply, managed failover, production PKI,
+load/chaos, on-call, penetration, accessibility, or compliance effectiveness claim is
+made.

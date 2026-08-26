@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aegis-migration
+  namespace: aegis-system
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aegis
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: Never
+      serviceAccountName: aegis-migration
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: migrate
+          image: ghcr.io/mrinmoyece/aegis-framework-platform@sha256:adb8783dde0decd295a37460a4a8ab24ced4640cadb8783dde0decd295a37460
+          command: ["python", "-c"]
+          args:
+            - "import os; from aegis_framework.postgres import setup_postgres; setup_postgres(admin_dsn=os.environ['AEGIS_POSTGRES_ADMIN_DSN'])"
+          env:
+            - name: AEGIS_POSTGRES_ADMIN_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: aegis-migration-secrets
+                  key: postgres-admin-dsn
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile: {type: RuntimeDefault}
+          resources:
+            requests: {cpu: 100m, memory: 128Mi, ephemeral-storage: 32Mi}
+            limits: {cpu: 500m, memory: 512Mi, ephemeral-storage: 128Mi}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 32Mi}

@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegis-otel-collector
+  namespace: aegis-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aegis
+      app.kubernetes.io/component: otel
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aegis
+        app.kubernetes.io/component: otel
+    spec:
+      serviceAccountName: aegis-otel
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib@sha256:e0f565815b2b8e78eb9fdbb80f6190c921ab323aaa8ccceab3255c6d4225f4af
+          args: ["--config=/etc/otel/collector.yaml"]
+          env:
+            - name: AEGIS_OTLP_UPSTREAM
+              valueFrom:
+                secretKeyRef:
+                  name: aegis-telemetry-secrets
+                  key: otlp-endpoint
+          ports:
+            - {name: otlp-grpc, containerPort: 4317}
+            - {name: otlp-http, containerPort: 4318}
+            - {name: health, containerPort: 13133}
+          startupProbe:
+            httpGet: {path: /, port: health}
+            failureThreshold: 30
+            periodSeconds: 5
+          readinessProbe:
+            httpGet: {path: /, port: health}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /, port: health}
+            periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec: {command: ["/bin/sh", "-c", "sleep 20"]}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: ["ALL"]}
+            privileged: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: config, mountPath: /etc/otel, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: config
+          configMap: {name: aegis-otel-config}
+        - name: tmp
+          emptyDir: {medium: Memory, sizeLimit: 32Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aegis-otel-collector
+  namespace: aegis-system
+spec:
+  selector:
+    app.kubernetes.io/name: aegis
+    app.kubernetes.io/component: otel
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: otlp-grpc}
+    - {name: otlp-http, port: 4318, targetPort: otlp-http}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: aegis-otel-collector, namespace: aegis-system}
+spec:
+  maxUnavailable: 1
+  selector: {matchLabels: {app.kubernetes.io/component: otel}}

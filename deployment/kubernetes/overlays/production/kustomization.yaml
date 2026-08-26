@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - path: production-settings.yaml
+images:
+  - name: ghcr.io/mrinmoyece/aegis-framework-platform
+    newName: ghcr.io/mrinmoyece/aegis-framework-platform
+    digest: sha256:adb8783dde0decd295a37460a4a8ab24ced4640cadb8783dde0decd295a37460

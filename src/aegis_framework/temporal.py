@@ -11,9 +11,11 @@ from typing import Literal, Protocol
 from pydantic import Field, ValidationError
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
-from temporalio.client import Client, PayloadLimitsConfig
+from temporalio.client import Client, PayloadLimitsConfig, TLSConfig
 from temporalio.common import (
     RetryPolicy,
+    VersioningBehavior,
+    WorkerDeploymentVersion,
     WorkflowIDConflictPolicy,
     WorkflowIDReusePolicy,
 )
@@ -26,7 +28,7 @@ from temporalio.exceptions import (
     WorkflowAlreadyStartedError,
 )
 from temporalio.service import RPCError
-from temporalio.worker import Worker
+from temporalio.worker import Worker, WorkerDeploymentConfig
 
 from aegis_framework.domain import Identifier, OpaqueReference, StrictModel
 from aegis_framework.durability import (
@@ -764,14 +766,47 @@ async def connect_temporal(
     *,
     target_host: str,
     namespace: str = "default",
-    tracing: bool = False,
+    tracing: bool = True,
+    api_key: str | None = None,
+    tls_server_name: str | None = None,
+    server_root_ca_cert: bytes | None = None,
+    client_certificate: bytes | None = None,
+    client_private_key: bytes | None = None,
+    identity: str | None = None,
 ) -> Client:
+    if (client_certificate is None) != (client_private_key is None):
+        raise ValueError("Temporal mTLS certificate and private key must be paired")
+    if tls_server_name is None and (
+        api_key is not None
+        or server_root_ca_cert is not None
+        or client_certificate is not None
+        or client_private_key is not None
+    ):
+        raise ValueError(
+            "Temporal authenticated transport requires a verified server name"
+        )
+    tls = (
+        TLSConfig(
+            server_root_ca_cert=server_root_ca_cert,
+            client_cert=client_certificate,
+            client_private_key=client_private_key,
+            verification_server_name=tls_server_name,
+        )
+        if tls_server_name is not None
+        else None
+    )
+    # Prevent credentials from travelling over an unencrypted channel.
+    if api_key is not None and tls is None:
+        raise ValueError("Temporal API key requires an authenticated TLS connection")
     interceptors = [TracingInterceptor()] if tracing else []
     return await Client.connect(
         target_host,
         namespace=namespace,
+        api_key=api_key,
         data_converter=temporal_data_converter(),
         interceptors=interceptors,
+        tls=tls,
+        identity=identity,
         payload_limits=PayloadLimitsConfig(
             payloads_warn_size=_MAX_PAYLOAD_BYTES,
             memo_warn_size=2_048,
@@ -784,15 +819,40 @@ def build_temporal_worker(
     client: Client,
     operations: ActivityOperations,
     task_queue: str = "aegis-investigations-v1",
+    identity: str | None = None,
+    deployment_name: str | None = None,
+    build_id: str | None = None,
+    maximum_activities_per_second: float | None = None,
+    maximum_task_queue_activities_per_second: float | None = None,
+    graceful_shutdown_timeout: timedelta = timedelta(seconds=90),
 ) -> Worker:
+    if (deployment_name is None) != (build_id is None):
+        raise ValueError("Temporal deployment name and build ID must be paired")
     activities = TemporalActivities(operations)
+    deployment = (
+        WorkerDeploymentConfig(
+            version=WorkerDeploymentVersion(
+                deployment_name=deployment_name,
+                build_id=build_id,
+            ),
+            use_worker_versioning=True,
+            default_versioning_behavior=VersioningBehavior.PINNED,
+        )
+        if deployment_name is not None and build_id is not None
+        else None
+    )
     return Worker(
         client,
         task_queue=task_queue,
+        identity=identity,
         workflows=[AegisInvestigationWorkflow],
         activities=list(activities.registered()),
         max_concurrent_workflow_tasks=50,
         max_concurrent_activities=20,
+        max_activities_per_second=maximum_activities_per_second,
+        max_task_queue_activities_per_second=(maximum_task_queue_activities_per_second),
+        graceful_shutdown_timeout=graceful_shutdown_timeout,
+        deployment_config=deployment,
     )
 
 

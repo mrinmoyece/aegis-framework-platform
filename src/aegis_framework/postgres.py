@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime
@@ -49,16 +50,18 @@ type DictConnection = Connection[dict[str, Any]]
 type RuntimePool = ConnectionPool[DictConnection]
 
 _ROOT = Path(__file__).resolve().parents[2]
+_MIGRATION_ROOT = Path(os.getenv("AEGIS_MIGRATIONS_DIR", _ROOT / "migrations"))
 _MIGRATIONS = (
-    _ROOT / "migrations/0001_layer2.sql",
-    _ROOT / "migrations/0002_layer3.sql",
-    _ROOT / "migrations/0003_layer4.sql",
-    _ROOT / "migrations/0004_layer5.sql",
-    _ROOT / "migrations/0005_layer6.sql",
-    _ROOT / "migrations/0006_layer7.sql",
-    _ROOT / "migrations/0007_layer8.sql",
-    _ROOT / "migrations/0008_layer9.sql",
-    _ROOT / "migrations/0009_layer13.sql",
+    _MIGRATION_ROOT / "0001_layer2.sql",
+    _MIGRATION_ROOT / "0002_layer3.sql",
+    _MIGRATION_ROOT / "0003_layer4.sql",
+    _MIGRATION_ROOT / "0004_layer5.sql",
+    _MIGRATION_ROOT / "0005_layer6.sql",
+    _MIGRATION_ROOT / "0006_layer7.sql",
+    _MIGRATION_ROOT / "0007_layer8.sql",
+    _MIGRATION_ROOT / "0008_layer9.sql",
+    _MIGRATION_ROOT / "0009_layer13.sql",
+    _MIGRATION_ROOT / "0010_layer14.sql",
 )
 _CHECKPOINT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 

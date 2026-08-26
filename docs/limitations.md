@@ -267,3 +267,45 @@ These are explicit non-production boundaries, not implied capabilities.
   tests do not prove PostgreSQL/Temporal HA, multi-region ordering, capacity or DR.
 - Public federation, production PKI/token brokerage, partner qualification, deployment,
   and independent conformance/security certification are explicitly deferred.
+
+# Layer 14 deployment limitations
+
+- Kustomize rendering, client dry-run, policy checks, Terraform validate/mock plan, and
+  deterministic restore/failover tests are not a cloud apply or production operation.
+- The checked-in application digest is an offline fixture. Only a keyless-signed,
+  attested, scanned registry digest may replace it through reviewed GitOps promotion.
+- The minimal runtime currently has two exact package records for one upstream OpenSSL
+  advisory with no fixed Wolfi package. Short-lived waivers expire on 2026-08-25 and
+  are exact by CVE/severity/package/version; unused, fixed, broad, duplicate, or expired
+  waivers fail promotion. This is bounded risk acceptance, not remediation or a
+  vulnerability-free claim.
+- The production worker entry point intentionally has no fake fallback. Live enterprise
+  model/connector/store/activity assembly remains required and fails readiness closed.
+- Temporal Cloud is a reference choice. Account/namespace, retention/export, region,
+  DPA, PrivateLink, API key/mTLS rotation, payload KMS, managed backup/failover, support,
+  capacity, and cost are not qualified.
+- One local replay corpus and SDK controls do not qualify long-lived Worker Deployment
+  routing, every workflow type, history growth, schedule-to-start scaling, sticky cache,
+  server/cloud upgrades, or failover.
+- Terraform models one region. No second-region apply, database/object replication,
+  generation switch, routing, failback, split-brain partition, key-residency, or managed
+  Temporal namespace failover was exercised.
+- AWS instance/storage/NAT/retention values are guarded starting assumptions, not a
+  capacity or cost model. No workload/IOPS/storage-growth/provider-quota/load evidence
+  exists.
+- Backup/vault/object-lock resources and the deterministic drill do not prove RDS PITR,
+  cross-account/cross-region copy, blob restore, physical erasure, or measured RPO/RTO.
+- Native admission and Sigstore policy files require installed/enforcing controllers.
+  CNI, proxy, private endpoint, Kata guest/kernel, CSI, PID, node, cleanup, escape, and
+  policy-drift qualification remain outside CI.
+- Standard NetworkPolicy cannot enforce FQDN and may not identify the managed API
+  endpoint. Boundary proxies/private endpoints are prerequisites; no broad fallback is
+  provided.
+- The additive migration does not prove large-table backfill, partition maintenance,
+  production lock/replication behavior, or later destructive contract migrations.
+- AWS/GitHub/Temporal coupling is real. OCI/Kustomize/SQL/OTel/Sigstore, neutral ports,
+  application facts, registry mirroring, and ledger-grounded recovery are escape paths,
+  not zero-cost portability.
+- Production UI/BFF OIDC/session, ingress proxy behavior, protocol PKI/partners,
+  provider/connectors, telemetry backend, SLO/on-call, load/chaos, penetration,
+  accessibility, legal/privacy, and compliance effectiveness remain unproven.

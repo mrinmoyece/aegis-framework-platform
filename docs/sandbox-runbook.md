@@ -8,6 +8,10 @@ cleanup controller. Exact DNS egress remains disabled in Layer 8: an authenticat
 and policy-registration adapter are both required first. A green Kubernetes API health
 check is insufficient.
 
+Production sets `manage_network_policy=false` and precreates namespace default deny.
+The sandbox controller has read-only NetworkPolicy RBAC and cannot delete or weaken the
+namespace boundary. Per-execution NetworkPolicy mutation is test/legacy behavior only.
+
 Never enable an ordinary `runc` fallback. Never mount a host path, Docker/containerd
 socket, service-account token, arbitrary Secret, device, or operator kubeconfig. Never
 convert argv into a shell string.

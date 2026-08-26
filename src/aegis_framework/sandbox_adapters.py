@@ -126,6 +126,7 @@ class KubernetesSandboxConfig:
         admission_policy_refs: tuple[str, ...],
         enabled: bool = False,
         external_egress_proxy_enforced: bool = False,
+        manage_network_policy: bool = False,
     ) -> None:
         for value in (
             namespace,
@@ -149,6 +150,7 @@ class KubernetesSandboxConfig:
         self.admission_policy_refs = admission_policy_refs
         self.enabled = enabled
         self.external_egress_proxy_enforced = external_egress_proxy_enforced
+        self.manage_network_policy = manage_network_policy
 
 
 def _get(value: object, *names: str) -> object | None:
@@ -311,6 +313,8 @@ class KubernetesJobSandboxBackend:
                 namespace=self._config.namespace,
                 body=self.job_manifest(request),
             )
+        except (SandboxRejected, SandboxUnavailable):
+            raise
         except Exception as exc:
             if getattr(exc, "status", None) == 409:
                 observation = self.observe(request)
@@ -776,6 +780,8 @@ class KubernetesJobSandboxBackend:
             ) from exc
 
     def _require_network_policy(self, request: SandboxExecutionRequest) -> object:
+        if not self._config.manage_network_policy:
+            return self._require_namespace_default_deny()
         policy = self._network_policy(request)
         labels = _get(policy, "metadata", "labels")
         expected = self._labels(request)
@@ -789,6 +795,9 @@ class KubernetesJobSandboxBackend:
         return policy
 
     def _ensure_network_policy(self, request: SandboxExecutionRequest) -> None:
+        if not self._config.manage_network_policy:
+            self._require_namespace_default_deny()
+            return
         existing = self._network_policy(request)
         if existing is not None:
             self._require_network_policy(request)
@@ -805,6 +814,8 @@ class KubernetesJobSandboxBackend:
             raise
 
     def _delete_network_policy(self, request: SandboxExecutionRequest) -> None:
+        if not self._config.manage_network_policy:
+            return
         policy = self._network_policy(request)
         if policy is None:
             return
@@ -818,6 +829,54 @@ class KubernetesJobSandboxBackend:
         except Exception as exc:
             if getattr(exc, "status", None) != 404:
                 raise
+
+    def _require_namespace_default_deny(self) -> object:
+        try:
+            policy = self._networking.read_namespaced_network_policy(
+                name="default-deny",
+                namespace=self._config.namespace,
+            )
+        except Exception as exc:
+            raise SandboxUnavailable(
+                "sandbox namespace default-deny NetworkPolicy is unavailable"
+            ) from exc
+        pod_selector = _get(policy, "spec", "podSelector")
+        if pod_selector is None:
+            pod_selector = _get(policy, "spec", "pod_selector")
+        policy_types = _get(policy, "spec", "policyTypes")
+        if policy_types is None:
+            policy_types = _get(policy, "spec", "policy_types")
+        selector_is_empty = (
+            isinstance(pod_selector, Mapping) and not pod_selector
+        ) or (
+            not isinstance(pod_selector, Mapping)
+            and pod_selector is not None
+            and _get(pod_selector, "match_labels") in (None, {})
+            and _get(pod_selector, "match_expressions") in (None, [])
+        )
+        policy_type_set = (
+            {str(item) for item in policy_types}
+            if isinstance(policy_types, Sequence)
+            and not isinstance(policy_types, (str, bytes))
+            else set()
+        )
+        if not selector_is_empty or policy_type_set != {"Ingress", "Egress"}:
+            raise SandboxRejected(
+                "sandbox namespace default-deny NetworkPolicy is incomplete"
+            )
+        # Confirm there are no ingress/egress allow rules — any non-empty list
+        # would make the policy a partial-allow rather than a true default-deny.
+        ingress_rules = _get(policy, "spec", "ingress")
+        if ingress_rules is None:
+            ingress_rules = _get(policy, "spec", "ingress_rules")
+        egress_rules = _get(policy, "spec", "egress")
+        if egress_rules is None:
+            egress_rules = _get(policy, "spec", "egress_rules")
+        if ingress_rules or egress_rules:
+            raise SandboxRejected(
+                "sandbox namespace default-deny NetworkPolicy has allow rules"
+            )
+        return policy
 
     def _pod_termination(
         self,

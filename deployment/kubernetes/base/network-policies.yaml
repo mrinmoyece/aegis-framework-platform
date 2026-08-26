@@ -1,0 +1,193 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: aegis-system}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: default-deny, namespace: aegis-sandbox}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: allow-dns, namespace: aegis-system}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: ingress-api-operator, namespace: aegis-system}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, operator, protocol-gateway]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              aegis.io/boundary: ingress
+          podSelector:
+            matchLabels:
+              aegis.io/role: ingress-controller
+      ports:
+        - {protocol: TCP, port: 8000}
+        - {protocol: TCP, port: 8001}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: egress-postgresql-pgvector, namespace: aegis-system}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {aegis.io/boundary: data}
+          podSelector:
+            matchLabels: {aegis.io/role: postgres-proxy}
+      ports:
+        - {protocol: TCP, port: 5432}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: egress-temporal-frontend, namespace: aegis-system}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          [outbox, reconciler, investigation, cognitive, evidence, remediation, memory, sandbox, protocol, protocol-gateway]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {aegis.io/boundary: temporal}
+          podSelector:
+            matchLabels: {aegis.io/role: temporal-private-endpoint}
+      ports:
+        - {protocol: TCP, port: 7233}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: egress-oidc, namespace: aegis-system}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, operator, protocol]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {aegis.io/boundary: identity}
+          podSelector:
+            matchLabels: {aegis.io/role: oidc-proxy}
+      ports:
+        - {protocol: TCP, port: 8443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: egress-approved-providers-connectors, namespace: aegis-system}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [cognitive, evidence, memory]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {aegis.io/boundary: egress}
+          podSelector:
+            matchLabels: {aegis.io/role: approved-provider-proxy}
+      ports:
+        - {protocol: TCP, port: 8443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: egress-approved-protocol-peers, namespace: aegis-system}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [protocol, protocol-gateway]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {aegis.io/boundary: egress}
+          podSelector:
+            matchLabels: {aegis.io/role: protocol-peer-proxy}
+      ports:
+        - {protocol: TCP, port: 8443}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: egress-otlp, namespace: aegis-system}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: NotIn
+        values: [otel]
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/component: otel}
+      ports:
+        - {protocol: TCP, port: 4317}
+        - {protocol: TCP, port: 4318}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: ingress-otlp, namespace: aegis-system}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/component: otel}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 4317}
+        - {protocol: TCP, port: 4318}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: otel-upstream, namespace: aegis-system}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/component: otel}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {aegis.io/boundary: telemetry}
+          podSelector:
+            matchLabels: {aegis.io/role: otlp-private-endpoint}
+      ports:
+        - {protocol: TCP, port: 4318}

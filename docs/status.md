@@ -246,3 +246,44 @@ OIDC/mTLS/secret rotation, qualified egress/DNS, deployed protocol endpoints, lo
 chaos, and independent MCP/A2A conformance or security certification are deferred.
 MCP Tasks remain experimental and unused. A2A push notifications remain disabled until
 webhook SSRF/auth/idempotency operations are independently qualified.
+
+# Layer 14 reference qualification status
+
+## Delivered
+
+- Kustomize base/production overlay for API, operator BFF/UI, outbox/reconciler,
+  queue-isolated Temporal and cognitive workers, sandbox/protocol, migration, and OTel;
+- digest/non-root/read-only/drop-all/no-escalation/seccomp, explicit accounts/RBAC,
+  probes/drain, resources, rolling safety, PDB/HPA/spread/anti-affinity;
+- default-deny application/sandbox networks with explicit data, Temporal, OIDC,
+  provider/connector, OTLP, protocol, ingress, and DNS boundaries;
+- dedicated Kata sandbox namespace/runtime/node/taint/quota/admission/network baseline;
+- direct exact-pinned private AWS reference for EKS, RDS pgvector, Temporal PrivateLink,
+  ECR/S3/KMS/Secrets/Pod Identity/DNS/TLS/telemetry/backup/state lock;
+- Temporal API-key/mTLS/TLS identity, payload codec boundary, pinned Worker Deployment
+  version/build ID, rate/concurrency, graceful shutdown, replay and recovery runbooks;
+- additive migration evidence for generation/fence, restore drills, and retention;
+- strict capacity, dual-chain restore, and monotonic single-writer failover contracts;
+- isolated digest-pinned PostgreSQL logical backup/restore with migration/RLS/hash/
+  sequence verification, projection/vector rebuild, disposable checkpoints, and
+  pending outbox reconciliation;
+- multi-arch SBOM/vulnerability/license/secret/provenance/keyless signing and staged
+  immutable promotion evidence with Sigstore admission policy;
+- exact short-lived no-fix vulnerability waivers that reject fixed, unmatched, unused,
+  duplicate, broad, or expired findings;
+- separate exact-pinned official Python build and minimal Chainguard Python 3.14.7
+  runtime stages to reduce production image packages without changing the Python ABI;
+- infrastructure, restore, deployment, supply-chain, migration/replay, frontend,
+  protocol, eval, Compose/container, and security gates.
+- 442 backend tests pass with 90.03% branch coverage; 45 focused protocol/operator
+  tests, 58 deterministic eval cases and 14 eval meta-tests pass; 32 frontend tests,
+  16 axe cases, and the 445,244-byte production JavaScript bundle pass their gates.
+
+## Not proven
+
+No cloud resource was applied and no paid service or live credential was used. The
+offline render digest is not a published image. Live worker adapter bootstrap, Temporal
+Cloud namespace/PrivateLink/failover, RDS PITR/cross-account restore, second region,
+PKI/secret rotation, CNI/proxy/admission/Kata enforcement, production OIDC/session,
+provider/connector/peer traffic, load/chaos, SLO/on-call, penetration/accessibility,
+legal/privacy review, and compliance certification remain deferred.

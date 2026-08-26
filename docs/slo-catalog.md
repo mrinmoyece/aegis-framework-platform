@@ -19,3 +19,15 @@ Fast burn is 14.4x on both 5m and 1h windows. Slow burn is 6x on both 30m and
 6h windows. Error-budget exhaustion freezes reliability-risking releases. Safety,
 tenant isolation, unauthorized effects, integrity, and cleanup violations page
 immediately and are not availability tradeoffs.
+
+Layer 14 adds operational release gates rather than new product SLO claims:
+
+- Temporal queue schedule-to-start objective below 30 seconds;
+- PostgreSQL guarded connection use below 70%;
+- zero unverified/mutable-image admissions;
+- restore drill objective RPO 5 minutes and RTO 60 minutes;
+- sandbox cleanup and stale-generation violations remain non-budgetable.
+
+These are objectives/configuration until measured in an operated environment. Local
+rules, mock plans, and deterministic drills do not establish SLO performance or on-call
+readiness.

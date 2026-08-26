@@ -46,3 +46,10 @@ request creators cannot self-approve, and ambiguity is never mapped to success.
 Live IdP/browser/logout/rotation, production TLS/proxy, distributed sessions, deployment,
 independent penetration and accessibility audits, managed telemetry, load/chaos,
 MCP/A2A, and compliance certification remain unproven.
+
+Layer 14 supplies internal TLS ingress shape, body/rate/connection/time limits,
+non-root/read-only Pods, PDB/HPA/spread, default-deny networking, and digest admission.
+It does not implement the live OIDC exchange or durable shared session repository, so
+the production `/operator/readyz` remains intentionally unavailable. Proxy trust,
+certificate rotation, browser/IdP logout, session KMS/replication, WAF/rate identity,
+penetration, and assistive-technology qualification remain activation gates.

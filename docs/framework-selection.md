@@ -7,7 +7,7 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 
 | Candidate | Version | Operational dependency | What it removes | What remains application-owned | Decision/escape |
 |---|---:|---|---|---|---|
-| Python | 3.14.7; CI 3.13.15 | Runtime/toolchain | Language/runtime | Types, controls, lifecycle | Select |
+| Python | 3.14.7; CI 3.13.15 | Runtime/toolchain | Language/runtime | Types, controls, lifecycle | Select; build on official slim-trixie and run on digest-pinned minimal Chainguard Python 3.14.7 |
 | LangGraph | 1.2.11 | Embedded + saver | Graph scheduler, fan-out/join, reducers, checkpoint API | Policy, evidence tenancy, citations, application facts | Select behind `OrchestratorPort` |
 | LangGraph PostgreSQL saver | 3.1.2 | PostgreSQL | Saver SQL/state history | Owner registry, forced RLS, retention | Select, replace through `OrchestratorPort` |
 | Temporal Python SDK | 1.31.0 | Temporal Server | Workflow replay, timers, signals, Activity retry/heartbeat/cancel, worker recovery | Event ledger, policy, budget, idempotency, outbox, projections, audit | Select behind `ActivityOperations` + outbox |
@@ -46,6 +46,11 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | MCP Tasks extension | Experimental | Additional extension coupling | Task polling/cancel wire shape | Durability/trust still custom; absent from SDK 2.0.0 | Reject for core flow |
 | UI and sandbox | Delivered in prior layers | Browser/Kubernetes when enabled | Delivery/runtime mechanics | Enterprise authority and isolation | Selected behind ports |
 | CrewAI / AutoGen | Not installed | Additional agent runtime | Agent chat/delegation abstractions | All Aegis authority/artifact/ledger controls | Reject: overlaps LangGraph and expands dynamic authority surface |
+| Kustomize | kubectl 1.36.1 client; v1beta1 API | Kubernetes apply/GitOps | Overlay rendering without a template language | Topology, policy, readiness, migration and promotion semantics | Select for fixed topology; Helm only if distribution requires it |
+| Terraform | 1.13.3 | AWS control plane/state backend | Declarative dependency/plan/state mechanics | Account policy, change approval, secrets, drift, recovery and cost | Select direct exact-pinned reference resources |
+| AWS provider | 6.10.0 | AWS APIs | EKS/RDS/S3/KMS/ECR/Backup/DNS resource mechanics | Workload/data policy and operated evidence | Select exact-pinned; no external modules |
+| Temporal Cloud | managed service boundary | PrivateLink + namespace | Server persistence/visibility/schema/HA control plane | Application ledger, namespace/queue policy, codec, replay, capacity, reconciliation | Reference choice; self-hosted escape requires full operations program |
+| Sigstore/cosign policy-controller | cosign action 3.9.2; policy v1beta1 | Fulcio/Rekor/admission controller | Keyless signing, transparency and verification mechanics | Change approval, protected branches, admission operation, release authority | Select as prerequisite, live enforcement unproven |
 
 ## Why Temporal now
 
@@ -621,3 +626,21 @@ intent/result ledger, fencing, reconciliation, provenance, operator or approval/
 security. Custom Layer 14 has no Temporal dependency; Framework Layer 13 reuses Temporal
 for protocol Activity scheduling while PostgreSQL remains truth. Exact measurements and
 the candid benchmark boundary are in `comparison/layer13-metrics.json`.
+
+## Layer 14 deployment comparison
+
+Pinned custom Layer 15 is commit
+`2756da792038e60ee764262c6d9e66059da155e5` / PR 17. It uses Kustomize, direct
+AWS Terraform, PostgreSQL, Redis Streams, gVisor, SBOM/cosign/attestations, and local
+restore/redrive scripts. It has no Temporal dependency, so it owns leases, heartbeat,
+queue redelivery, workflow state, and reconciliation mechanics that this repository
+delegates to Temporal.
+
+Framework Layer 14 selects Temporal Cloud/private connectivity rather than self-hosting
+another persistence/visibility plane. That reduces server operational code/services but
+adds managed-service cost, namespace/history/versioning coupling, payload/privacy/vendor
+qualification, and a recovery boundary that still depends on application facts. Both
+implementations must retain identity, RLS/ledger, intent-before-effect, idempotency,
+fencing, approvals, provenance, retention/legal hold, sandbox, protocol trust, and
+regional generation controls. Exact figures and candid gaps are in
+`comparison/layer14-metrics.json`.

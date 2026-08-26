@@ -56,6 +56,17 @@ REQUIRED_DOCS = (
     "docs/operator-runbook.md",
     "docs/operator-accessibility.md",
     "docs/operator-security.md",
+    "docs/adr/019-production-deployment-foundations.md",
+    "docs/production-deployment.md",
+    "docs/terraform-aws-reference.md",
+    "docs/database-lifecycle.md",
+    "docs/capacity-and-multi-region.md",
+    "docs/backup-restore-dr.md",
+    "docs/compliance-evidence.md",
+    "docs/runbooks/deployment-promotion.md",
+    "docs/runbooks/database-migration.md",
+    "docs/runbooks/restore-failover.md",
+    "docs/runbooks/temporal-worker-rollout.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -253,6 +264,32 @@ def _measurement_errors() -> list[str]:
                 "deferred",
             )
             if not layer13.get(field)
+        )
+    layer14_path = ROOT / "comparison/layer14-metrics.json"
+    if not layer14_path.is_file():
+        errors.append("missing comparison/layer14-metrics.json")
+    else:
+        layer14 = json.loads(layer14_path.read_text(encoding="utf-8"))
+        if layer14.get("schema_version") != 14 or layer14.get("layer") != 14:
+            errors.append("Layer 14 metrics schema/layer is invalid")
+        custom = layer14.get("comparison_basis", {}).get("custom_layer15", {})
+        if custom.get("sha") != "2756da792038e60ee764262c6d9e66059da155e5":
+            errors.append("Layer 15 custom comparison SHA is not pinned")
+        errors.extend(
+            f"Layer 14 metrics missing {field}"
+            for field in (
+                "source_loc",
+                "runtime_dependencies",
+                "configuration_and_topology",
+                "framework_code_removed_or_avoided",
+                "remaining_custom_controls",
+                "temporal_tradeoff",
+                "supply_chain_comparison",
+                "cost_and_capacity",
+                "lock_in_and_escape",
+                "deferred",
+            )
+            if not layer14.get(field)
         )
     return errors
 

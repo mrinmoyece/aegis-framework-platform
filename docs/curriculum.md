@@ -1,4 +1,4 @@
-# Layer 13 curriculum
+# Layer 14 curriculum
 
 ## Learning outcomes
 
@@ -100,6 +100,26 @@ After this layer, an engineer should be able to:
 75. reject protocol poisoning, confused-deputy escalation, SSRF, forged artifacts,
     schema bombs, Unicode attacks, URL exfiltration and denial-of-wallet;
 76. compare official SDK code removal with the custom security controls that remain.
+77. choose Kustomize over Helm for a fixed security-sensitive topology and explain the
+    distribution trigger that would revisit the decision;
+78. separate Temporal Cloud availability/history from application ledger recovery,
+    namespace policy, payload encryption, replay, and reconciliation;
+79. design pinned Worker Deployment/build ID rollouts with queue isolation, rate bounds,
+    schedule-to-start monitoring, drain, replay, and rollback;
+80. apply expand-contract migrations to application and LangGraph saver schemas while
+    preserving RLS, old-code reads, and event replay;
+81. budget DB pools, Temporal concurrency, provider quotas, HPAs, and tenant partitions
+    without creating retry storms or noisy-neighbor bypass;
+82. verify backup integrity, rebuild projections/vector/checkpoints, discard caches, and
+    reconcile Temporal/outbox/effects without treating framework state as truth;
+83. design one home-region writer with monotonic generation fencing, residency-aware
+    routing, failover, and failback while rejecting active-active claims;
+84. verify SBOM, provenance, keyless signatures, vulnerability/license/secret gates,
+    immutable promotion, admission, and rollback evidence;
+85. map deployment evidence to compliance objectives without claiming certification;
+86. compare Framework Layer 14 with pinned custom Aegis Layer 15 across LOC,
+    dependencies, runtime services, managed Temporal tradeoffs, retained controls,
+    lock-in/escape, cost, and unproven operation.
 
 ## Suggested sequence
 

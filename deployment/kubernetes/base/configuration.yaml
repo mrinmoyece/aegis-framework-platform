@@ -1,0 +1,81 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegis-runtime
+  namespace: aegis-system
+data:
+  AEGIS_MODE: production
+  AEGIS_OIDC_ALGORITHMS: RS256
+  AEGIS_OIDC_ALLOW_LOOPBACK_HTTP: "false"
+  AEGIS_TEMPORAL_NAMESPACE: aegis-production
+  AEGIS_TEMPORAL_TASK_QUEUE_PREFIX: aegis-production
+  AEGIS_TEMPORAL_TLS_SERVER_NAME: temporal.example.invalid
+  AEGIS_TEMPORAL_WORKER_VERSIONING: required
+  AEGIS_TEMPORAL_PAYLOAD_ENCRYPTION: required
+  AEGIS_WORKER_BUILD_ID: aegis-0.14.0-offline-render
+  AEGIS_LANGGRAPH_AUTOMATIC_TRACING: disabled
+  AEGIS_LANGGRAPH_GRAPH_VERSION: "6.0.0"
+  AEGIS_LEDGER_WRITER_MODE: single-home-region
+  AEGIS_DEPLOYMENT_GENERATION: "1"
+  AEGIS_TELEMETRY_ATTRIBUTES: allowlist-only
+  OTEL_SDK_DISABLED: "false"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://aegis-otel-collector:4318
+  PYTHONUNBUFFERED: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+  LANGGRAPH_STRICT_MSGPACK: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegis-otel-config
+  namespace: aegis-system
+data:
+  collector.yaml: |
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+    processors:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 384
+        spike_limit_mib: 96
+      transform/redact:
+        error_mode: propagate
+        trace_statements:
+          - context: resource
+            statements:
+              - keep_keys(attributes, ["service.name", "service.version", "deployment.environment"])
+          - context: span
+            statements:
+              - keep_keys(attributes, ["aegis.semantic.version", "aegis.component", "aegis.operation", "aegis.outcome", "aegis.retry", "aegis.count_bucket"])
+              - limit(events, 0, [])
+      batch:
+        timeout: 5s
+        send_batch_size: 512
+        send_batch_max_size: 1024
+    exporters:
+      otlphttp/upstream:
+        endpoint: ${env:AEGIS_OTLP_UPSTREAM}
+        sending_queue:
+          enabled: true
+          queue_size: 2048
+        retry_on_failure:
+          enabled: true
+          max_elapsed_time: 60s
+    service:
+      extensions: [health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/redact, batch]
+          exporters: [otlphttp/upstream]
+      telemetry:
+        logs:
+          level: warn

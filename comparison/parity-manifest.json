@@ -2,8 +2,8 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 10,
-  "generated_on": "2026-08-17",
+  "layer": 14,
+  "generated_on": "2026-08-18",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
     "partial": "A boundary or deterministic subset exists; enterprise completion is explicit",
@@ -14,7 +14,7 @@
     {
       "id": "01-platform-foundation",
       "name": "Platform foundation",
-      "status": "delivered",
+      "status": "partial",
       "evidence": [
         "pyproject.toml",
         "src/aegis_framework",
@@ -417,23 +417,45 @@
     {
       "id": "15-production-deployment",
       "name": "Production deployment foundations",
-      "status": "partial",
+      "status": "delivered",
       "evidence": [
         "Dockerfile",
         "compose.yaml",
-        ".github/workflows/ci.yml"
+        ".github/workflows/ci.yml",
+        ".github/workflows/infrastructure.yml",
+        ".github/workflows/supply-chain.yml",
+        ".github/workflows/promotion.yml",
+        ".github/workflows/restore-drill.yml",
+        "deployment/kubernetes",
+        "deployment/terraform/aws",
+        "migrations/0010_layer14.sql",
+        "src/aegis_framework/production.py",
+        "src/aegis_framework/worker_runtime.py",
+        "tests/test_production_layer14.py",
+        "tests/test_worker_runtime_layer14.py",
+        "tools/deployment_check.py",
+        "tools/restore_drill.py",
+        "docs/adr/019-production-deployment-foundations.md",
+        "docs/production-deployment.md",
+        "docs/database-lifecycle.md",
+        "docs/backup-restore-dr.md",
+        "docs/capacity-and-multi-region.md"
       ],
       "framework_owned": [
-        "dependency build tooling",
-        "local Temporal server"
+        "Kubernetes rollout, placement, probe, disruption and autoscaling mechanics",
+        "Terraform dependency graph and state mechanics",
+        "Temporal Cloud workflow service and Worker Deployment Versioning mechanics",
+        "Sigstore signature/transparency and GitHub attestation mechanics",
+        "AWS managed EKS/RDS/KMS/S3/Backup/PrivateLink mechanics"
       ],
       "enterprise_owned": [
-        "RLS/runtime role",
-        "mTLS",
-        "provenance",
-        "admission",
-        "HA",
-        "DR"
+        "identity, authorization, RLS and ledger truth",
+        "namespace, queue, worker, payload-codec, mTLS and retention policy",
+        "migration compatibility, archival, legal hold and application replay",
+        "capacity, quotas, backpressure and noisy-neighbor partitions",
+        "approval, fencing, receipts, reconciliation and restore acceptance",
+        "single-writer generation, residency, failover and failback",
+        "release approval, admission, rollback and compliance evidence"
       ]
     },
     {

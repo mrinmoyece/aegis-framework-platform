@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aegis
+  namespace: aegis-system
+spec:
+  tls:
+    - hosts: [aegis.example.invalid]
+      secretName: aegis-ingress-tls
+  rules:
+    - host: aegis.example.invalid
+      http:
+        paths:
+          - path: /operator
+            pathType: Prefix
+            backend:
+              service: {name: aegis-operator, port: {name: http}}
+          - path: /mcp
+            pathType: Prefix
+            backend:
+              service: {name: aegis-protocol-gateway, port: {name: protocol}}
+          - path: /a2a
+            pathType: Prefix
+            backend:
+              service: {name: aegis-protocol-gateway, port: {name: protocol}}
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: aegis-api, port: {name: http}}

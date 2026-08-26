@@ -1,0 +1,76 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: aegis-hardened-pods
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: "object.spec.containers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$')) && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$'))) && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$')))"
+      message: Every container image must use an OCI sha256 digest.
+    - expression: "!has(object.spec.hostNetwork) || object.spec.hostNetwork == false"
+      message: hostNetwork is forbidden.
+    - expression: "!has(object.spec.hostPID) || object.spec.hostPID == false"
+      message: hostPID is forbidden.
+    - expression: "!has(object.spec.hostIPC) || object.spec.hostIPC == false"
+      message: hostIPC is forbidden.
+    - expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL')) && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL'))) && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL')))"
+      message: Containers, initContainers, and ephemeralContainers must be non-root, read-only, drop-all, and non-privileged.
+    - expression: "object.spec.volumes.all(v, !has(v.hostPath))"
+      message: hostPath volumes are forbidden.
+    - expression: "object.spec.containers.all(c, has(c.resources.requests.cpu) && has(c.resources.requests.memory) && has(c.resources.limits.cpu) && has(c.resources.limits.memory))"
+      message: CPU and memory requests and limits are required.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: aegis-hardened-pods
+spec:
+  policyName: aegis-hardened-pods
+  validationActions: [Deny, Audit]
+  matchResources:
+    namespaceSelector:
+      matchExpressions:
+        - key: kubernetes.io/metadata.name
+          operator: In
+          values: [aegis-system, aegis-sandbox]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: aegis-sandbox-boundary
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: aegis-sandbox
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+  validations:
+    - expression: "object.spec.runtimeClassName == 'kata-qemu'"
+      message: Sandbox Pods require the qualified Kata RuntimeClass.
+    - expression: "object.spec.serviceAccountName == 'aegis-sandbox-job' && object.spec.automountServiceAccountToken == false"
+      message: Sandbox Pods require the tokenless dedicated service account.
+    - expression: "object.spec.nodeSelector['aegis.io/sandbox-runtime'] == 'kata'"
+      message: Sandbox Pods require dedicated Kata nodes.
+    - expression: "object.spec.tolerations.exists(t, t.key == 'aegis.io/sandbox' && t.value == 'true' && t.effect == 'NoSchedule')"
+      message: Sandbox Pods require the dedicated-node toleration.
+    - expression: "object.spec.volumes.all(v, has(v.emptyDir) || has(v.csi))"
+      message: Sandbox Pods permit only bounded ephemeral and approved CSI volumes.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: aegis-sandbox-boundary
+spec:
+  policyName: aegis-sandbox-boundary
+  validationActions: [Deny, Audit]

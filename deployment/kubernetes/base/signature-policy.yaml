@@ -1,0 +1,26 @@
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: aegis-keyless-supply-chain
+spec:
+  images:
+    - glob: ghcr.io/mrinmoyece/aegis-framework-platform@sha256:*
+  authorities:
+    - keyless:
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subjectRegExp: ^https://github.com/mrinmoyece/aegis-framework-platform/.github/workflows/supply-chain.yml@refs/heads/master$
+      attestations:
+        - name: github-provenance
+          predicateType: https://slsa.dev/provenance/v1
+          policy:
+            type: cue
+            data: |
+              predicateType: "https://slsa.dev/provenance/v1"
+        - name: spdx-sbom
+          predicateType: https://spdx.dev/Document/v2.3
+          policy:
+            type: cue
+            data: |
+              predicateType: "https://spdx.dev/Document/v2.3"
+      ctlog: {}

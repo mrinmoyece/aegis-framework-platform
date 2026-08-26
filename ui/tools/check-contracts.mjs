@@ -18,7 +18,7 @@ const expectedRoutes = [
   "/operator/session/logout",
   "/operator/session/tenant"
 ];
-if (manifest.schema_version !== 1 || manifest.api_version !== "0.13.0") {
+if (manifest.schema_version !== 1 || manifest.api_version !== "0.14.0") {
   throw new Error("operator contract version drift");
 }
 for (const route of expectedRoutes) {

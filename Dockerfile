@@ -1,4 +1,5 @@
-ARG PYTHON_IMAGE=python:3.14.7-slim-bookworm@sha256:23c59390fc717bf09f9336908199a0ae75d9c4264bf296123f94ad772fea3b52
+ARG PYTHON_IMAGE=python:3.14.7-slim-trixie@sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9885476e7df5a4
+ARG PYTHON_RUNTIME_IMAGE=cgr.dev/chainguard/python@sha256:6d71f8dbd199350964ce8b10d50fb9d4d8e2bd50316f3a1821dbdc6eef5252fb
 ARG NODE_IMAGE=node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d
 
 FROM ${NODE_IMAGE} AS ui-builder
@@ -17,21 +18,26 @@ RUN python -m pip install --no-cache-dir uv==0.12.5
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 RUN uv sync --frozen --no-dev --no-editable \
+    --extra connectors \
+    --extra framework-observability \
     --extra postgres \
     --extra model-providers
+RUN ln -sf /usr/bin/python .venv/bin/python \
+    && ln -sf python .venv/bin/python3 \
+    && ln -sf python .venv/bin/python3.14
 
-FROM ${PYTHON_IMAGE} AS runtime
+FROM ${PYTHON_RUNTIME_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/mrinmoyece/aegis-framework-platform" \
-      org.opencontainers.image.description="Aegis framework-first governed Layer 13"
+      org.opencontainers.image.description="Aegis framework-first governed Layer 14"
 ENV PATH="/app/.venv/bin:${PATH}" \
+    AEGIS_MIGRATIONS_DIR="/app/migrations" \
     LANGGRAPH_STRICT_MSGPACK=true \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
-RUN groupadd --gid 10001 aegis \
-    && useradd --uid 10001 --gid aegis --no-create-home --shell /usr/sbin/nologin aegis
-COPY --from=builder --chown=aegis:aegis /app/.venv /app/.venv
-COPY --from=ui-builder --chown=aegis:aegis /ui/dist /app/ui
+COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
+COPY --from=ui-builder --chown=10001:10001 /ui/dist /app/ui
+COPY --chown=10001:10001 migrations /app/migrations
 ENV AEGIS_OPERATOR_UI_DIR=/app/ui
 USER 10001:10001
 EXPOSE 8000
