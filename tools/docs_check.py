@@ -19,7 +19,9 @@ REQUIRED_DOCS = (
     "docs/failure-modes.md",
     "docs/threat-model.md",
     "docs/limitations.md",
+    "docs/status.md",
     "docs/roadmap.md",
+    "docs/runbook.md",
     "docs/interview-questions.md",
     "docs/curriculum.md",
     "docs/glossary.md",
@@ -30,6 +32,8 @@ REQUIRED_DOCS = (
     "docs/adr/004-postgresql-without-redis.md",
     "docs/adr/005-pyjwt-and-explicit-authorization.md",
     "docs/adr/006-postgresql-rls-and-application-audit.md",
+    "docs/adr/007-temporal-durable-workflow.md",
+    "docs/adr/008-application-event-ledger.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -115,21 +119,29 @@ def _workflow_pin_errors() -> list[str]:
 
 
 def _measurement_errors() -> list[str]:
-    path = ROOT / "comparison/layer2-metrics.json"
+    path = ROOT / "comparison/layer3-metrics.json"
     if not path.is_file():
-        return ["missing comparison/layer2-metrics.json"]
+        return ["missing comparison/layer3-metrics.json"]
     payload = json.loads(path.read_text(encoding="utf-8"))
     errors = []
-    if payload.get("schema_version") != 2 or payload.get("layer") != 2:
-        errors.append("Layer 2 metrics schema/layer is invalid")
+    if payload.get("schema_version") != 3 or payload.get("layer") != 3:
+        errors.append("Layer 3 metrics schema/layer is invalid")
     basis = payload.get("comparison_basis", {})
-    custom = basis.get("custom", {}) if isinstance(basis, dict) else {}
-    if custom.get("sha") != "81409792c97698479a9ca827a4143c6391f28d2b":
-        errors.append("Layer 2 custom comparison SHA is not pinned")
+    custom_layer3 = basis.get("custom_layer3", {}) if isinstance(basis, dict) else {}
+    custom_layer4 = basis.get("custom_layer4", {}) if isinstance(basis, dict) else {}
+    if custom_layer3.get("sha") != ("87cefe58adbf62e6a419d38e57e0928581b7003c"):
+        errors.append("Layer 3 custom comparison SHA is not pinned")
+    if custom_layer4.get("sha") != ("171fa485819334a892684544c0a993a6e2fc4ace"):
+        errors.append("Layer 4 custom comparison SHA is not pinned")
     if not payload.get("remaining_custom_controls"):
-        errors.append("Layer 2 metrics must list remaining custom controls")
+        errors.append("Layer 3 metrics must list remaining custom controls")
     if not payload.get("lock_in_and_escape"):
-        errors.append("Layer 2 metrics must list lock-in and escape hatches")
+        errors.append("Layer 3 metrics must list lock-in and escape hatches")
+    if payload.get("required_stateful_services") != [
+        "PostgreSQL",
+        "Temporal Server",
+    ]:
+        errors.append("Layer 3 metrics must list exact stateful services")
     return errors
 
 

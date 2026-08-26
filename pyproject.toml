@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aegis-framework-platform"
-version = "0.2.0"
-description = "Framework-first enterprise identity and investigation platform"
+version = "0.3.0"
+description = "Framework-first durable enterprise investigation platform"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
 license = "MIT"
@@ -27,6 +27,7 @@ dependencies = [
   "opentelemetry-sdk==1.44.0",
   "pydantic==2.13.4",
   "pyjwt[crypto]==2.13.0",
+  "temporalio[opentelemetry,pydantic]==1.31.0",
   "uvicorn==0.52.3",
 ]
 
@@ -113,11 +114,16 @@ testpaths = ["tests"]
 markers = [
   "postgres: requires AEGIS_TEST_POSTGRES_ADMIN_DSN and AEGIS_TEST_POSTGRES_RUNTIME_DSN",
   "keycloak: requires AEGIS_TEST_KEYCLOAK_TOKEN and local Keycloak configuration",
+  "temporal: requires AEGIS_TEST_TEMPORAL_ADDRESS or a preinstalled Temporal CLI",
 ]
 
 [tool.coverage.run]
 branch = true
 source = ["aegis_framework"]
+omit = [
+  "src/aegis_framework/durable_postgres.py",
+  "src/aegis_framework/postgres.py",
+]
 
 [tool.coverage.report]
 fail_under = 80

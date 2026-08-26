@@ -3,7 +3,7 @@ name: aegis-framework-platform
 services:
   postgres:
     image: pgvector/pgvector:0.8.6-pg17-bookworm@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
-    profiles: ["durable"]
+    profiles: ["durable", "temporal"]
     environment:
       POSTGRES_DB: aegis
       POSTGRES_USER: aegis_admin
@@ -41,6 +41,40 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  temporal:
+    image: temporalio/auto-setup:1.29.1@sha256:5b3502a3b685f9eff1b925af90c57c9e3dbeccbef367cc28a2a9712c63379312
+    profiles: ["temporal"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_SEEDS: postgres
+      POSTGRES_USER: aegis_admin
+      POSTGRES_PWD: ${AEGIS_POSTGRES_ADMIN_PASSWORD:-change-me-before-use}
+      DBNAME: temporal
+      VISIBILITY_DBNAME: temporal_visibility
+    ports:
+      - "127.0.0.1:57233:7233"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "tctl",
+          "--address",
+          "temporal:7233",
+          "cluster",
+          "health",
+        ]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
   app:
     build:
       context: .
@@ -53,6 +87,9 @@ services:
       AEGIS_OIDC_ISSUER: ${AEGIS_OIDC_ISSUER:-}
       AEGIS_OIDC_AUDIENCE: ${AEGIS_OIDC_AUDIENCE:-}
       AEGIS_OIDC_JWKS_URI: ${AEGIS_OIDC_JWKS_URI:-}
+      AEGIS_CURSOR_SIGNING_KEY: ${AEGIS_CURSOR_SIGNING_KEY:-}
+      AEGIS_REFERENCE_ENCRYPTION_KEY: ${AEGIS_REFERENCE_ENCRYPTION_KEY:-}
+      AEGIS_TEMPORAL_ADDRESS: ${AEGIS_TEMPORAL_ADDRESS:-}
     tmpfs:
       - /tmp:size=16m,mode=1777
     cap_drop:

@@ -37,6 +37,17 @@ compared layer.
 16. quota race and retry behavior;
 17. durable audit mutation prevention/redaction;
 18. tenant-isolated framework checkpoints.
+19. expected-version event race and commit-safe tenant cursor;
+20. application event/outbox/idempotency atomicity;
+21. immutable fact mutation and dual hash verification;
+22. deterministic projection rebuild and cursor tamper;
+23. no-worker recovery and transient Activity retry;
+24. duplicate start/signal/Activity delivery;
+25. cancellation/stale-result race and timer timeout;
+26. policy revocation during a durable wait;
+27. malformed/oversized Temporal payload containment;
+28. workflow history replay/version compatibility;
+29. framework history/checkpoint loss reconciliation boundary.
 
 Inputs, expected status, citation rules, and authority boundaries must match. A
 framework feature cannot be credited if the custom implementation is tested against
@@ -87,6 +98,11 @@ independent reviewer has no unresolved high-confidence correctness finding.
 Environment-gated PostgreSQL and local Keycloak compatibility are reported separately
 from the network-free deterministic count. A skipped gate is not a pass and cannot be
 reported as production evidence.
+
+The local Temporal integration is also reported separately. Its server/SDK versions,
+image digest, test topology, and absence of production credentials must be recorded.
+Time-skipping tests may use only a preinstalled binary; test execution must not download
+one implicitly.
 
 ## Lock-in evaluation
 

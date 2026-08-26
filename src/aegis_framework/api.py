@@ -39,18 +39,29 @@ from aegis_framework.domain import (
     StrictModel,
     stable_id,
 )
+from aegis_framework.durability import (
+    CursorCodec,
+    DurableInvestigationService,
+    InMemoryDurability,
+    RunView,
+    SignalCommand,
+    TimelinePage,
+)
 from aegis_framework.errors import (
     AegisFrameworkError,
     AuthenticationFailed,
+    ConcurrencyConflict,
     IdempotencyConflict,
     IdentityUnavailable,
     InvestigationInProgress,
+    PayloadRejected,
     PolicyDenied,
     RepositoryUnavailable,
 )
 from aegis_framework.fixtures import DemoBundle, DemoScenario, build_demo_bundle
 from aegis_framework.identity import UnavailableAuthenticator
 from aegis_framework.ports import Action, PolicyDecision, PolicyPort
+from aegis_framework.references import TenantReferenceCodec
 from aegis_framework.service import InvestigationService
 
 _IDENTIFIER_ADAPTER = TypeAdapter(Identifier)
@@ -65,6 +76,30 @@ class AppMode(StrEnum):
 class ApiInvestigationRequest(StrictModel):
     incident_id: Identifier
     alert: CheckoutAlert
+
+
+class ApiDurableInvestigationRequest(StrictModel):
+    incident_id: Identifier
+    alert: CheckoutAlert
+    wait_for_signal: bool = False
+
+
+class ApiSignalRequest(StrictModel):
+    command_id: Identifier
+
+
+class DurableRunResponse(StrictModel):
+    run_id: Identifier
+    incident_id: Identifier
+    request_ref: Identifier
+    workflow_id: Identifier
+    status: str
+    version: int = Field(ge=1)
+    last_cursor: int = Field(ge=1)
+    created_at: str
+    updated_at: str
+    failure_code: Identifier | None = None
+    replayed: bool = False
 
 
 class HealthResponse(StrictModel):
@@ -163,6 +198,7 @@ class ApiRuntime:
     governance: GovernancePort
     policy: PolicyPort
     service_for: Callable[[DemoScenario], InvestigationService]
+    durable: DurableInvestigationService | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -224,8 +260,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.2.0",
-        description="Authenticated Layer 2 checkout investigation API.",
+        version="0.3.0",
+        description="Authenticated durable Layer 3 investigation API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -410,6 +446,138 @@ def create_app(
                 detail="investigation failed safely",
             ) from exc
 
+    @app.post(
+        "/v1/durable-investigations",
+        response_model=DurableRunResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    def submit_durable_investigation(
+        payload: ApiDurableInvestigationRequest,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> DurableRunResponse:
+        durable = _require_durable(selected_runtime)
+        request = InvestigationRequest(
+            incident_id=payload.incident_id,
+            alert=payload.alert,
+        )
+        try:
+            result = durable.submit(
+                identity,
+                request,
+                wait_for_signal=payload.wait_for_signal,
+            )
+        except PolicyDenied as exc:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="investigation is not authorized",
+            ) from exc
+        except (ConcurrencyConflict, IdempotencyConflict) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="investigation request conflicts with current state",
+            ) from exc
+        except AegisFrameworkError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable investigation failed safely",
+            ) from exc
+        return _durable_response(result)
+
+    @app.get(
+        "/v1/durable-investigations/{run_id}",
+        response_model=DurableRunResponse,
+    )
+    def durable_investigation(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> DurableRunResponse:
+        durable = _require_durable(selected_runtime)
+        try:
+            result = durable.get(identity, run_id=run_id)
+        except PolicyDenied:
+            _not_found()
+        except AegisFrameworkError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable investigation failed safely",
+            ) from exc
+        if result is None:
+            _not_found()
+        return _durable_response(result)
+
+    @app.get(
+        "/v1/durable-investigations/{run_id}/timeline",
+        response_model=TimelinePage,
+    )
+    def durable_timeline(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        cursor: Annotated[str | None, Query(max_length=1_024)] = None,
+        limit: Annotated[int, Query(ge=1, le=100)] = 50,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> TimelinePage:
+        durable = _require_durable(selected_runtime)
+        try:
+            if durable.get(identity, run_id=run_id) is None:
+                _not_found()
+            return durable.timeline(
+                identity,
+                run_id=run_id,
+                cursor=cursor,
+                limit=limit,
+            )
+        except PolicyDenied:
+            _not_found()
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="timeline cursor is invalid",
+            ) from exc
+        except AegisFrameworkError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable investigation failed safely",
+            ) from exc
+
+    @app.post(
+        "/v1/durable-investigations/{run_id}/signals/{command_type}",
+        response_model=DurableRunResponse,
+        status_code=status.HTTP_202_ACCEPTED,
+    )
+    def durable_signal(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        command_type: Annotated[str, Path(pattern=r"^(resume|cancel)$")],
+        payload: ApiSignalRequest,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> DurableRunResponse:
+        durable = _require_durable(selected_runtime)
+        try:
+            result = durable.signal(
+                identity,
+                command=SignalCommand(
+                    command_id=payload.command_id,
+                    run_id=run_id,
+                    command_type=command_type,
+                ),
+            )
+        except PolicyDenied:
+            _not_found()
+        except (ConcurrencyConflict, IdempotencyConflict) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="signal conflicts with current state",
+            ) from exc
+        except PayloadRejected as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="signal exceeds the permitted bound",
+            ) from exc
+        except AegisFrameworkError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="durable signal failed safely",
+            ) from exc
+        return _durable_response(result)
+
     return app
 
 
@@ -436,6 +604,11 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
             return created
 
     primary = bundle_for(DemoScenario.SUCCESS)
+    from aegis_framework.adapters import FixedClock
+    from aegis_framework.durability import CursorCodec, DurableInvestigationService
+    from aegis_framework.fixtures import DEMO_TIME
+
+    durable_store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
     return ApiRuntime(
         authenticator=primary.authenticator,
         governance=primary.governance,
@@ -444,6 +617,11 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         # and idempotency state are shared at the app boundary — scenario
         # selection is server-side configuration, not caller-selectable.
         service_for=lambda _scenario: primary.service,
+        durable=DurableInvestigationService(
+            policy=primary.policy,
+            store=durable_store,
+            cursor_codec=CursorCodec(b"aegis-demo-cursor-key-is-test-only-0001"),
+        ),
     )
 
 
@@ -466,12 +644,15 @@ def _production_runtime_from_environment() -> ApiRuntime:
         "issuer": os.getenv("AEGIS_OIDC_ISSUER"),
         "audience": os.getenv("AEGIS_OIDC_AUDIENCE"),
         "jwks_uri": os.getenv("AEGIS_OIDC_JWKS_URI"),
+        "cursor_key": os.getenv("AEGIS_CURSOR_SIGNING_KEY"),
+        "reference_key": os.getenv("AEGIS_REFERENCE_ENCRYPTION_KEY"),
     }
     if any(value is None or not value for value in required.values()):
         return _unavailable_runtime()
 
     from aegis_framework.adapters import SystemClock
     from aegis_framework.authorization import EnterprisePolicy
+    from aegis_framework.durable_postgres import PostgresDurability
     from aegis_framework.identity import (
         HttpJwksFetcher,
         IssuerConfiguration,
@@ -493,6 +674,10 @@ def _production_runtime_from_environment() -> ApiRuntime:
         )
         pool = open_runtime_pool(dsn=str(required["dsn"]))
         repository = PostgresRepository(pool=pool, clock=clock)
+        cursor_codec = CursorCodec(str(required["cursor_key"]).encode())
+        tenant_references = TenantReferenceCodec(
+            str(required["reference_key"]).encode()
+        )
         authenticator = JwtAuthenticator(
             configurations=(configuration,),
             identities=repository,
@@ -510,14 +695,24 @@ def _production_runtime_from_environment() -> ApiRuntime:
     def unavailable_investigation(scenario: DemoScenario) -> InvestigationService:
         del scenario
         raise IdentityUnavailable(
-            "production evidence and model adapters are not configured in Layer 2"
+            "production evidence and model adapters are not configured in Layer 3"
         )
 
+    policy = EnterprisePolicy(policies=repository, clock=clock)
     return ApiRuntime(
         authenticator=authenticator,
         governance=repository,
-        policy=EnterprisePolicy(policies=repository, clock=clock),
+        policy=policy,
         service_for=unavailable_investigation,
+        durable=DurableInvestigationService(
+            policy=policy,
+            store=PostgresDurability(
+                pool=pool,
+                clock=clock,
+                tenant_references=tenant_references,
+            ),
+            cursor_codec=cursor_codec,
+        ),
     )
 
 
@@ -590,6 +785,31 @@ def json_bytes(value: Mapping[str, object]) -> bytes:
     import json
 
     return json.dumps(value, separators=(",", ":"), sort_keys=True).encode()
+
+
+def _require_durable(runtime: ApiRuntime) -> DurableInvestigationService:
+    if runtime.durable is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="durable investigation service is unavailable",
+        )
+    return runtime.durable
+
+
+def _durable_response(value: RunView) -> DurableRunResponse:
+    return DurableRunResponse(
+        run_id=value.run_id,
+        incident_id=value.incident_id,
+        request_ref=value.request_ref,
+        workflow_id=value.workflow_id,
+        status=value.status.value,
+        version=value.version,
+        last_cursor=value.last_cursor,
+        created_at=value.created_at.isoformat(),
+        updated_at=value.updated_at.isoformat(),
+        failure_code=value.failure_code,
+        replayed=value.replayed,
+    )
 
 
 app = create_app(mode=AppMode(os.getenv("AEGIS_MODE", AppMode.PRODUCTION.value)))

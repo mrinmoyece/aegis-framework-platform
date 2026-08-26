@@ -1,136 +1,128 @@
 # Framework selection report
 
-Research was refreshed from official project/package sources on **2026-08-15**.
-Versions are exact pins where installed. Candidate versions that are deliberately
-deferred are recorded so the decision can be reproduced.
+Research was refreshed from official package/project sources on **2026-08-15**.
+Installed dependencies and Actions are exact-pinned; container images use digests.
 
 ## Selected and deferred stack
 
-| Candidate | Version | Maturity/license | Operational dependency | Known limitation | Exit strategy | Decision |
-|---|---:|---|---|---|---|---|
-| Python | 3.14.7; supports 3.13 | Stable, PSF | Runtime/toolchain | Newer ecosystem wheels can lag | CI keeps 3.13 compatibility | Select 3.14.7 |
-| LangGraph | 1.2.11 | Stable 1.x, MIT | Embedded; saver optional | Checkpoints are not audit/auth/exactly-once; state can accumulate | `OrchestratorPort` | Select |
-| LangGraph checkpoint | 4.2.0 transitively | Stable, MIT | Saver backend | Memory saver is process-local; default permissive deserialization must be overridden | JSON state + strict serializer + saver adapter | Select |
-| PostgreSQL saver | 3.1.2 | Stable, MIT | PostgreSQL + Psycopg 3.3.4 | Saver schema is not authority; RLS overlay remains ours | `OrchestratorPort` + SQL export | Tenant-bound durable mode |
-| Temporal Python | 1.31.0 | Mature, MIT | Temporal Server and datastore | Workflow determinism; activities remain at-least-once and need idempotency | Durable-workflow port in later layer | Defer |
-| FastAPI | 0.141.1 | Mature, MIT | ASGI server | Does not supply identity, RBAC, or tenancy | Delivery adapter only | Select |
-| Pydantic | 2.13.4 | Stable, MIT | None | Validation is not authorization | Domain models are framework-neutral | Select |
-| PyJWT | 2.13.0 | Production/stable, MIT | cryptography 50.0.0 | JWKS bounds, issuer registry, grants, and policy remain ours | `AuthenticatorPort` | Select |
-| Authlib / joserfc | 1.7.2 / 1.7.4 candidates | Production/stable, BSD | cryptography | Authlib JOSE is moving to joserfc; broader OAuth surface than required | Standard OIDC/JWK documents | Defer |
-| Casbin / OPA | 1.43.0 / 1.19.0 candidates | Apache-2.0 | OPA adds a service | Neither authenticates or owns grants; Casbin lacks declared Python 3.13/3.14 support | `PolicyPort` | Defer |
-| Langfuse Python | 4.14.4 | Stable SDK; MIT core, commercial `ee/` areas | Hosted service or self-hosted stack | Backend operations and feature license boundaries | `ObservabilityPort` + OTel | Primary optional backend |
-| LangSmith client | 0.11.0 transitively | MIT client; commercial platform | SaaS, or enterprise-licensed self-host stack | Strong LangGraph coupling and backend lock-in | Do not call it in Layer 2 | Redundant; not selected |
-| OpenTelemetry | 1.44.0 | Stable API/SDK, Apache-2.0 | Exporter/backend optional | Redaction/cardinality are not automatic | Standard API and OTLP | Select |
-| OTel instrumentation | 0.65b0 transitively | Beta, Apache-2.0 | Instrumented integrations | Beta semconv can rename | Manual stable application spans | Limit use |
-| PostgreSQL/pgvector | PG 17.11 line + pgvector 0.8.6 image | Mature/permissive PostgreSQL licenses | Database operations | HA, backup/restore, retention and regional policy remain unproven | Repository ports + SQL export | Select with forced RLS; vectors defer |
-| Keycloak | 26.7.1 local candidate | Mature, Apache-2.0 | JVM service + database | Realm operations, HA, rotation, and production evidence remain external | OIDC standards + `AuthenticatorPort` | Optional local profile |
-| Redis | redis-py 8.1.0 candidate; Redis 8 server | Client MIT; server triple license | New stateful service | No cache/queue need; licensing/ownership cost | Add only with measured requirement; consider Valkey | Reject Layer 2 |
-| OpenAI adapter | langchain-openai 1.5.1 candidate | Stable, MIT adapter | Provider credentials/network | Provider schema, cost, data policy | `StructuredModelPort` | Defer |
-| Anthropic adapter | langchain-anthropic 1.5.6 candidate | Stable, MIT adapter | Provider credentials/network | Same, with provider-specific semantics | `StructuredModelPort` | Defer |
-| React/TypeScript | Current stable when UI begins | Mature | Node/browser toolchain | No Layer 2 UI requirement | API contract | Defer |
-| MCP/A2A SDKs | Re-evaluate official stable releases | Evolving | Protocol servers/identity | Adds tool delegation attack surface | Tool/effect ports | Defer |
+| Candidate | Version | Operational dependency | What it removes | What remains application-owned | Decision/escape |
+|---|---:|---|---|---|---|
+| Python | 3.14.7; CI 3.13.15 | Runtime/toolchain | Language/runtime | Types, controls, lifecycle | Select |
+| LangGraph | 1.2.11 | Embedded + saver | Graph scheduler, fan-out/join, reducers, checkpoint API | Policy, evidence tenancy, citations, application facts | Select behind `OrchestratorPort` |
+| LangGraph PostgreSQL saver | 3.1.2 | PostgreSQL | Saver SQL/state history | Owner registry, forced RLS, retention | Select, replace through `OrchestratorPort` |
+| Temporal Python SDK | 1.31.0 | Temporal Server | Workflow replay, timers, signals, Activity retry/heartbeat/cancel, worker recovery | Event ledger, policy, budget, idempotency, outbox, projections, audit | Select behind `ActivityOperations` + outbox |
+| Temporal Server | 1.29.1 local digest | Server + PostgreSQL | Local compatibility runtime | Auth/TLS, namespaces, HA, upgrades, DR, capacity | Optional Compose only |
+| FastAPI/Pydantic | 0.141.1 / 2.13.4 | ASGI runtime | Routing/OpenAPI/validation | Identity, policy, body bounds, anti-enumeration | Delivery adapter |
+| PostgreSQL/Psycopg | PG 17 / 3.3.4 | Stateful DB | Transactions, locks, pooling | Schema, RLS, event/hash/idempotency/delivery semantics | Repository ports + SQL export |
+| PyJWT/cryptography | 2.13.0 / 50.0.0 | IdP/JWKS | JOSE/JWK/signature/registered claims | Issuer/cache bounds/current principal/grants | `AuthenticatorPort` |
+| OpenTelemetry | 1.44.0 | Exporter/backend optional | Span/metric transport APIs | Redaction, cardinality, sampling, SLO | Canonical telemetry |
+| Langfuse | 4.14.4 | Hosted/self-hosted backend | Optional model/graph trace/eval UI | Payload minimization, retention | Optional behind `ObservabilityPort` |
+| Keycloak | 26.7.1 local digest | JVM + database | Local OIDC compatibility | Realm/client/grants/production operations | Optional |
+| Redis/Valkey | Not installed | Additional state service | Queue primitives | Leases, truth, retry, tenancy still custom | Reject: Temporal owns workflow queue |
+| OpenAI/Anthropic | Deferred | Credentials/network | Provider calls | Data policy, routing, quotas, schema | `StructuredModelPort` |
+| pgvector/RAG | Deferred | Extension/index | Vector search | Tenant/provenance/relevance | `EvidencePort` |
+| UI, MCP/A2A, sandbox | Deferred | New runtimes/services | N/A | Session/tool/effect security | Later layers |
 
-Ruff 0.16.3 and uv 0.12.5 are production-proven but pre-1.0, so both are exact
-pinned. Mypy 2.3.0, pytest 9.1.1, coverage 7.15.4, and pre-commit 4.6.2 are pinned
-after compatibility validation. Strict mypy is the single Python type gate; pyright
-is not added because a second checker would duplicate the Layer 2 surface without a
-measured correctness benefit. Revisit that choice when editor/BFF integration adds a
-distinct need. The complete transitive graph is in `uv.lock`.
+## Why Temporal now
 
-## Why PyJWT but no policy engine
+ADR 002 deferred Temporal while the product had a short request-bound investigation.
+Layer 3 explicitly requires process-independent scheduling, a durable wait/timer,
+signals, cancellation delivery, bounded Activity retry/heartbeat, worker recovery, and
+workflow replay. Those are workflow-engine requirements; reproducing them with
+PostgreSQL/Redis pollers would create a custom engine.
 
-PyJWT removes custom JOSE parsing, signature verification, JWK conversion, and
-registered issuer/audience validation. Layer 2 still owns a bounded cache because
-maximum key count, refresh cooldown, configured endpoint policy, and fail-closed
-staleness are application security decisions. The token's unverified issuer is used
-only to choose an exact configured verifier. Tenant and grants are resolved from
-application storage.
+The SDK's workflow sandbox prohibits common nondeterministic operations. Pydantic
+conversion is supported by the official extra. SDK 1.31.0 moved payload warning limits
+to `Client.connect`; the application adds a stricter codec that rejects payload items
+over 64 KiB. Built-in `WorkflowEnvironment.start_time_skipping()` is supported but
+downloads a test server unless a path is supplied, so tests require a preinstalled
+binary. CI uses the digest-pinned local server instead.
 
-The current policy is intentionally small: immutable role definitions plus current
-tenant policy, purpose, risk ceiling, grant expiry, revocation, and version checks.
-Casbin would not supply identity or grant management, and OPA would add another
-policy service and lifecycle. Both remain valid future adapters behind `PolicyPort`
-when policy volume or independent authoring justifies them. See
-[ADR 005](adr/005-pyjwt-and-explicit-authorization.md).
+Temporal does **not** provide:
 
-## Why LangGraph
+- current tenant identity, grants, purpose/risk policy, or quota;
+- an application event/audit ledger or authorized API projection;
+- exactly-once Activities or external effects;
+- application inbox/outbox/idempotency/fencing;
+- payload privacy, retention, or low-cardinality policy;
+- deterministic LangGraph/model semantics.
 
-LangGraph directly removes custom graph scheduling, parallel super-step joins,
-checkpoint plumbing, and state-history APIs. Its explicit state and fixed graph fit a
-bounded investigation better than an open-ended agent loop. The coordinator fans out
-to telemetry and change nodes, reducers make merge order deterministic, and a critic
-joins before completion.
+## Temporal and LangGraph ownership
 
-It does not remove application code for identity, policy, budget, evidence tenancy,
-idempotency, citation integrity, approval, effects, fencing, audit, redaction, or
-reconciliation. [ADR 001](adr/001-langgraph-orchestration.md) records the choice.
+LangGraph stays inside one Activity and owns only the bounded cognitive graph. Temporal
+retries the Activity, not individual nodes. LangGraph has no independent retry loop.
+Provider SDK retries must be disabled or included inside the Activity attempt. This
+keeps one visible retry owner per boundary.
 
-## LangGraph versus Temporal
+Temporal workflow history can resume mechanics but is not an authorization, tenant
+grant, audit record, application outcome, approval, fencing token, or effect receipt.
+The API reads PostgreSQL projections only.
 
-They solve different durability scopes:
+## Server compatibility choice
 
-- **LangGraph** checkpoints state around nodes in one investigation graph. It is
-  ideal for pausing/resuming model and specialist reasoning.
-- **Temporal** replays deterministic workflow code from event history across worker
-  loss and long waits. Non-deterministic or side-effecting work belongs in Activities,
-  whose duplicate/retry behavior still needs idempotency.
+The current stable SDK and server are 1.31.0. The official
+`temporalio/docker-compose` reference still pins `auto-setup:1.29.1`. The used core
+workflow/Activity APIs are within Temporal's documented SDK/server compatibility
+window. Local integration verifies the exact pair:
 
-Putting both in charge of the same node retry tree creates overlapping ownership.
-Layer 2 has no production effect or multi-day approval workflow, so Temporal's
-separate server cluster is unjustified. Add it when approval/effect/reconciliation
-must survive deployment and process boundaries; keep LangGraph inside a single
-investigation Activity. See [ADR 002](adr/002-defer-temporal.md).
+- `temporalio==1.31.0`;
+- `temporalio/auto-setup:1.29.1@sha256:5b3502a3b685f9eff1b925af90c57c9e3dbeccbef367cc28a2a9712c63379312`.
 
-## Langfuse versus LangSmith
+This is not a recommendation to deploy `auto-setup` in production. Production must use
+a qualified server topology and schema upgrade process.
 
-Both would duplicate tracing/evaluation ownership if enabled together.
+## Framework comparison against custom Aegis
 
-LangSmith offers the tightest LangGraph run-tree and hosted evaluation experience,
-but the platform is commercial; self-hosting is an Enterprise add-on and requires a
-larger storage stack. Its MIT client being in the lockfile does not make the platform
-open source.
+Pinned custom targets:
 
-Langfuse v4 is OpenTelemetry-native, has an MIT core, can be self-hosted, and accepts
-manual observations. It is the primary external backend. The adapter sends only
-fixed names, tenant buckets, counts, and status; automatic LangGraph capture is
-blocked because graph state includes evidence. Evals publish aggregate counts only.
-OpenTelemetry remains canonical, so removing Langfuse does not change application
-code. See [ADR 003](adr/003-langfuse-and-opentelemetry.md).
+- Layer 3 durable ledger: `87cefe58adbf62e6a419d38e57e0928581b7003c`;
+- Layer 4 worker runtime: `171fa485819334a892684544c0a993a6e2fc4ace`.
+
+Custom Layer 3 uses 3,765 production LOC and 2,239 test LOC. Its change from Layer 2 is
+3,901 additions across 42 files. Custom Layer 4 grows to 7,452 production LOC and
+3,687 test LOC; the worker layer adds 6,301 lines across 47 files and introduces Redis
+Streams plus PostgreSQL-authoritative leases/fencing.
+
+Temporal removes custom poller/scheduler, retry/backoff, heartbeat, timer, signal
+history, and crash-recovery machinery. It does not remove application event envelopes,
+expected versions, RLS, idempotency, inbox/outbox, stale-result controls, projections,
+authorization, audit, or redaction. It adds one operational control plane and workflow
+history/versioning lock-in. The exact framework branch measurements are in
+`comparison/layer3-metrics.json`.
+
+## Versioning and lock-in
+
+Workflow code records `aegis-investigation-lifecycle-v1` with
+`workflow.patched`. Release replay uses `Replayer`. Future deployments use patch
+add/deprecate/remove or current Worker Versioning—not the removed pre-2026 experimental
+scheme. Continue-as-new is deferred until measured history size justifies it.
+
+Escape hatches:
+
+- Temporal: application outbox + opaque typed messages + `ActivityOperations`;
+- LangGraph: `OrchestratorPort` + JSON-compatible domain results;
+- PostgreSQL: repository ports + canonical SQL/JSON export;
+- PyJWT/IdP: `AuthenticatorPort` + standard JWT/JWK/OIDC;
+- Langfuse: `ObservabilityPort` + OpenTelemetry.
 
 ## Primary sources
 
-All links were accessed 2026-08-15:
+Accessed 2026-08-15:
 
-- [Python downloads](https://www.python.org/downloads/)
-- [LangGraph PyPI metadata](https://pypi.org/pypi/langgraph/json)
+- [Temporal Python SDK releases/changelog](https://github.com/temporalio/sdk-python/blob/main/CHANGELOG.md)
+- [Temporal Python workflows](https://docs.temporal.io/develop/python/core-application)
+- [Temporal testing and replay](https://docs.temporal.io/develop/python/testing-suite)
+- [Temporal workflow versioning](https://docs.temporal.io/develop/python/versioning)
+- [Temporal data handling](https://docs.temporal.io/develop/python/converters-and-encryption)
+- [Temporal cancellation](https://docs.temporal.io/develop/python/cancellation)
+- [Temporal Server 1.31.0](https://github.com/temporalio/temporal/releases/tag/v1.31.0)
+- [Official Temporal Docker Compose](https://github.com/temporalio/docker-compose)
 - [LangGraph persistence](https://docs.langchain.com/oss/python/langgraph/persistence)
-- [LangGraph graph API and super-steps](https://docs.langchain.com/oss/python/langgraph/graph-api)
-- [Temporal workflows](https://docs.temporal.io/workflows)
-- [Temporal Server](https://docs.temporal.io/temporal-service/temporal-server)
-- [FastAPI releases](https://pypi.org/project/fastapi/)
-- [Pydantic releases](https://pypi.org/project/pydantic/)
-- [PyJWT 2.13.0 metadata](https://pypi.org/pypi/PyJWT/2.13.0/json)
-- [PyJWT API and algorithm warning](https://pyjwt.readthedocs.io/en/stable/api.html)
-- [cryptography 50.0.0 metadata](https://pypi.org/pypi/cryptography/50.0.0/json)
-- [Authlib 1.7.2 metadata](https://pypi.org/pypi/Authlib/1.7.2/json)
-- [joserfc 1.7.4 metadata](https://pypi.org/pypi/joserfc/1.7.4/json)
-- [Casbin 1.43.0 metadata](https://pypi.org/pypi/casbin/1.43.0/json)
-- [OPA 1.19.0 release](https://github.com/open-policy-agent/opa/releases/tag/v1.19.0)
-- [Keycloak 26.7.1 release](https://github.com/keycloak/keycloak/releases/tag/26.7.1)
-- [OpenID Connect Core](https://openid.net/specs/openid-connect-core-1_0.html)
-- [JWT BCP, RFC 8725](https://www.rfc-editor.org/rfc/rfc8725)
-- [Langfuse Python](https://pypi.org/project/langfuse/)
-- [Langfuse repository license](https://github.com/langfuse/langfuse/blob/main/LICENSE)
-- [Langfuse masking](https://langfuse.com/docs/observability/features/masking)
-- [LangSmith self-hosting](https://docs.langchain.com/langsmith/self-hosted)
-- [OpenTelemetry GenAI spans](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-spans/)
-- [PostgreSQL releases](https://www.postgresql.org/support/versioning/)
-- [pgvector](https://github.com/pgvector/pgvector)
-- [Redis licensing](https://redis.io/legal/licenses/)
-- [Docker build best practices](https://docs.docker.com/build/building/best-practices/)
-- [GitHub Actions secure use](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
-- [CodeQL](https://docs.github.com/en/code-security/code-scanning/introduction-to-code-scanning/about-code-scanning-with-codeql)
-- [Dependabot version updates](https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/about-dependabot-version-updates)
+- [PyJWT API](https://pyjwt.readthedocs.io/en/stable/api.html)
+- [JWT BCP RFC 8725](https://www.rfc-editor.org/rfc/rfc8725)
+- [PostgreSQL version policy](https://www.postgresql.org/support/versioning/)
+- [OpenTelemetry](https://opentelemetry.io/docs/)
+- [Langfuse repository/license](https://github.com/langfuse/langfuse)
 
-Package metadata is the source of exact release versions. License boundaries for
-deployed services still require organizational legal review.
+Package metadata is the source for exact SDK pins. Production service/license/security
+qualification remains an organizational responsibility.

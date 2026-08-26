@@ -48,26 +48,42 @@ type DictConnection = Connection[dict[str, Any]]
 type RuntimePool = ConnectionPool[DictConnection]
 
 _ROOT = Path(__file__).resolve().parents[2]
-_MIGRATION = _ROOT / "migrations/0001_layer2.sql"
+_MIGRATIONS = (
+    _ROOT / "migrations/0001_layer2.sql",
+    _ROOT / "migrations/0002_layer3.sql",
+)
 _CHECKPOINT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 
 
 class MigrationRunner:
     """Apply exact migration content under the SQL advisory lock and verify drift."""
 
-    def __init__(self, path: Path = _MIGRATION) -> None:
-        self._path = path
+    def __init__(self, paths: tuple[Path, ...] = _MIGRATIONS) -> None:
+        if not paths:
+            raise ValueError("at least one migration is required")
+        self._paths = paths
 
     def apply(self, connection: DictConnection) -> None:
-        script = self._path.read_text(encoding="utf-8")
+        for version, path in enumerate(self._paths, start=1):
+            self._apply_one(connection, version=version, path=path)
+
+    @staticmethod
+    def _apply_one(
+        connection: DictConnection,
+        *,
+        version: int,
+        path: Path,
+    ) -> None:
+        script = path.read_text(encoding="utf-8")
         checksum = sha256(script.encode()).hexdigest()
         try:
             existing = connection.execute(
                 """
                 SELECT checksum
                 FROM aegis.schema_migrations
-                WHERE version = 1
-                """
+                WHERE version = %s
+                """,
+                (version,),
             ).fetchone()
         except Error:
             connection.rollback()
@@ -75,7 +91,7 @@ class MigrationRunner:
         if existing is not None:
             connection.rollback()
             if existing["checksum"] != checksum:
-                raise MigrationFailure("applied Layer 2 migration checksum changed")
+                raise MigrationFailure(f"applied migration {version} checksum changed")
             return
         connection.rollback()
         try:
@@ -83,20 +99,25 @@ class MigrationRunner:
             connection.execute(
                 """
                 INSERT INTO aegis.schema_migrations (version, filename, checksum)
-                VALUES (1, %s, %s)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (version) DO NOTHING
                 """,
-                (self._path.name, checksum),
+                (version, path.name, checksum),
             )
             connection.commit()
             recorded = connection.execute(
-                "SELECT checksum FROM aegis.schema_migrations WHERE version = 1"
+                """
+                SELECT checksum
+                FROM aegis.schema_migrations
+                WHERE version = %s
+                """,
+                (version,),
             ).fetchone()
         except Error as exc:
             connection.rollback()
-            raise MigrationFailure("Layer 2 migration failed") from exc
+            raise MigrationFailure(f"migration {version} failed") from exc
         if recorded is None or recorded["checksum"] != checksum:
-            raise MigrationFailure("Layer 2 migration was not recorded safely")
+            raise MigrationFailure(f"migration {version} was not recorded safely")
 
 
 def setup_postgres(*, admin_dsn: str) -> None:
@@ -331,10 +352,22 @@ class PostgresRepository:
                         AND to_regclass('aegis.principals') IS NOT NULL
                         AND to_regclass('aegis.policies') IS NOT NULL
                         AND to_regclass('aegis.audit_events') IS NOT NULL
+                        AND to_regclass('aegis.application_events') IS NOT NULL
+                        AND to_regclass('aegis.outbox_messages') IS NOT NULL
+                        AND to_regclass('aegis.investigation_runs') IS NOT NULL
                         AND (
                             SELECT relforcerowsecurity
                             FROM pg_class
                             WHERE oid = 'aegis.audit_events'::regclass
+                        )
+                        AND (
+                            SELECT bool_and(relforcerowsecurity)
+                            FROM pg_class
+                            WHERE oid IN (
+                                'aegis.application_events'::regclass,
+                                'aegis.outbox_messages'::regclass,
+                                'aegis.investigation_runs'::regclass
+                            )
                         ) AS ready
                     """
                 ).fetchone()

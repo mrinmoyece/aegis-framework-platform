@@ -30,7 +30,7 @@ class _SpanObservation:
 
 class OpenTelemetryObservability:
     def __init__(self, tracer: Tracer | None = None) -> None:
-        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.2.0")
+        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.3.0")
 
     def investigation(
         self,

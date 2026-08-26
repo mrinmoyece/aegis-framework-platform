@@ -1,4 +1,4 @@
-# Layer 2 curriculum
+# Layer 3 curriculum
 
 ## Learning outcomes
 
@@ -14,6 +14,13 @@ After this layer, an engineer should be able to:
 8. prevent transaction/pool tenant context leakage;
 9. distinguish application audit and quota from framework checkpoints;
 10. test cross-tenant, concurrency, mutation and exporter attacks deterministically.
+11. distinguish application ledger truth from Temporal history and LangGraph state;
+12. design dual aggregate/tenant integrity chains and commit-safe cursors;
+13. place idempotency, inbox/outbox and projections in one transaction;
+14. explain Temporal workflow determinism, replay, patching and Activity at-least-once;
+15. assign retry ownership without overlapping workflow, graph and provider retries;
+16. reauthorize commands/signals/Activities against current policy;
+17. recover worker/history/checkpoint failures without fabricating application outcome.
 
 ## Suggested sequence
 
@@ -27,6 +34,11 @@ After this layer, an engineer should be able to:
 | Audit | audit migration/repository | Attempt update/delete and verify chain | Why is a checkpoint not audit evidence? |
 | Graph boundary | `service.py`, `graph.py` | Attempt cross-tenant thread rebinding | Can graph output change current policy? |
 | Privacy | `safety.py`, exporter tests | Inject identifiers/secrets into attributes | Where must redaction occur? |
+| Event ledger | ADR 008, `durability.py`, migration 0002 | Race expected-version appends and verify both chains | Why is tenant cursor assigned at commit? |
+| Transactional delivery | `durable_postgres.py` | Crash a claimant and reclaim the outbox row | Which record proves delivery intent? |
+| Temporal lifecycle | ADR 007, `temporal.py` | Run no-worker recovery, retry, timer and replay | What may workflow code do deterministically? |
+| Activity authority | `activity_runtime.py` | Revoke a signaller during wait | Why is a signal payload never authority? |
+| Projection API | durable API/timeline tests | Rebuild and tamper with a cursor | Why can Temporal query not serve product status? |
 
 ## Practical exercises
 
@@ -40,13 +52,19 @@ After this layer, an engineer should be able to:
    qualification test.
 6. Design—but do not implement—a Vault resolver that cannot expose values to graph
    state or observability.
+7. Add an event schema v2 with an explicit v1 upcaster and prove old replay.
+8. Kill a worker between Activity attempts and explain why budget is not charged twice.
+9. Remove an Activity policy check in a disposable branch and identify the confused
+   deputy path.
+10. Propose a Temporal-to-alternative migration using only outbox messages and
+    application events.
 
 ## Assessment rubric
 
 - **Pass:** all deterministic unit/eval gates and local PostgreSQL integration pass;
   the engineer correctly identifies every authority owner.
 - **Strong pass:** adds an attack case with a fail-closed implementation and explains
-  retry, tenant and redaction semantics.
+  retry, tenant, replay/versioning, ledger integrity and redaction semantics.
 - **Not qualified:** treats IdP roles, LangGraph checkpoints, traces, or API payloads
-  as current authorization/audit truth, or claims production evidence from the local
-  Keycloak/PostgreSQL profiles.
+  as current authorization/audit truth; treats Temporal completion as application
+  truth; overlaps retry owners; or claims production evidence from local profiles.

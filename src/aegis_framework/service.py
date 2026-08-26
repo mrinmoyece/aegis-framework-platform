@@ -178,7 +178,7 @@ class InvestigationService:
                     return result
 
                 collected = tuple(self._evidence.collect(identity, request))
-                _validate_evidence(identity, collected)
+                validate_evidence(identity, collected)
                 result = self._orchestrator.run(
                     tenant_id=identity.tenant_id,
                     request=request,
@@ -313,7 +313,7 @@ def _budget_abstention(
     )
 
 
-def _validate_evidence(
+def validate_evidence(
     identity: IdentityContext,
     collected: tuple[Evidence, ...],
 ) -> None:

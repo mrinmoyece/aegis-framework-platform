@@ -1,54 +1,49 @@
-# Failure modes
+# Layer 3 failure modes
 
-| Failure | Layer 2 behavior | Authority owner | Test/eval |
+| Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
-| Missing/malformed bearer | Generic `401`; no repository or graph authority | Authenticator | API tests |
-| Unknown issuer/audience/algorithm/key | Fail authentication closed | OIDC verifier | JWT attack tests |
-| Expired/future/long token | Fail authentication within explicit skew/lifetime | OIDC verifier | JWT attack tests |
-| JWKS unavailable/oversized/malformed | No stale success; identity unavailable | JWKS adapter | identity tests |
-| Rotated signing key | Cooldown-bounded refresh then verify current key | JWKS adapter | rotation test |
-| Stale/revoked grant version | Fail authentication before policy | Principal/grant repository | identity tests |
-| Missing role/purpose/risk grant | Deny before graph; audit denial | Policy | policy/service/API tests |
-| Cross-tenant resource | Generic `404` before object lookup | Delivery policy | API anti-enumeration tests |
-| Tenant mismatch from evidence adapter | Raise explicit isolation error; mark run failed | Application service | service test |
-| Budget exhausted | Deterministic abstention; zero checkpoints/model calls | Budget | eval |
-| Duplicate completed request | Reauthorize, return stored result, no new graph run | Idempotency | graph/service tests |
-| Duplicate in progress | Conflict, never start another run | Idempotency | service test |
-| Failed attempt retried | Same budget reservation; next explicit attempt may run | Idempotency/budget | service test |
-| No evidence | Specialists and critic abstain | Evidence/critic | graph test |
-| Malformed structured output | Named node abstention | Model adapter/critic | graph test |
-| Declared provider outage | Named node abstention | Model adapter/critic | graph test |
-| Unexpected framework/adapter defect | Raise `OrchestrationFailure`, audit failed | Orchestrator adapter | graph/service test |
-| Forged/missing citation | Critic rejects all hypotheses/proposal | Critic | graph test |
-| Invalid evidence-derived action target | Keep cited hypothesis, omit proposal, abstain safely | Critic | graph test |
-| Specialist contradiction | Abstain, return reasons, no proposal | Critic | eval |
-| Prompt injection in evidence | Drop untrusted text, flag, abstain, no proposal | Evidence projection/critic | eval |
-| Checkpoint process loss in demo | State is lost; do not claim durability | Saver selection | documented limitation |
-| PostgreSQL unavailable | Readiness/authenticated governance fail closed; no memory fallback | Repository/operator | readiness test |
-| Runtime role can bypass RLS | Pool configuration fails | PostgreSQL adapter | integration policy |
-| Tenant context remains after transaction | Connection is rejected/reset, not returned as success | Pool adapter | PostgreSQL integration |
-| Optimistic version changed | Explicit concurrency conflict | Repository | governance tests |
-| Quota race | Serialized row update; durable winner/denials | Quota repository | PostgreSQL integration |
-| Audit mutation | Privilege and trigger reject update/delete | Audit repository | PostgreSQL integration |
-| Cross-tenant checkpoint | RLS hides read; owner uniqueness rejects rebinding | Checkpoint repository | graph/PostgreSQL tests |
-| Langfuse unavailable | Default runtime unaffected because external export is opt-in | Observability operator | adapter is non-authoritative |
-| Audit adapter unavailable | Operation must not be represented as fully audited | Audit operator | production gap |
-| Approval/effect requested | No decision endpoint; effect adapter raises | Approval/effect boundary | service test |
+| Stale aggregate writer | Expected-version conflict; no event/cursor/outbox commit | Application ledger | unit + PostgreSQL |
+| Duplicate request/signal/activity | Fingerprint/inbox/event ID returns same fact or rejects conflict | Application database | unit + eval |
+| Event/outbox insert race | Whole transaction rolls back | PostgreSQL | unit + integration |
+| Event mutation/reorder/delete | Runtime privilege/trigger rejects mutation; hash verification fails | PostgreSQL ledger | integration |
+| Tenant cursor race | Locked tenant cursor produces contiguous commit order | PostgreSQL | integration |
+| Projection corruption/loss | Rebuild from verified events; projection is never source truth | Application reducer | unit + eval |
+| Tampered/wrong cursor | HMAC/tenant/run binding rejects cursor | Application API | unit/API |
+| Cross-tenant ledger/API read | Current policy and forced RLS hide object | Policy/PostgreSQL | unit/integration |
+| Outbox worker crash | Claim expires and another worker reclaims | Application outbox | unit |
+| Repeated delivery failure | Fifth failure becomes explicit dead letter | Application outbox | unit |
+| Temporal unavailable | Intent/outbox remain pending; API stays queued, never claims completion | Application database | documented/dispatcher test |
+| Duplicate Temporal start | Stable workflow ID and conflict policy reuse current execution | Application + Temporal | adapter/integration |
+| Worker absent/crashes | Temporal retains work; compatible worker replays and resumes | Temporal | integration |
+| Activity transient failure | Temporal retries up to three attempts with same operation/budget IDs | Temporal + application idempotency | integration/eval |
+| Activity poison/framework defect | Non-retryable typed failure; worker process survives | Activity adapter | unit |
+| Activity heartbeat timeout | Temporal retries bounded attempt | Temporal | configuration/integration boundary |
+| Workflow timer expiry | `timed_out` application event; no silent success | Temporal timer + application event | integration |
+| Duplicate resume signal | Workflow set and inbox suppress duplicate command | Temporal + application inbox | integration/unit |
+| Forged signal payload | Signal reference is reloaded from inbox and current signaller reauthorized | Application authority | unit/eval |
+| Policy revoked during wait | Resume Activity denies; workflow fails safely | Current policy | eval |
+| Cancellation/result race | Persisted cancel transition rejects stale graph result | Application aggregate state machine | unit/eval |
+| Temporal history loss | Reconcile pending application intent using same workflow/message IDs; never infer completion | Application ledger | documented boundary |
+| LangGraph checkpoint loss | Bounded graph Activity may rerun under stable operation/budget; checkpoint is not truth | LangGraph + application idempotency | eval/documented |
+| Workflow code incompatibility | Replay test fails release; patch/version strategy required | Temporal deployment | integration |
+| Oversized/malformed payload | Pydantic/codec rejects before handler; no unbounded allocation | Application converter | unit |
+| Evidence tenant/hash mismatch | Activity fails before LangGraph | Application evidence validation | inherited unit tests |
+| Budget exhausted | Authorization Activity records fail-closed outcome before evidence/graph | Application budget | eval |
+| Audit/ledger unavailable | Operation cannot be represented as durable success | PostgreSQL | fail-closed adapter |
+| OTel/Langfuse unavailable | Product truth unaffected; export remains optional | Observability adapter | non-authoritative |
 
-## Retry ownership
+## Retry rules
 
-LangGraph may retry/replay nodes according to graph/checkpoint configuration. Layer 2
-does not attach external effects to nodes. The application idempotency record owns
-whole-run duplicate suppression. A future Temporal workflow will own long-running
-approval/effect retries. Provider SDK retries must be bounded and observable when
-introduced; they must not overlap invisibly with graph or workflow retry policy.
+The application dispatcher retries command delivery. Temporal retries whole Activities.
+LangGraph owns graph checkpoints but not a second retry loop. Connector/provider retries
+must be disabled or included in the Activity attempt. No framework retry converts an
+at-least-once external operation into exactly-once behavior.
 
-## Operator responses
+## Operator rules
 
-- Treat citation rejection, contradiction, injection, and budget exhaustion as safe
-  abstentions requiring human investigation.
-- Treat `OrchestrationFailure`, evidence isolation, audit failure, or saver failure as
-  platform incidents, not empty successful investigations.
-- Never bypass policy, budget, approval, or audit to recover availability.
-- Never switch silently from PostgreSQL to memory checkpoints in a durable
-  deployment.
+- Never edit an immutable event, idempotency row, or inbox fact.
+- Never report Temporal `COMPLETED` as product completion without the application event.
+- Never bypass current policy/budget to recover availability.
+- Never switch silently to memory persistence.
+- Treat hash failure, cross-tenant access, stale results, and framework defects as
+  platform/security incidents.

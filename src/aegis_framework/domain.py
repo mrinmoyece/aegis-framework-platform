@@ -22,6 +22,9 @@ from pydantic import (
 Identifier = Annotated[
     str, Field(min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9._:-]+$")
 ]
+OpaqueReference = Annotated[
+    str, Field(min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9._:-]+$")
+]
 Issuer = Annotated[
     str,
     Field(

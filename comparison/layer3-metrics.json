@@ -1,0 +1,143 @@
+{
+  "comparison_basis": {
+    "custom_layer3": {
+      "branch": "mrinmoyece-aegis-durable-ledger",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 4,
+        "locked_total": null
+      },
+      "implementation_effort_proxy": {
+        "additions": 3901,
+        "changed_files": 42,
+        "commits": 1,
+        "deletions": 176
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "87cefe58adbf62e6a419d38e57e0928581b7003c",
+      "source_loc": {
+        "production": 3765,
+        "tests": 2239,
+        "total": 6004
+      },
+      "test_functions": 77
+    },
+    "custom_layer4": {
+      "branch": "mrinmoyece-aegis-worker-runtime",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 6,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer3": {
+        "additions": 6301,
+        "changed_files": 47,
+        "commits": 1,
+        "deletions": 198
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "171fa485819334a892684544c0a993a6e2fc4ace",
+      "source_loc": {
+        "production": 7452,
+        "tests": 3687,
+        "total": 11139
+      },
+      "test_functions": 99
+    },
+    "effort_definition": "Git additions/deletions and changed files from each prior layer",
+    "equivalent_scenario": "tenant-scoped durable checkout investigation intent, bounded orchestration, duplicate suppression, recovery, cancellation, redacted timeline, and no production effect",
+    "foundation_sha": "754e536d10b9643b40cac2f7b6c0d1de870fd630",
+    "loc_definition": "non-blank, non-comment physical Python lines"
+  },
+  "custom_comparison": {
+    "layer3_services": [
+      "PostgreSQL"
+    ],
+    "layer4_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "runtime_comparison_status": "framework local timing only; cross-repository throughput is not reported because equivalent constrained environments were not run",
+    "temporal_tradeoff": "Temporal removes scheduler, timers, signal history, retry/backoff, and crash recovery code but adds a second operational control plane"
+  },
+  "dependencies": {
+    "direct_development": 8,
+    "direct_optional": 4,
+    "direct_runtime": 10,
+    "locked_total": 111
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "Darwin",
+    "python": "3.14.7"
+  },
+  "framework_code_removed": [
+    "custom graph scheduler",
+    "parallel fan-out and deterministic join engine",
+    "checkpoint serialization and state-history plumbing",
+    "HTTP routing and OpenAPI generation",
+    "JWT signature and registered-claim cryptography",
+    "PostgreSQL connection-pool lifecycle",
+    "cross-process workflow scheduling and replay",
+    "durable timers and signal delivery",
+    "activity retry/backoff and worker crash recovery"
+  ],
+  "implementation_effort_proxy": {
+    "additions": 8286,
+    "changed_files": 53,
+    "commits": 1,
+    "deletions": 933
+  },
+  "layer": 3,
+  "lock_in_and_escape": {
+    "fastapi": "typed request/response models at the delivery adapter",
+    "langfuse": "ObservabilityPort plus OpenTelemetry",
+    "langgraph": "OrchestratorPort plus JSON-compatible domain state",
+    "psycopg_postgresql": "repository ports plus application-owned SQL migrations",
+    "pyjwt": "AuthenticatorPort plus standard OIDC/JWT claims and JWK documents",
+    "temporal": "opaque typed payloads plus application outbox, ActivityOperations, and application-owned ledger/projections"
+  },
+  "measured_at": "2026-08-15T10:44:45.961270+00:00",
+  "qualification_counts": {
+    "deterministic_evals_passed": 13,
+    "deterministic_tests_passed": 138,
+    "keycloak_integration_environment_gated": 1,
+    "postgres_integration_passed": 4,
+    "temporal_integration_passed": 2
+  },
+  "remaining_custom_controls": [
+    "issuer registry and bounded JWKS rotation policy",
+    "authoritative principal and tenant resolution",
+    "immutable RBAC, purpose, risk, and policy evaluation",
+    "quota reservation and retry ownership",
+    "forced RLS schema and transaction tenant context",
+    "tenant-scoped checkpoint ownership",
+    "secret-reference boundary",
+    "redacted hash-chained durable audit",
+    "API anti-enumeration and readiness failure policy",
+    "event envelope and dual integrity chains",
+    "transactional inbox/outbox and idempotency",
+    "projection rebuild and redacted cursor API",
+    "activity authorization and retry ownership",
+    "stale-result, poison-payload, and DLQ policy"
+  ],
+  "required_stateful_services": [
+    "PostgreSQL",
+    "Temporal Server"
+  ],
+  "runtime": {
+    "median_ms": 2.305,
+    "network": false,
+    "p95_ms": 6.676,
+    "runs": 50,
+    "scenario": "deterministic-success"
+  },
+  "schema_version": 3,
+  "source_loc": {
+    "production": 8848,
+    "tests": 3860,
+    "total": 12708
+  }
+}

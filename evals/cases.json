@@ -53,5 +53,30 @@
     "case_id": "graph-authority-override",
     "kind": "graph-authority-attack",
     "expected_reason": "application_policy_authoritative"
+  },
+  {
+    "case_id": "durable-worker-recovery",
+    "kind": "durable-recovery",
+    "expected_reason": "application_ledger_recovery"
+  },
+  {
+    "case_id": "durable-duplicate-request",
+    "kind": "durable-duplicate-request",
+    "expected_reason": "durable_idempotency"
+  },
+  {
+    "case_id": "durable-cancellation-race",
+    "kind": "durable-cancellation",
+    "expected_reason": "stale_result_rejected"
+  },
+  {
+    "case_id": "durable-policy-revocation",
+    "kind": "policy-revocation-wait",
+    "expected_reason": "activity_reauthorization"
+  },
+  {
+    "case_id": "durable-framework-outage",
+    "kind": "framework-outage",
+    "expected_reason": "bounded_retry_same_intent"
   }
 ]

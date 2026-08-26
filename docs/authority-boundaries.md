@@ -1,63 +1,47 @@
-# Framework state and enterprise authority
+# Layer 3 authority and retry ownership
 
 ## Ownership matrix
 
-| Data or decision | Owner | May appear in checkpoint? | Authoritative there? |
-|---|---|---:|---:|
-| Node progress and intermediate findings | LangGraph | Yes | For graph resumption only |
-| Issuer/subject authentication | PyJWT adapter + application principal store | Never authoritative | No |
-| Tenant, grant version, roles, purposes, risk | Application identity/policy store | Minimal routing context | No |
-| Run authorization | `PolicyPort` | No grant stored | No |
-| Quota reservation | `BudgetPort` + PostgreSQL | No | No |
-| Evidence access decision | `EvidencePort` | Evidence copy may | No |
-| Duplicate suppression | `IdempotencyPort` | No | No |
-| Hypothesis/citations | Domain + critic | Yes | Candidate output only |
-| Approval request/decision | `ApprovalPort` | Proposal may | No |
-| Fencing token | Future durable effect layer | Never in Layer 2 | No |
-| Effect receipt and verification | Future effect/reconciliation layer | Never in Layer 2 | No |
-| Audit | Application PostgreSQL audit | No | No |
-| Secret reference | Application tenant store | No secret values | No |
-| Trace/eval | OTel/Langfuse adapters | Counts/status only | No |
+| Fact or mechanic | Authoritative owner | Framework copy allowed? | Recovery source |
+|---|---|---:|---|
+| Current identity/tenant/grants | Application identity store | Opaque references only | Identity repository |
+| Run/checkpoint-read authorization | `PolicyPort` current evaluation | Decision may be observed, never reused as grant | Current policy/grants |
+| Budget reservation | PostgreSQL quota reservation | Reservation reference only | Application database |
+| Application intent/outcome | Append-only application events | Reference only | Event ledger |
+| Tenant/aggregate order and integrity | Ledger heads/cursors/hash chains | No | Event ledger |
+| Command idempotency | Application idempotency/inbox | IDs may route messages | Application database |
+| Delivery retry/DLQ | Application outbox claim record | Temporal also retries Activities, not command delivery facts | Application database |
+| Cross-process schedule/timer/signal | Temporal history | Yes | Temporal |
+| Activity result fact | Application event after Activity | Temporal return reference only | Event ledger |
+| Cognitive node progress | LangGraph checkpoint | Yes | LangGraph saver |
+| Hypothesis/proposal | Domain result with citations | Yes, non-authoritative candidate | Application result event |
+| API status/timeline | Rebuildable application projection | Temporal query is convenience only | Event replay |
+| Audit | Application PostgreSQL audit/ledger | No | Application database |
+| Approval/effect/fencing/receipt | Not implemented in Layer 3 | Never | Future application layer |
 
-## Required call order
+## Retry matrix
 
-1. Delivery validates a bearer token against an exact configured issuer, audience,
-   algorithm, key ID, signature, and time policy.
-2. Application storage resolves `(issuer, subject)` to one active principal/tenant
-   and current grant version; token roles are ignored.
-3. Policy authorizes the exact tenant/action/purpose/risk using current grants.
-4. Idempotency claims the tenant/request key.
-5. Quota reserves once for the opaque thread reference.
-6. Evidence collection scopes by tenant and the service checks every returned item.
-7. LangGraph receives data but no authority object.
-8. The application opens approval from a proposal after the graph returns.
-9. Durable audit records the redacted application outcome.
+| Boundary | Retry owner | Limit/idempotency |
+|---|---|---|
+| HTTP durable command | Caller may retry | Tenant/request fingerprint returns the same run |
+| Outbox to Temporal | Application dispatcher | Five claims, stable workflow/message ID, DLQ |
+| Workflow task | Temporal | Deterministic replay; no application fact inferred |
+| Activity | Temporal | Three attempts, timeout/heartbeat, stable operation ID |
+| Evidence connector call | Activity only | Connector SDK retries disabled or counted inside Activity limit |
+| LangGraph run | One Activity attempt | No Temporal per-node retry and no graph retry loop |
+| Signal | Temporal may redeliver | Workflow command-reference set + application inbox |
+| Projection | Application replay | Cursor/hash checkpoint; deterministic reducer |
 
-Changing this order is a security-sensitive architecture change.
+## Non-negotiable call order
 
-## Why framework persistence is insufficient
+1. Establish `IdentityContext` at delivery.
+2. Authorize current command.
+3. Persist idempotency, event, projection, and outbox atomically.
+4. Dispatch using a tenant-scoped claim.
+5. Resolve opaque references and reauthorize immediately before every Activity.
+6. Reserve budget before evidence or graph work; retry reuses the run reservation.
+7. Persist Activity intent before I/O and result/failure afterward.
+8. Serve status/timeline only from authorized application projections.
 
-Checkpoint availability is useful, but a mutable row containing `"approved": true`
-cannot prove who approved, under which policy, at what revision, or whether a fencing
-token remains current. A trace backend is optimized for debugging, not evidentiary
-retention or access governance. A workflow retry does not make an external API
-idempotent. Production layers therefore require:
-
-- tenant RLS and independent authorization;
-- signed/append-only durable audit with retention controls;
-- separation of proposer and approver;
-- idempotency keys and leases;
-- fencing before effects;
-- reconciliation against observed state;
-- supply-chain provenance and deploy policy.
-
-Layer 2 supplies PostgreSQL authority and audit repositories without creating a
-shortcut through framework state.
-
-## Secrets boundary
-
-Application records contain only tenant-bound `SecretReference` values such as a
-Vault URI. The API, graph, checkpoint, trace, and audit never receive resolved secret
-material. A future resolver must authenticate the workload, verify the same tenant,
-return credentials only to a narrow provider adapter, and prevent values from entering
-models or telemetry. Layer 2 deliberately does not implement secret resolution.
+A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
+trace cannot change this order or grant authority.

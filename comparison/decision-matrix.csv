@@ -1,19 +1,18 @@
 concern,framework_or_tool,custom_code_eliminated,enterprise_code_still_required,lock_in_surface,escape_hatch
-Graph scheduling,LangGraph 1.2.11,"scheduler; parallel join; checkpoint traversal","policy; budget; tenancy; idempotency; citations","graph API; Pregel reducers; state schema",OrchestratorPort
-Structured contracts,Pydantic 2.13.4,"manual parsing; schema serialization","authorization; semantic validation; migrations","Pydantic model API",JSON schema and domain adapters
-OIDC JWT,PyJWT 2.13.0 + cryptography 50.0.0,"JOSE parsing; signature verification; JWK conversion; registered claims","issuer registry; cache bounds; principal/grant freshness; tenant mapping","PyJWT key and exception APIs",AuthenticatorPort plus standard JWT/JWK
-Authorization,Explicit immutable RBAC,None,"tenant/action/purpose/risk/current grant policy","application role catalog",PolicyPort; later Cedar/Casbin/OPA adapter
-HTTP delivery,FastAPI 0.141.1,"routing; OpenAPI; request validation","authentication; rate policy; BFF security","ASGI/FastAPI dependency injection",Delivery adapter
-Checkpoint persistence,LangGraph checkpoint 4.2.0,"checkpoint writes; state history","access control; retention; backup; audit","saver schema and serialization",PostgreSQL export plus OrchestratorPort
-Durable checkpoints,PostgreSQL saver 3.1.2,"saver SQL plumbing","forced RLS; thread ownership; HA; migrations; operations","LangGraph saver tables",TenantPostgresOrchestrator plus OrchestratorPort
-Tenant persistence,PostgreSQL 17 + Psycopg 3.3.4,"connection protocol; pooling; transactions","schema; forced RLS; runtime role; quota and concurrency semantics","PostgreSQL SQL and Psycopg pool callbacks",Repository ports plus SQL export
-External workflow,Temporal 1.31.0 deferred,None yet,"activity idempotency; fencing; audit; reconciliation","event history and workflow determinism",Future DurableWorkflowPort
-Framework tracing,Langfuse 4.14.4,"trace/eval UI and storage when enabled","redaction; cardinality; retention policy","SDK and backend data model",ObservabilityPort and OTLP
-Portable telemetry,OpenTelemetry 1.44.0,"span context/export protocol","safe attributes; sampling; SLO policy","semantic convention churn",OTel API/OTLP
-Live model access,OpenAI/Anthropic adapters deferred,None yet,"credentials; routing; quotas; schema and data policy","provider APIs and message formats",StructuredModelPort
-Vector retrieval,pgvector 0.8.6 deferred,None yet,"tenant filters; provenance; relevance evals","PostgreSQL extension and index choices",EvidencePort
-Caching/queue,Redis rejected,None,None for Layer 1,"new state owner and server licensing",Add only from measured need
-Long-running approvals,Temporal deferred,None yet,"separation of duties; signed decision; timeout policy","workflow history and server operations",Future DurableWorkflowPort
-Effects,No framework selected,None,"approval validation; idempotency; fencing; credentials; verification",Application-specific external APIs,EffectPort
-Audit,PostgreSQL application schema,"transaction durability","redaction; immutable hash chain; RLS; retention; witness; replay","PostgreSQL trigger and JSONB",AuditPort plus canonical export
-Local identity service,Keycloak 26.7.1 optional,"OIDC issuer/JWKS/token service","realm/client operations; grants; production rotation evidence","Keycloak realm operations",OIDC standards plus AuthenticatorPort
+Graph scheduling,LangGraph 1.2.11,"scheduler; parallel join; checkpoint traversal","policy; budget; tenancy; citations","graph API; reducers; saver schema",OrchestratorPort
+Cross-process workflow,Temporal SDK 1.31.0 + Server 1.29.1,"poller; scheduler; timer; signal history; workflow replay","application events; policy; idempotency; outbox; projections; audit","workflow history; deterministic APIs; task queues",ActivityOperations plus transactional outbox
+Activity delivery,Temporal,"retry/backoff; heartbeat timeout; cancellation delivery; worker recovery","operation idempotency; stale-result rejection; connector bounds","Activity error and retry semantics",Stable application operation IDs
+Application ledger,PostgreSQL 17 + Psycopg 3.3.4,"transaction protocol; locks; pooling","event envelope; expected version; dual hashes; RLS; cursor; retention","PostgreSQL SQL and pool callbacks",Repository ports plus canonical SQL/JSON export
+Transactional boundaries,PostgreSQL,None,"tenant idempotency; inbox/outbox; claims; DLQ; projections","SQL isolation and locking",Durable store port
+Structured contracts,Pydantic 2.13.4,"manual parsing; JSON conversion","authorization; semantic validation; payload bounds","Pydantic model API",JSON schema and domain adapters
+OIDC JWT,PyJWT 2.13.0 + cryptography 50.0.0,"JOSE parsing; signature verification; JWK conversion","issuer/cache bounds; current principal/grants; tenant mapping","PyJWT key/exception API",AuthenticatorPort plus standard JWT/JWK
+Authorization,Explicit immutable RBAC,None,"tenant/action/purpose/risk/current grant checks","application role catalog",PolicyPort
+HTTP delivery,FastAPI 0.141.1,"routing; OpenAPI; request validation","identity boundary; anti-enumeration; durable semantics","ASGI/FastAPI dependencies",Delivery adapter
+Graph checkpoints,LangGraph PostgreSQL saver 3.1.2,"checkpoint SQL/history","tenant owner; forced RLS; retention; backup","saver tables/state format",OrchestratorPort
+Workflow payloads,Temporal Pydantic converter,"framework serialization","opaque references; 64 KiB bound; encryption policy","Temporal converter/history format",Typed application messages
+Framework tracing,Temporal OTel + Langfuse 4.14.4,"trace propagation/UI","redaction; fixed names; retention; no payloads","interceptor/backend data models",ObservabilityPort and OTLP
+Portable telemetry,OpenTelemetry 1.44.0,"span/export protocols","allowlists; sampling; SLO","semantic convention churn",OTel API/OTLP
+Local identity,Keycloak 26.7.1 optional,"OIDC issuer/JWKS/token service","realm/client/grants/production operations","Keycloak operations",OIDC plus AuthenticatorPort
+Queue alternative,Redis/Valkey rejected,None,"would duplicate Temporal workflow ownership","additional service/license",Do not add without separate measured need
+Effects,No framework selected,None,"approval; fencing; idempotency; credentials; verification; reconciliation",External APIs,EffectPort
+Audit,PostgreSQL application schema,"transaction durability","redaction; immutability; hash chain; witness; retention","PostgreSQL trigger/JSONB",AuditPort and canonical export

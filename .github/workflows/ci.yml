@@ -107,6 +107,42 @@ jobs:
       - if: always()
         run: docker compose --profile durable down --volumes
 
+  temporal-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14.7"
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Generate ephemeral local database credentials
+        run: |
+          echo "AEGIS_POSTGRES_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "AEGIS_POSTGRES_RUNTIME_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+      - run: uv sync --locked --all-extras
+      - run: docker compose --profile temporal up --detach postgres temporal
+      - name: Wait for Temporal
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker compose exec -T temporal \
+              tctl --address temporal:7233 cluster health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs temporal postgres
+          exit 1
+      - name: Run Temporal recovery and replay tests
+        env:
+          AEGIS_TEST_TEMPORAL_ADDRESS: 127.0.0.1:57233
+        run: uv run pytest -m temporal --no-cov
+      - if: always()
+        run: docker compose --profile temporal down --volumes
+
   evals:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
