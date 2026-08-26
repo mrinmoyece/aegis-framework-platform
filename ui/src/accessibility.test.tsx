@@ -164,6 +164,7 @@ describe("WCAG automated baseline", () => {
 
   it("shows redacted error when protocol trust mutation fails", async () => {
     const user = userEvent.setup();
+    vi.restoreAllMocks();
     const mutate = vi
       .spyOn(operatorApi, "mutateProtocolTrust")
       .mockRejectedValue(new Error("network failure"));
