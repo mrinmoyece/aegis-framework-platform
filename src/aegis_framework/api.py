@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from threading import Lock
+from time import monotonic
 from typing import Annotated, Literal, NoReturn
 
 from fastapi import (
@@ -16,9 +18,11 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
+    Request,
     status,
 )
 from pydantic import Field, TypeAdapter, ValidationError
+from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from aegis_framework.access import (
@@ -90,17 +94,33 @@ from aegis_framework.orchestration import (
     ArtifactSummary,
     OrchestrationArtifactReadPort,
 )
-from aegis_framework.ports import Action, PolicyDecision, PolicyPort
+from aegis_framework.ports import Action, AuditPort, PolicyDecision, PolicyPort
 from aegis_framework.references import TenantReferenceCodec
 from aegis_framework.remediation import (
     ApprovalDisposition,
     ApprovalService,
     ApprovalView,
 )
+from aegis_framework.replay import SupportReport
 from aegis_framework.sandbox import ArtifactRecord, SandboxProjection, SandboxReadPort
 from aegis_framework.service import InvestigationService
+from aegis_framework.slos import (
+    ERROR_BUDGET_POLICY,
+    SLO_CATALOG,
+    ErrorBudgetPolicy,
+    ServiceLevelObjective,
+)
+from aegis_framework.telemetry import (
+    DependencyState,
+    MetricRegistry,
+    ReadinessSnapshot,
+    TraceContextRejected,
+    extract_trace_context,
+    readiness_snapshot,
+)
 
 _IDENTIFIER_ADAPTER = TypeAdapter(Identifier)
+_METRICS_ELIGIBLE_STATE_KEY = "aegis_metrics_eligible"
 
 
 class AppMode(StrEnum):
@@ -150,6 +170,12 @@ class ReadinessResponse(StrictModel):
     status: str
     identity_ready: bool
     governance_ready: bool
+
+
+class SloCatalogResponse(StrictModel):
+    schema_version: int = Field(default=1, ge=1, le=1)
+    objectives: tuple[ServiceLevelObjective, ...]
+    error_budget_policy: ErrorBudgetPolicy
 
 
 class MeResponse(StrictModel):
@@ -327,6 +353,63 @@ class BodySizeLimitMiddleware:
         await self._app(scope, replay, send)
 
 
+class TelemetryMiddleware:
+    """Record bounded API RED metrics without making exporters correctness-critical."""
+
+    def __init__(self, app: ASGIApp, *, metrics: MetricRegistry) -> None:
+        self._app = app
+        self._metrics = metrics
+
+    async def __call__(
+        self,
+        scope: Scope,
+        receive: Receive,
+        send: Send,
+    ) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        started = monotonic()
+        response_status = 500
+
+        async def observed_send(message: Message) -> None:
+            nonlocal response_status
+            if message["type"] == "http.response.start":
+                response_status = int(message["status"])
+            await send(message)
+
+        try:
+            await self._app(scope, receive, observed_send)
+        finally:
+            state = scope.get("state")
+            if (
+                isinstance(state, dict)
+                and state.get(_METRICS_ELIGIBLE_STATE_KEY) is True
+            ):
+                if response_status < 300:
+                    metric_status = "ok"
+                elif response_status < 500:
+                    metric_status = "denied"
+                else:
+                    metric_status = "error"
+                elapsed = max(0.0, monotonic() - started)
+                with suppress(Exception):
+                    self._metrics.record(
+                        "aegis_operations_total",
+                        1,
+                        labels={
+                            "component": "api",
+                            "operation": "request",
+                            "status": metric_status,
+                        },
+                    )
+                    self._metrics.record(
+                        "aegis_operation_duration_seconds",
+                        elapsed,
+                        labels={"component": "api", "operation": "request"},
+                    )
+
+
 @dataclass(frozen=True)
 class ApiRuntime:
     authenticator: AuthenticatorPort
@@ -342,6 +425,8 @@ class ApiRuntime:
     sandbox_control: SandboxReadPort | None = None
     memory_status_control: MemoryStatusPort | None = None
     memory_retrieval_control: MemoryRetrievalPort | None = None
+    operator_audit: AuditPort | None = None
+    metrics: MetricRegistry | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -403,17 +488,22 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.9.0",
-        description="Authenticated Layer 9 event-grounded memory and RAG control API.",
+        version="0.11.0",
+        description="Authenticated Layer 11 operations, observability, and replay API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
     app.state.runtime = selected_runtime
+    metrics = selected_runtime.metrics or MetricRegistry()
+    app.add_middleware(TelemetryMiddleware, metrics=metrics)
 
     def authenticated(
+        request: Request,
         authorization: Annotated[str | None, Header(alias="Authorization")] = None,
         x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
         x_trace_id: Annotated[str | None, Header(alias="X-Trace-ID")] = None,
+        traceparent: Annotated[str | None, Header(alias="traceparent")] = None,
+        baggage: Annotated[str | None, Header(alias="baggage")] = None,
     ) -> IdentityContext:
         if x_request_id is None:
             _unauthorized()
@@ -424,13 +514,31 @@ def create_app(
         except ValidationError:
             _unauthorized()
         token = _bearer_token(authorization)
-        trace_id = x_trace_id or stable_id("trace", x_request_id)
         try:
-            return selected_runtime.authenticator.authenticate(
+            propagation = extract_trace_context(
+                {
+                    **({"traceparent": traceparent} if traceparent is not None else {}),
+                    **({"baggage": baggage} if baggage is not None else {}),
+                }
+            )
+        except TraceContextRejected as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="trace context is invalid",
+            ) from exc
+        trace_id = (
+            propagation.parent.trace_id
+            if propagation.parent is not None
+            else x_trace_id or stable_id("trace", x_request_id)
+        )
+        try:
+            identity = selected_runtime.authenticator.authenticate(
                 bearer_token=token,
                 request_id=x_request_id,
                 trace_id=trace_id,
             )
+            request.state.aegis_metrics_eligible = True
+            return identity
         except AuthenticationFailed as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -458,10 +566,28 @@ def create_app(
             effects_enabled=False,
         )
 
+    @app.get("/metrics", include_in_schema=False)
+    def prometheus_metrics() -> PlainTextResponse:
+        return PlainTextResponse(
+            metrics.render_prometheus(),
+            media_type="text/plain; version=0.0.4",
+        )
+
     @app.get("/readyz", response_model=ReadinessResponse)
     def readiness() -> ReadinessResponse:
         identity_ready = selected_runtime.authenticator.ready()
         governance_ready = selected_runtime.governance.ready()
+        with suppress(Exception):
+            metrics.record(
+                "aegis_dependency_ready",
+                1.0 if identity_ready else 0.0,
+                labels={"dependency": "identity", "criticality": "correctness"},
+            )
+            metrics.record(
+                "aegis_dependency_ready",
+                1.0 if governance_ready else 0.0,
+                labels={"dependency": "governance", "criticality": "correctness"},
+            )
         if not selected_runtime.ready():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -899,10 +1025,26 @@ def create_app(
                 detail="approval decision conflicts with current state",
             ) from exc
         except IntegrityFailure as exc:
+            with suppress(Exception):
+                metrics.record(
+                    "aegis_safety_violations_total",
+                    1,
+                    labels={"control": "integrity", "severity": "ticket"},
+                )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="approval is already terminal",
             ) from exc
+        with suppress(Exception):
+            metrics.record(
+                "aegis_operations_total",
+                1,
+                labels={
+                    "component": "api",
+                    "operation": "approval.decide",
+                    "status": "ok",
+                },
+            )
         return _approval_view(view)
 
     @app.post(
@@ -1008,6 +1150,16 @@ def create_app(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="durable investigation failed safely",
             ) from exc
+        with suppress(Exception):
+            metrics.record(
+                "aegis_operations_total",
+                1,
+                labels={
+                    "component": "api",
+                    "operation": "investigation.submit",
+                    "status": "ok",
+                },
+            )
         return _durable_response(result)
 
     @app.get(
@@ -1065,6 +1217,155 @@ def create_app(
                 detail="durable investigation failed safely",
             ) from exc
 
+    @app.get("/v1/operations/slos", response_model=SloCatalogResponse)
+    def operation_slos(
+        identity: IdentityContext = Depends(authenticated),
+    ) -> SloCatalogResponse:
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.OPERATIONS_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        _audit_operational_access(
+            selected_runtime,
+            identity,
+            operation="slo_catalog",
+            record_count=len(SLO_CATALOG),
+        )
+        return SloCatalogResponse(
+            objectives=SLO_CATALOG,
+            error_budget_policy=ERROR_BUDGET_POLICY,
+        )
+
+    @app.get("/v1/operations/readiness", response_model=ReadinessSnapshot)
+    def operation_readiness(
+        identity: IdentityContext = Depends(authenticated),
+    ) -> ReadinessSnapshot:
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.OPERATIONS_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        snapshot = readiness_snapshot(
+            (
+                DependencyState(
+                    name="identity",
+                    criticality="correctness",
+                    ready=selected_runtime.authenticator.ready(),
+                    status=(
+                        "ready"
+                        if selected_runtime.authenticator.ready()
+                        else "unavailable"
+                    ),
+                ),
+                DependencyState(
+                    name="governance",
+                    criticality="correctness",
+                    ready=selected_runtime.governance.ready(),
+                    status=(
+                        "ready"
+                        if selected_runtime.governance.ready()
+                        else "unavailable"
+                    ),
+                ),
+                DependencyState(
+                    name="telemetry-export",
+                    criticality="optional",
+                    ready=selected_runtime.metrics is not None,
+                    status=(
+                        "ready" if selected_runtime.metrics is not None else "degraded"
+                    ),
+                ),
+            )
+        )
+        _audit_operational_access(
+            selected_runtime,
+            identity,
+            operation="readiness",
+            record_count=len(snapshot.dependencies),
+        )
+        return snapshot
+
+    @app.get(
+        "/v1/operations/runs/{run_id}/support-report",
+        response_model=SupportReport,
+    )
+    def operation_support_report(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        maximum_events: Annotated[int, Query(ge=1, le=200)] = 100,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> SupportReport:
+        durable = _require_durable(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.SUPPORT_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        try:
+            report = durable.replay_report(
+                identity,
+                run_id=run_id,
+                maximum_events=maximum_events,
+            )
+        except PolicyDenied:
+            _not_found()
+        except IntegrityFailure as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="ledger replay integrity failed",
+            ) from exc
+        except PayloadRejected as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="support report exceeds the permitted bound",
+            ) from exc
+        if report is None:
+            _not_found()
+        _audit_operational_access(
+            selected_runtime,
+            identity,
+            operation="support_report",
+            record_count=len(report.causal_chain),
+        )
+        return report
+
+    @app.post(
+        "/v1/operations/runs/{run_id}/projection/rebuild",
+        response_model=DurableRunResponse,
+    )
+    def operation_projection_rebuild(
+        run_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> DurableRunResponse:
+        durable = _require_durable(selected_runtime)
+        # Persist audit intent before mutation (intent-before-side-effect).
+        _audit_operational_access(
+            selected_runtime,
+            identity,
+            operation="projection_rebuild",
+            record_count=1,
+            event_type="operations.rebuild",
+        )
+        try:
+            result = durable.rebuild_projection(identity, run_id=run_id)
+        except (PolicyDenied, ValueError):
+            _not_found()
+        except IntegrityFailure as exc:
+            with suppress(Exception):
+                metrics.record(
+                    "aegis_safety_violations_total",
+                    1,
+                    labels={"control": "ledger", "severity": "ticket"},
+                )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="ledger projection integrity failed",
+            ) from exc
+        return _durable_response(result)
+
     @app.post(
         "/v1/durable-investigations/{run_id}/signals/{command_type}",
         response_model=DurableRunResponse,
@@ -1111,6 +1412,31 @@ def create_app(
 def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
     if budget_units < 5:
         raise ValueError("API demo budget must permit at least one investigation")
+
+    class _DemoOperatorAudit:
+        """Bounded in-memory audit log for demo and test environments."""
+
+        _MAX_ENTRIES = 10_000
+
+        def __init__(self) -> None:
+            self._entries: list[tuple[str, str, Mapping[str, str | int | bool]]] = []
+            self._lock = Lock()
+
+        def append(
+            self,
+            *,
+            identity: IdentityContext,
+            event_type: str,
+            attributes: Mapping[str, str | int | bool],
+        ) -> None:
+            with self._lock:
+                if len(self._entries) >= self._MAX_ENTRIES:
+                    self._entries.pop(0)
+                self._entries.append(
+                    (identity.subject_id, event_type, dict(attributes))
+                )
+
+    operator_audit = _DemoOperatorAudit()
     bundles: dict[DemoScenario, DemoBundle] = {}
     bundle_lock = Lock()
 
@@ -1174,6 +1500,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         approvals=remediation_demo.approvals,
         memory_status_control=memory_demo.control,
         memory_retrieval_control=memory_demo.retrieval_service,
+        operator_audit=operator_audit,
     )
 
 
@@ -1256,6 +1583,11 @@ def _production_runtime_from_environment() -> ApiRuntime:
         )
 
     policy = EnterprisePolicy(policies=repository, clock=clock)
+    durability = PostgresDurability(
+        pool=pool,
+        clock=clock,
+        tenant_references=tenant_references,
+    )
     return ApiRuntime(
         authenticator=authenticator,
         governance=repository,
@@ -1263,11 +1595,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
         service_for=unavailable_investigation,
         durable=DurableInvestigationService(
             policy=policy,
-            store=PostgresDurability(
-                pool=pool,
-                clock=clock,
-                tenant_references=tenant_references,
-            ),
+            store=durability,
             cursor_codec=cursor_codec,
         ),
         model_control=PostgresModelControlStore(pool=pool),
@@ -1278,6 +1606,8 @@ def _production_runtime_from_environment() -> ApiRuntime:
         ),
         orchestration_cursor_codec=cursor_codec,
         sandbox_control=PostgresSandboxStore(pool=pool),
+        operator_audit=repository,
+        metrics=MetricRegistry(),
     )
 
 
@@ -1505,6 +1835,36 @@ def _authorize_resource(
         ) from exc
     if not decision.allowed:
         _not_found()
+
+
+def _audit_operational_access(
+    runtime: ApiRuntime,
+    identity: IdentityContext,
+    *,
+    operation: str,
+    record_count: int,
+    event_type: str = "operations.read",
+) -> None:
+    if runtime.operator_audit is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="privileged access audit is unavailable",
+        )
+    try:
+        runtime.operator_audit.append(
+            identity=identity,
+            event_type=event_type,
+            attributes={
+                "operation": operation,
+                "record_count": record_count,
+                "status": "complete",
+            },
+        )
+    except AegisFrameworkError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="privileged access audit failed",
+        ) from exc
 
 
 def _bearer_token(authorization: str | None) -> str:

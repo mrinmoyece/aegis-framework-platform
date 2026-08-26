@@ -1,0 +1,16 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Availability by component", "type": "timeseries", "targets": [{"expr": "1 - (sum(rate(aegis_operations_total{status=\"error\"}[5m])) by (component) / clamp_min(sum(rate(aegis_operations_total[5m])) by (component), 0.000001))", "refId": "A"}]},
+    {"id": 2, "title": "Fast burn rate", "type": "timeseries", "targets": [{"expr": "aegis:slo_burn_rate:fast", "refId": "A"}]},
+    {"id": 3, "title": "Safety violations", "type": "timeseries", "targets": [{"expr": "increase(aegis_safety_violations_total[5m])", "refId": "A"}]}
+  ],
+  "schemaVersion": 41,
+  "tags": ["aegis", "service-health", "slo"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Aegis Service Health and SLOs",
+  "uid": "aegis-service-health",
+  "version": 1
+}

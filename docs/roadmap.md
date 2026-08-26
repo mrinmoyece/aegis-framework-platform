@@ -1,6 +1,6 @@
 # Roadmap across the 16 Aegis capabilities
 
-| Layer | Capability | Layer 10 status | Framework-first direction |
+| Layer | Capability | Layer 11 status | Framework-first direction |
 |---:|---|---|---|
 | 1 | Platform foundation | **Delivered** | Strict Python, contracts, deterministic slice, CI/container/docs |
 | 2 | Tenant identity and authorization | **Delivered** | OIDC/JWT current grants, purpose/risk policy, forced RLS, quota, secret refs, audit |
@@ -12,8 +12,8 @@
 | 8 | Approval-gated remediation actions | **Delivered offline/adapter boundary** | Exact approvals, Temporal waits, fixed action, fencing/idempotency/reconciliation, verification and compensation |
 | 9 | Hardened sandbox execution | **Delivered offline/adapter boundary** | Approval-bound immutable contracts, Temporal lifecycle, forced-RLS ledger, safe artifacts, hardened Kubernetes Job/RuntimeClass adapter; live isolation qualification deferred |
 | 10 | Event-grounded memory and pgvector RAG | **Delivered offline/adapter boundary** | Immutable three-tier ledger, deterministic chunk/embed/compact pipeline, live forced-RLS pgvector hybrid SQL query (store-tested), digest-only retrieval/context ledger facts, explicit `MemoryAcceptance` decision contract, LangGraph-bounded untrusted context; production wiring of the SQL query into the serving path, real embedding providers, and KMS/blob erasure remain deferred |
-| 11 | Deterministic enterprise evaluation gates | **Delivered offline/adapter boundary** | Governed artifacts, 44 real cross-layer cases, 17 named fault cuts, adversarial/recovery/baseline/meta gates, deterministic reports and optional sanitized Langfuse publication |
-| 12 | Observability and replay | Partial | Redacted OTel/Langfuse, ledger rebuild, workflow replay; SLOs pending |
+| 11 | Deterministic enterprise evaluation gates | **Delivered offline/adapter boundary** | Governed artifacts, 50 real cross-layer cases, 20 named fault cuts, adversarial/recovery/baseline/meta gates, deterministic reports and optional sanitized Langfuse publication |
+| 12 | Observability and replay | **Delivered offline/adapter boundary** | Neutral semantics/OTel, bounded logs/metrics, Prometheus SLOs, Grafana provisioning, authenticated support and ledger replay; live backends/SLO evidence deferred |
 | 13 | Secure operator workspace and BFF | Partial | Authenticated redacted APIs; browser session/CSRF/review UX deferred |
 | 14 | Secure MCP and A2A interoperability | Planned | Capability/tool/effect policies |
 | 15 | Production deployment foundations | Partial | Digest images and CI; IaC/KMS/admission/HA/DR pending |
@@ -21,10 +21,10 @@
 
 ## Next layer boundary
 
-Layer 10 delivers deterministic enterprise evaluation as release evidence, not
-runtime truth. The next framework capability is the observability/SLO layer. Memory
+Layer 11 delivers portable observability and ledger replay as operational evidence,
+not runtime truth. The next capability is the secure operator workspace/BFF. Memory
 serving-path wiring, production model/connector qualification, independent
-penetration/human labeling, operator UI, MCP/A2A, deployment/IaC, and final
+penetration/human labeling, operator UI implementation, MCP/A2A, deployment/IaC, and final
 load/chaos certification remain explicitly deferred. Do not add another hosted
 evaluation authority, orchestration/workflow framework, or model judge to required
 CI.

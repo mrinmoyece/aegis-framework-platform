@@ -449,3 +449,36 @@ retrieval/context-build ledger facts (`MemoryOperationFact`), but the production
 `/v1/memories/retrieve` API and demo still serve from `InMemoryHybridIndex` — wiring the
 SQL query into that serving path is a documented gap, not an implicit capability. Tests
 are hermetic and use no live embedding provider, network call, or credential.
+
+## Layer 10: governed deterministic evaluation
+
+Run `uv run aegis-framework eval run`, `replay`, and `compare`. The suite uses only
+reviewed synthetic cases, fixed clocks/seeds/fingerprints, canonical digests, hard
+safety scorers and an explicit reviewed baseline. Langfuse publication is optional and
+never changes the local result.
+
+## Layer 11: portable observability and ledger replay
+
+Validate and start the local profile:
+
+```bash
+make observability-config
+docker compose --profile observability up -d app otel-collector prometheus grafana
+```
+
+Read the authenticated SLO catalog and operational readiness through
+`/v1/operations/slos` and `/v1/operations/readiness`. Export one tenant's application
+events through an authorized ledger path, then run:
+
+```bash
+uv run aegis-framework replay \
+  --events application-events.json \
+  --run-id run:opaque \
+  --view support
+```
+
+The replay CLI validates hash chains, sequence and schema before projection. It cannot
+call a model, connector, tool, sandbox or effect. Trace links are optional navigation;
+the ledger remains truth. Continue with [ADR 016](adr/016-provider-neutral-observability-replay.md),
+the [SLO catalog](slo-catalog.md), and the
+[observability runbook](observability-runbook.md).

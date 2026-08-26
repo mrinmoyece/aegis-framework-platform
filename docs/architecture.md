@@ -185,6 +185,27 @@ Temporal LangGraph plugin is not used: per-node Temporal Activities would overla
 ownership and increase framework coupling. Interrupts are not used for approval or
 effects; any future non-authoritative pause must resume only through application intent.
 
+## Layer 6 specialist graph
+
+The static graph is `coordinator -> four specialists -> critic -> optional remediation
+planner -> verification agent -> coordinator decision`. The coordinator creates exactly
+four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
+parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
+checkpoint history. Application code provides the fixed role set, deny-by-default
+capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
+dispatch intent, result fencing, terminal decision, and all tenant authority.
+
+Every artifact is a frozen strict neutral envelope with schema version, tenant,
+incident, run and optional task linkage, producer role, ordinal, provenance digests,
+bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
+artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
+resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
+
+Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
+Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
+ownership and increase framework coupling. Interrupts are not used for approval or
+effects; any future non-authoritative pause must resume only through application intent.
+
 ## Three durable owners
 
 | Owner | Owns | Never authoritative for |
@@ -340,6 +361,24 @@ low-cardinality count/status attributes. Tenant IDs, actor IDs, request IDs, evi
 locators, prompts, completions, credentials, and payload bodies are not exported.
 Langfuse remains model/graph telemetry only; automatic LangGraph/LangChain capture is
 disabled.
+
+Layer 11 adds semantic convention version `1.0.0`, strict W3C `traceparent`
+validation, a two-entry boolean baggage allowlist, deterministic hash sampling and
+bounded span links for fan-out, retry and redelivery. Only validated opaque trace
+coordinates may enter event/outbox payloads. They are navigation hints, not authority.
+
+Prometheus metrics use registered units, buckets, at most four enumerated labels and
+logical-operation deduplication so retries/replay have separate counters. Structured
+logs are bounded JSON with the same allowlist and rate suppression. The OTel Collector
+uses a memory limiter, redaction/filtering, batch, bounded queue/retry and no debug
+exporter. Optional telemetry failure makes operations visibility degraded but does not
+make correctness-critical readiness fail.
+
+The replay debugger reads application events in tenant-cursor order, validates both
+hash chains, aggregate sequence, schema and record hash, then derives state, comparison,
+causal chain and a bounded digest-only support report. It never invokes models,
+connectors, tools, sandboxes or effects. Temporal replay and LangGraph checkpoints
+remain framework recovery mechanisms and cannot rebuild application truth.
 
 ## API truth
 

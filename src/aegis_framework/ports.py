@@ -75,6 +75,10 @@ class Action(StrEnum):
     MEMORY_READ = "memory:read"
     MEMORY_RETRIEVE = "memory:retrieve"
     MEMORY_DELETE = "memory:delete"
+    OPERATIONS_READ = "operations:read"
+    SUPPORT_READ = "support:read"
+    REPLAY_READ = "replay:read"
+    PROJECTION_REBUILD = "projection:rebuild"
 
 
 class PolicyDecision(StrictModel):

@@ -823,8 +823,8 @@ class PostgresDurability:
         self,
         *,
         tenant_id: str,
-        aggregate_type: str,
-        aggregate_id: str,
+        aggregate_type: str | None = None,
+        aggregate_id: str | None = None,
         after_cursor: int = 0,
         limit: int = 500,
     ) -> tuple[ApplicationEvent, ...]:
@@ -840,8 +840,8 @@ class PostgresDurability:
                        tenant_previous_hash, record_hash
                 FROM aegis.application_events
                 WHERE tenant_id = %s
-                  AND aggregate_type = %s
-                  AND aggregate_id = %s
+                  AND (%s::text IS NULL OR aggregate_type = %s::text)
+                  AND (%s::text IS NULL OR aggregate_id = %s::text)
                   AND tenant_cursor > %s
                 ORDER BY tenant_cursor
                 LIMIT %s
@@ -849,6 +849,8 @@ class PostgresDurability:
                 (
                     tenant_id,
                     aggregate_type,
+                    aggregate_type,
+                    aggregate_id,
                     aggregate_id,
                     after_cursor,
                     limit,
@@ -919,6 +921,114 @@ class PostgresDurability:
             tenant_cursor = event.tenant_cursor
             tenant_hash = event.record_hash
         return True
+
+    def verify_run_integrity(
+        self,
+        *,
+        tenant_id: str,
+        run_id: str,
+        maximum_events: int = 10_000,
+    ) -> bool:
+        if maximum_events < 1 or maximum_events > 10_000:
+            raise ValueError("run integrity event bound is invalid")
+        with tenant_transaction(self._pool, tenant_id=tenant_id) as connection:
+            rows = connection.execute(
+                """
+                SELECT current.tenant_id, current.aggregate_type,
+                       current.aggregate_id, current.aggregate_sequence,
+                       current.tenant_cursor, current.event_id,
+                       current.event_type, current.occurred_at,
+                       current.actor_ref, current.correlation_ref,
+                       current.causation_ref, current.schema_version,
+                       current.payload, current.aggregate_previous_hash,
+                       current.tenant_previous_hash, current.record_hash,
+                       previous.record_hash AS actual_tenant_previous_hash,
+                       successor.tenant_previous_hash AS next_tenant_previous_hash,
+                       aggregate_head.last_sequence AS head_sequence,
+                       aggregate_head.last_hash AS head_hash,
+                       tenant_head.last_cursor AS tenant_last_cursor,
+                       tenant_head.last_hash AS tenant_last_hash
+                FROM aegis.application_events AS current
+                LEFT JOIN aegis.application_events AS previous
+                  ON previous.tenant_id = current.tenant_id
+                 AND previous.tenant_cursor = current.tenant_cursor - 1
+                LEFT JOIN aegis.application_events AS successor
+                  ON successor.tenant_id = current.tenant_id
+                 AND successor.tenant_cursor = current.tenant_cursor + 1
+                JOIN aegis.ledger_aggregate_heads AS aggregate_head
+                  ON aggregate_head.tenant_id = current.tenant_id
+                 AND aggregate_head.aggregate_type = current.aggregate_type
+                 AND aggregate_head.aggregate_id = current.aggregate_id
+                JOIN aegis.ledger_tenant_cursors AS tenant_head
+                  ON tenant_head.tenant_id = current.tenant_id
+                WHERE current.tenant_id = %s
+                  AND current.aggregate_type = 'investigation'
+                  AND current.aggregate_id = %s
+                ORDER BY current.aggregate_sequence
+                LIMIT %s
+                """,
+                (tenant_id, run_id, maximum_events + 1),
+            ).fetchall()
+        if not rows or len(rows) > maximum_events:
+            return False
+        aggregate_sequence = 0
+        aggregate_hash = _ZERO_HASH
+        head_sequence = 0
+        head_hash = _ZERO_HASH
+        for row in rows:
+            material = dict(row)
+            actual_tenant_previous_hash = material.pop("actual_tenant_previous_hash")
+            next_tenant_previous_hash = material.pop("next_tenant_previous_hash")
+            head_sequence = int(material.pop("head_sequence"))
+            head_hash = str(material.pop("head_hash"))
+            tenant_last_cursor = int(material.pop("tenant_last_cursor"))
+            tenant_last_hash = str(material.pop("tenant_last_hash"))
+            event = ApplicationEvent.model_validate(material)
+            previous_tenant_hash = (
+                _ZERO_HASH
+                if event.tenant_cursor == 1
+                else str(actual_tenant_previous_hash)
+            )
+            draft = EventDraft(
+                event_id=event.event_id,
+                event_type=event.event_type,
+                occurred_at=event.occurred_at,
+                actor_ref=event.actor_ref,
+                correlation_ref=event.correlation_ref,
+                causation_ref=event.causation_ref,
+                schema_version=event.schema_version,
+                payload=event.payload,
+            )
+            expected = sha256(
+                event_material(
+                    tenant_id=event.tenant_id,
+                    aggregate_type=event.aggregate_type,
+                    aggregate_id=event.aggregate_id,
+                    aggregate_sequence=event.aggregate_sequence,
+                    tenant_cursor=event.tenant_cursor,
+                    draft=draft,
+                    aggregate_previous_hash=aggregate_hash,
+                    tenant_previous_hash=previous_tenant_hash,
+                ).encode()
+            ).hexdigest()
+            if (
+                event.aggregate_sequence != aggregate_sequence + 1
+                or event.aggregate_previous_hash != aggregate_hash
+                or event.tenant_previous_hash != previous_tenant_hash
+                or event.record_hash != expected
+            ):
+                return False
+            if event.tenant_cursor < tenant_last_cursor:
+                if next_tenant_previous_hash != event.record_hash:
+                    return False
+            elif (
+                event.tenant_cursor != tenant_last_cursor
+                or tenant_last_hash != event.record_hash
+            ):
+                return False
+            aggregate_sequence = event.aggregate_sequence
+            aggregate_hash = event.record_hash
+        return aggregate_sequence == head_sequence and aggregate_hash == head_hash
 
     def claim_outbox(
         self,
@@ -1091,9 +1201,14 @@ class PostgresDurability:
                 break
             after_cursor = page[-1].tenant_cursor
         if not events:
-            raise IntegrityFailure("run events are unavailable")
+            raise ValueError("run does not exist")
         projection: RunView | None = None
         for event in events:
+            if event.schema_version != 1:
+                raise IntegrityFailure(
+                    f"event {event.event_id!r} has unsupported "
+                    f"schema_version {event.schema_version!r}; expected 1"
+                )
             projection = reduce_run(projection, event)
         if projection is None:
             raise IntegrityFailure("run projection could not be rebuilt")
@@ -1111,6 +1226,7 @@ class PostgresDurability:
                     last_event_hash = EXCLUDED.last_event_hash,
                     version = aegis.projection_checkpoints.version + 1,
                     rebuilt_at = clock_timestamp()
+                WHERE aegis.projection_checkpoints.last_cursor <= EXCLUDED.last_cursor
                 """,
                 (
                     tenant_id,
@@ -1118,7 +1234,20 @@ class PostgresDurability:
                     events[-1].record_hash,
                 ),
             )
-        return projection
+            current = connection.execute(
+                """
+                SELECT tenant_id, run_id, incident_id, request_ref, workflow_id,
+                       status, version, last_cursor, created_at, updated_at,
+                       failure_code
+                FROM aegis.investigation_runs
+                WHERE tenant_id = %s AND run_id = %s
+                FOR UPDATE
+                """,
+                (tenant_id, run_id),
+            ).fetchone()
+        if current is None:
+            raise IntegrityFailure("rebuilt run projection is unavailable")
+        return RunView.model_validate(current)
 
     def _idempotency(
         self, *, tenant_id: str, request_id: str
@@ -1226,6 +1355,7 @@ class PostgresDurability:
                 version = EXCLUDED.version,
                 last_cursor = EXCLUDED.last_cursor,
                 updated_at = EXCLUDED.updated_at
+            WHERE aegis.investigation_runs.version <= EXCLUDED.version
             """,
             (
                 projection.tenant_id,

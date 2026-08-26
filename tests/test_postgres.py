@@ -2009,6 +2009,10 @@ def test_live_ledger_outbox_projection_rls_and_immutability() -> None:
         )
         assert appended[0].aggregate_sequence == 1
         assert durability.verify_integrity(tenant_id=_TENANT_ALPHA)
+        assert durability.verify_run_integrity(
+            tenant_id=_TENANT_ALPHA,
+            run_id=run_id,
+        )
         assert (
             durability.rebuild_run(
                 tenant_id=_TENANT_ALPHA,

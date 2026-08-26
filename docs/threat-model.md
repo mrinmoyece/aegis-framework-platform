@@ -171,3 +171,20 @@ context build — but wiring that SQL query into the production retrieval contro
 KMS/blob-qualified crypto-erasure remain unproven; only ingest, supersession, legal hold,
 tombstone, digest-only retrieval/context facts, and the derived in-memory index/cache path
 are exercised by tests today.
+# Layer 11 observability threats
+
+1. **Telemetry tenant/identity exfiltration.** Semantic and metric policies reject
+   tenant, actor, user, request, run, incident, artifact and locator dimensions.
+2. **Prompt/secret/PII export.** Value scanning, key allowlists, bounded structured
+   logs and Collector deletion reject sensitive material before exporters.
+3. **Cardinality denial of service.** Metrics permit at most four registered labels
+   with stable enumerated values; log rate suppression and exporter queues are bounded.
+4. **Trace-context poisoning.** Strict lowercase W3C parsing rejects zero/oversized/
+   malformed parents and baggage outside the boolean allowlist.
+5. **Trace-as-authority confusion.** APIs, docs and replay preserve the application
+   ledger as truth; traces cannot authorize, approve, fence or prove effects.
+6. **Replay tool execution.** Replay accepts only bounded strict event arrays and has
+   no model, connector, tool, sandbox or effect port.
+
+Managed backend tenancy, exporter mTLS, production alert routing and external
+penetration testing remain unproven.

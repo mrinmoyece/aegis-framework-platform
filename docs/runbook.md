@@ -7,6 +7,8 @@ activation and orphan cleanup are in the [sandbox runbook](sandbox-runbook.md). 
 ingestion, retrieval, compaction, legal hold, and erasure incidents are in the
 [memory runbook](memory-runbook.md). Evaluation baseline, dataset, waiver, replay and
 tamper procedures are in the [evaluation runbook](evaluation-runbook.md).
+Telemetry outage, SLO response, dashboard use and ledger replay are in the
+[observability runbook](observability-runbook.md) and [SLO catalog](slo-catalog.md).
 
 ## Start application PostgreSQL
 

@@ -183,6 +183,28 @@
         "policy-revocation"
       ],
       "fault_points": ["action", "effect", "temporal-timer"]
+    },
+    {
+      "scenario_id": "observability-replay",
+      "version": 1,
+      "title": "Portable telemetry, bounded safety alerts and ledger replay",
+      "expected_outcome": "recovered",
+      "layers": [11],
+      "case_ids": [
+        "observability-causal-coverage",
+        "observability-retry-counting",
+        "observability-secret-absence",
+        "observability-outage-correctness",
+        "observability-replay-convergence",
+        "observability-safety-alert-bounded"
+      ],
+      "attack_tags": [
+        "cardinality-attack",
+        "context-injection",
+        "secret-leakage",
+        "telemetry-poisoning"
+      ],
+      "fault_points": ["outbox", "projection", "provider"]
     }
   ],
   "scorers": [

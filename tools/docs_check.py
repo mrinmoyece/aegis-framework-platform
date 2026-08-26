@@ -46,6 +46,9 @@ REQUIRED_DOCS = (
     "docs/adr/015-governed-deterministic-evaluation.md",
     "docs/memory-runbook.md",
     "docs/evaluation-runbook.md",
+    "docs/observability-runbook.md",
+    "docs/slo-catalog.md",
+    "docs/adr/016-provider-neutral-observability-replay.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -131,9 +134,9 @@ def _workflow_pin_errors() -> list[str]:
 
 
 def _measurement_errors() -> list[str]:
-    path = ROOT / "comparison/layer10-metrics.json"
+    path = ROOT / "comparison/layer11-metrics.json"
     if not path.is_file():
-        return ["missing comparison/layer10-metrics.json"]
+        return ["missing comparison/layer11-metrics.json"]
     payload = json.loads(path.read_text(encoding="utf-8"))
     errors = []
     basis = payload.get("comparison_basis", {})
@@ -146,8 +149,9 @@ def _measurement_errors() -> list[str]:
     custom_layer9 = basis.get("custom_layer9", {}) if isinstance(basis, dict) else {}
     custom_layer10 = basis.get("custom_layer10", {}) if isinstance(basis, dict) else {}
     custom_layer11 = basis.get("custom_layer11", {}) if isinstance(basis, dict) else {}
-    if payload.get("schema_version") != 10 or payload.get("layer") != 10:
-        errors.append("Layer 10 metrics schema/layer is invalid")
+    custom_layer12 = basis.get("custom_layer12", {}) if isinstance(basis, dict) else {}
+    if payload.get("schema_version") != 11 or payload.get("layer") != 11:
+        errors.append("Layer 11 metrics schema/layer is invalid")
     if custom_layer3.get("sha") != ("87cefe58adbf62e6a419d38e57e0928581b7003c"):
         errors.append("Layer 3 custom comparison SHA is not pinned")
     if custom_layer5.get("sha") != ("7c22d380a66f57aad943fe926ffff3ca8fc06ed6"):
@@ -166,6 +170,8 @@ def _measurement_errors() -> list[str]:
         errors.append("Layer 10 custom comparison SHA is not pinned")
     if custom_layer11.get("sha") != ("d17447f016cfd335ad9ff9900e9478b9d25844ea"):
         errors.append("Layer 11 custom comparison SHA is not pinned")
+    if custom_layer12.get("sha") != ("b63915659e8bcd49ca2ebd1f901f0f1cdc370c3b"):
+        errors.append("Layer 12 custom comparison SHA is not pinned")
     if not payload.get("remaining_custom_controls"):
         errors.append("Layer 10 metrics must list remaining custom controls")
     if not payload.get("lock_in_and_escape"):
@@ -189,6 +195,8 @@ def _measurement_errors() -> list[str]:
         errors.append("Layer 9 metrics must include the memory benchmark")
     if not payload.get("equivalent_evaluation_benchmark"):
         errors.append("Layer 10 metrics must include the evaluation benchmark")
+    if not payload.get("equivalent_observability_benchmark"):
+        errors.append("Layer 11 metrics must include the observability benchmark")
     return errors
 
 

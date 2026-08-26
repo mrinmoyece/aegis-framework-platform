@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${AEGIS_POSTGRES_ADMIN_PASSWORD:-change-me-before-use}
       AEGIS_POSTGRES_RUNTIME_PASSWORD: ${AEGIS_POSTGRES_RUNTIME_PASSWORD:-change-me-before-use}
     ports:
-      - "127.0.0.1:55432:5432"
+      - "127.0.0.1:${AEGIS_POSTGRES_PORT:-55432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U aegis_admin -d aegis"]
       interval: 2s
@@ -31,7 +31,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${AEGIS_KEYCLOAK_ADMIN_USERNAME:-local-admin}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${AEGIS_KEYCLOAK_ADMIN_PASSWORD:-change-me-before-use}
     ports:
-      - "127.0.0.1:58080:8080"
+      - "127.0.0.1:${AEGIS_KEYCLOAK_PORT:-58080}:8080"
     read_only: true
     tmpfs:
       - /opt/keycloak/data:size=256m,mode=1770
@@ -56,7 +56,7 @@ services:
       DBNAME: temporal
       VISIBILITY_DBNAME: temporal_visibility
     ports:
-      - "127.0.0.1:57233:7233"
+      - "127.0.0.1:${AEGIS_TEMPORAL_PORT:-57233}:7233"
     healthcheck:
       test:
         [
@@ -79,7 +79,7 @@ services:
     build:
       context: .
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${AEGIS_APP_PORT:-8000}:8000"
     read_only: true
     environment:
       AEGIS_MODE: ${AEGIS_MODE:-production}
@@ -90,6 +90,8 @@ services:
       AEGIS_CURSOR_SIGNING_KEY: ${AEGIS_CURSOR_SIGNING_KEY:-}
       AEGIS_REFERENCE_ENCRYPTION_KEY: ${AEGIS_REFERENCE_ENCRYPTION_KEY:-}
       AEGIS_TEMPORAL_ADDRESS: ${AEGIS_TEMPORAL_ADDRESS:-}
+      OTEL_SDK_DISABLED: ${OTEL_SDK_DISABLED:-true}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
     tmpfs:
       - /tmp:size=16m,mode=1777
     cap_drop:
@@ -97,5 +99,76 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.132.0@sha256:e0f565815b2b8e78eb9fdbb80f6190c921ab323aaa8ccceab3255c6d4225f4af
+    profiles: ["observability"]
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    environment:
+      AEGIS_OTLP_TRACE_ENDPOINT: ${AEGIS_OTLP_TRACE_ENDPOINT:-http://127.0.0.1:9}
+      AEGIS_OTLP_TRACE_AUTHORIZATION: ${AEGIS_OTLP_TRACE_AUTHORIZATION:-disabled}
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - "127.0.0.1:${AEGIS_OTEL_GRPC_PORT:-4317}:4317"
+      - "127.0.0.1:${AEGIS_OTEL_HTTP_PORT:-4318}:4318"
+      - "127.0.0.1:${AEGIS_OTEL_PROMETHEUS_PORT:-9464}:9464"
+      - "127.0.0.1:${AEGIS_OTEL_HEALTH_PORT:-13133}:13133"
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "--version"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  prometheus:
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    profiles: ["observability"]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=24h
+      - --storage.tsdb.retention.size=256MB
+    volumes:
+      - ./observability/prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./observability/prometheus/rules:/etc/prometheus/rules:ro
+      - aegis-prometheus:/prometheus
+    ports:
+      - "127.0.0.1:${AEGIS_PROMETHEUS_PORT:-59090}:9090"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  grafana:
+    image: grafana/grafana:12.1.0@sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f
+    profiles: ["observability"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_BASIC_ENABLED: "true"
+      GF_SECURITY_ADMIN_PASSWORD: ${AEGIS_GRAFANA_ADMIN_PASSWORD:-change-me-before-use}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_PLUGINS_PREINSTALL: ""
+      GF_PLUGIN_ADMIN_ENABLED: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - aegis-grafana:/var/lib/grafana
+    ports:
+      - "127.0.0.1:${AEGIS_GRAFANA_PORT:-53000}:3000"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   aegis-postgres:
+  aegis-prometheus:
+  aegis-grafana:

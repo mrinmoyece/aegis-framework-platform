@@ -10,7 +10,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Span, Tracer
 
 from aegis_framework.ports import Observation
-from aegis_framework.safety import safe_observability_attributes, tenant_bucket
+from aegis_framework.telemetry import SEMANTIC_CONVENTION_VERSION, safe_attributes
 
 
 @dataclass
@@ -23,14 +23,19 @@ class _SpanObservation:
         status: str,
         attributes: Mapping[str, str | int | bool],
     ) -> None:
-        safe = safe_observability_attributes({**attributes, "status": status})
+        prefixed = {
+            f"aegis.{k}": v for k, v in {**attributes, "status": status}.items()
+        }
+        safe = safe_attributes(prefixed, strict=False)
         for key, value in safe.items():
-            self.span.set_attribute(f"aegis.{key}", value)
+            self.span.set_attribute(key, value)
 
 
 class OpenTelemetryObservability:
     def __init__(self, tracer: Tracer | None = None) -> None:
-        self._tracer = tracer or trace.get_tracer("aegis-framework", "0.9.0")
+        self._tracer = tracer or trace.get_tracer(
+            "aegis-framework", SEMANTIC_CONVENTION_VERSION
+        )
 
     def investigation(
         self,
@@ -120,12 +125,17 @@ class OpenTelemetryObservability:
         attributes: Mapping[str, str | int | bool],
         span_name: str = "aegis.investigation",
     ) -> Iterator[Observation]:
-        safe = safe_observability_attributes(attributes)
-        safe.setdefault("operation", "checkout_investigation")
+        # Prefix keys with "aegis." so safe_attributes can enforce the
+        # semantic allowlist, value bounds, and low-cardinality enum rules
+        # defined in the telemetry module.
+        prefixed = {f"aegis.{k}": v for k, v in attributes.items()}
+        safe = safe_attributes(prefixed, strict=False)
+        safe.setdefault("aegis.operation", "checkout_investigation")
         with self._tracer.start_as_current_span(span_name) as span:
-            span.set_attribute("aegis.tenant.bucket", tenant_bucket(tenant_id))
+            del tenant_id
+            span.set_attribute("aegis.semantic.version", SEMANTIC_CONVENTION_VERSION)
             for key, value in safe.items():
-                span.set_attribute(f"aegis.{key}", value)
+                span.set_attribute(key, value)
             yield _SpanObservation(span)
 
 

@@ -92,6 +92,12 @@ class EvalCase(StrictModel):
         "memory-tenant-cache",
         "memory-context",
         "memory-retention",
+        "observability-causal-coverage",
+        "observability-retry-counting",
+        "observability-secret-absence",
+        "observability-outage-correctness",
+        "observability-replay-convergence",
+        "observability-safety-alert-bounded",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -138,6 +144,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 def run_eval_case(case: EvalCase) -> EvalOutcome:
     """Execute one canonical case for the governed Layer 10 runner."""
+    if case.kind.startswith("observability-"):
+        return _run_observability_case(case)
     if case.kind.startswith("memory-"):
         return _run_memory_case(case)
     if case.kind.startswith("sandbox-"):
@@ -219,6 +227,102 @@ def run_eval_case(case: EvalCase) -> EvalOutcome:
         if secondary.tenant_id != "tenant-beta":
             details.append("secondary_tenant_mismatch")
 
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details),
+    )
+
+
+def _run_observability_case(case: EvalCase) -> EvalOutcome:
+    from aegis_framework.adapters import FixedClock
+    from aegis_framework.durability import InMemoryDurability
+    from aegis_framework.fixtures import DEMO_TIME
+    from aegis_framework.replay import ReplayDebugger
+    from aegis_framework.telemetry import (
+        BoundedJsonLogger,
+        MetricRegistry,
+        TelemetryAttributeRejected,
+        safe_attributes,
+    )
+
+    details: list[str] = []
+    store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
+    identity = demo_identity(request_id=f"eval-{case.case_id}")
+    run = store.accept_run(
+        identity=identity,
+        request=demo_request(),
+        wait_for_signal=False,
+    )
+    events = store.events(tenant_id=identity.tenant_id)
+    debugger = ReplayDebugger(events)
+    if case.kind == "observability-causal-coverage":
+        chain = debugger.causal_chain(aggregate_id=run.run_id)
+        if len(chain) != len(events) or not all(item.event_type for item in chain):
+            details.append("causal_chain_incomplete")
+    elif case.kind == "observability-retry-counting":
+        registry = MetricRegistry()
+        labels = {"component": "api", "operation": "request", "status": "ok"}
+        first = registry.record(
+            "aegis_operations_total",
+            1,
+            labels=labels,
+            logical_key="eval-logical-operation",
+        )
+        replay = registry.record(
+            "aegis_operations_total",
+            1,
+            labels=labels,
+            logical_key="eval-logical-operation",
+        )
+        if not first or replay or " 1\n" not in registry.render_prometheus():
+            details.append("retry_or_replay_double_counted")
+    elif case.kind == "observability-secret-absence":
+        try:
+            safe_attributes({"aegis.operation": "Bearer secret-token"})
+        except TelemetryAttributeRejected:
+            pass
+        else:
+            details.append("secret_was_exportable")
+    elif case.kind == "observability-outage-correctness":
+
+        class _FailingSink:
+            def emit(self, record: str) -> None:
+                del record
+                raise RuntimeError("telemetry unavailable")
+
+        logger = BoundedJsonLogger(_FailingSink())
+        emitted = logger.emit(
+            event="aegis.ledger.append",
+            level="ERROR",
+            attributes={"aegis.component": "ledger", "aegis.status": "error"},
+        )
+        if (
+            emitted
+            or store.get_run(tenant_id=identity.tenant_id, run_id=run.run_id) is None
+        ):
+            details.append("telemetry_outage_blocked_correctness")
+    elif case.kind == "observability-replay-convergence":
+        report = debugger.support_report(aggregate_id=run.run_id, live=run)
+        if (
+            not report.integrity.valid
+            or report.projection is None
+            or not report.projection.matches
+        ):
+            details.append("ledger_replay_did_not_converge")
+    elif case.kind == "observability-safety-alert-bounded":
+        rules = Path("observability/prometheus/rules/aegis-slos.yaml").read_text(
+            encoding="utf-8"
+        )
+        if (
+            len(rules.encode()) > 32_768
+            or "AegisSafetyViolation" not in rules
+            or "increase(aegis_safety_violations_total[5m]) > 0" not in rules
+            or 'budgetable: "false"' not in rules
+        ):
+            details.append("safety_alert_is_missing_or_unbounded")
+    else:
+        details.append("unknown_observability_case")
     return EvalOutcome(
         case_id=case.case_id,
         passed=not details,

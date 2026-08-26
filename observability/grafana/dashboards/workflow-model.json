@@ -1,0 +1,16 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Workflow and queue age", "type": "timeseries", "targets": [{"expr": "histogram_quantile(0.99, sum(rate(aegis_queue_age_seconds_bucket[5m])) by (le, component, queue))", "refId": "A"}]},
+    {"id": 2, "title": "Retry attempts", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_retries_total[5m])) by (component, operation, reason)", "refId": "A"}]},
+    {"id": 3, "title": "Model calls and cost operations", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=\"model\"}[5m])) by (operation, status)", "refId": "A"}]}
+  ],
+  "schemaVersion": 41,
+  "tags": ["aegis", "workflow", "queue", "model", "cost"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Aegis Workflow Queue and Model",
+  "uid": "aegis-workflow-model",
+  "version": 1
+}

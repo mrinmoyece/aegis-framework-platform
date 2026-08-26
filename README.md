@@ -185,6 +185,23 @@ runtime authority or production certification.**
   smaller and reuses real Layers 1-9 scenarios, but has a narrower catalog and less
   granular case-specific scoring than the custom implementation.
 
+## Delivered Layer 11
+
+- versioned provider-neutral semantic conventions and fixed spans across API, ledger,
+  outbox, Temporal, LangGraph, models, connectors, approvals/effects, sandbox, memory
+  and evaluation, with strict low-cardinality allowlists and explicit units/buckets;
+- strict W3C propagation, hostile-context rejection, baggage allowlist, deterministic
+  sampling, bounded fan-out/retry/redelivery links, and safe durable trace references;
+- bounded JSON logging, Prometheus metrics with logical-operation deduplication,
+  exporter failure containment, neutral OTel Collector pipelines, multi-window SLO
+  rules and four provisioned Grafana dashboards covering every implemented layer;
+- authenticated, purpose-authorized, anti-enumerating and audited SLO/readiness/support/
+  projection APIs, plus deterministic read-only ledger replay and CLI with dual-chain,
+  sequence, schema, compare, causal-chain and bounded support-report validation;
+- nine measurable SLOs and non-budgetable safety alerts. Langfuse remains optional
+  trace/evaluation UX; OTel and the application ledger preserve portability and truth.
+  UI, MCP/A2A, deployment, live managed telemetry/SLO/on-call evidence remain deferred.
+
 ## Ownership
 
 | Owner | Responsibility | Not authoritative for |
@@ -198,6 +215,7 @@ runtime authority or production certification.**
 | Connector libraries | HTTPX transport, Kubernetes decoding, PyYAML syntax | Tenant/source policy, SSRF, secrets, provenance, pagination truth, quarantine |
 | Memory ledger/lifecycle | Immutable `memory_facts`/`MemoryLifecycleService` | Derived index/cache, retrieval quality, framework state |
 | Derived memory index/cache | `InMemoryHybridIndex` + PostgreSQL `memory_chunks`/cache | Tenancy, retention, legal hold, audit — never authority |
+| OTel/Prometheus/Grafana/Langfuse | Portable signals, alert evaluation, dashboards and optional trace UX | Application truth, authorization, approval, audit, fencing, effect receipts |
 
 A framework history, checkpoint, trace, prompt, completion, message, or tool result is
 never an authorization, tenant grant, quota receipt, approval, audit record, fencing

@@ -126,6 +126,14 @@
 | Eval report overflows or leaks payload | Byte cap and digest/reason-only schema reject; redaction tests gate exporter | Reporting adapter | meta |
 | Order/shard/replay differs | Stable sorted selection/hash shard and canonical result comparison fail | Evaluation runner | meta |
 | Langfuse unavailable | Local report/comparison remains authoritative; publication fails separately | Optional adapter | unit |
+| Hostile trace/baggage context | Strict W3C parser rejects before application delivery; no foreign parent accepted | Delivery boundary | unit/API |
+| Telemetry cardinality/secret injection | Attribute/label allowlist and bounded enum reject before export | Semantic policy | unit/eval |
+| Collector/exporter unavailable | Bounded queue/retry/drop; application correctness continues and operations readiness degrades | Optional telemetry | unit/config |
+| Retry/replay metric duplication | Logical-operation digest suppresses total; retry remains a separate counter | Metrics registry | unit/eval |
+| SLO fast/slow burn | Multi-window alert links the owning runbook; release policy applies | Prometheus/application SLO | rule validation |
+| Safety violation | Immediate non-budgetable page; fence/reconcile affected work | Application control + alert | eval/rule validation |
+| Replay hash/sequence/schema divergence | Stop before projection/support conclusion; preserve source events | Application ledger | unit/eval |
+| Privileged support audit unavailable | SLO/support/rebuild request fails closed | Application audit | API |
 
 ## Retry rules
 
