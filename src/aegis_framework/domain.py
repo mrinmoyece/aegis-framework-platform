@@ -205,6 +205,8 @@ class Citation(StrictModel):
 
 
 class SpecialistTask(StrictModel):
+    tenant_id: Identifier
+    run_id: Identifier
     incident_id: Identifier
     specialist: Specialist
     evidence: tuple[ModelEvidence, ...]

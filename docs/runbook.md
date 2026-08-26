@@ -1,4 +1,4 @@
-# Layer 3 local operations runbook
+# Layer 4 local operations runbook
 
 ## Start application PostgreSQL
 
@@ -8,7 +8,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 and Layer 3 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 4 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -70,6 +70,33 @@ Pause projection writers for the tenant or use a shadow projection. Replay
 `application_events` in tenant cursor order, validate both hash chains and contiguous
 aggregate sequences, write a projection checkpoint, compare counts/statuses, then swap.
 Never edit source events to repair a projection.
+
+## Model call and billing reconciliation
+
+1. Authorize the tenant model usage view. Never inspect another tenant through an admin
+   connection for routine operations.
+2. Find immutable `model_call_events` for the stable attempt ID. `requested` without
+   `settled` is a crash window and must be treated as possibly billed.
+3. Compare the provider's billing export using the separately controlled credential/account
+   mapping. Do not put prompts, completions, credentials, tenant IDs, or provider request
+   IDs into tickets or traces.
+4. Append an explicit settlement through application tooling. Never mutate the requested
+   fact or silently retry the provider call.
+5. If a usage/health projection is corrupt, run the tenant-scoped projection rebuild from
+   immutable call events and reservations, compare totals, then restore writers.
+
+Unknown price, capability, region, classification, model, credential reference, or policy
+revision is denial, not a reason to choose a default. Circuit and health views are derived
+availability signals, never authorization or billing truth.
+
+## Provider credential and catalog operations
+
+Only secret references belong in policy/catalog. Values are resolved inside the provider
+adapter and must never enter graph state, Temporal history, application events, API
+responses, or telemetry. Rotate by publishing a new reference version, qualifying the
+exact model/region/capability/price declaration, draining old calls, and retaining old
+pricing versions for ledger replay. Live provider activation requires organizational
+data-processing, retention, regional, security, legal, capacity, and billing sign-off.
 
 ## Dead-letter handling
 

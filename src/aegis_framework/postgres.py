@@ -51,6 +51,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 _MIGRATIONS = (
     _ROOT / "migrations/0001_layer2.sql",
     _ROOT / "migrations/0002_layer3.sql",
+    _ROOT / "migrations/0003_layer4.sql",
 )
 _CHECKPOINT_TABLES = ("checkpoints", "checkpoint_blobs", "checkpoint_writes")
 
@@ -355,18 +356,40 @@ class PostgresRepository:
                         AND to_regclass('aegis.application_events') IS NOT NULL
                         AND to_regclass('aegis.outbox_messages') IS NOT NULL
                         AND to_regclass('aegis.investigation_runs') IS NOT NULL
+                        AND to_regclass('aegis.model_policies') IS NOT NULL
+                        AND to_regclass('aegis.model_catalog') IS NOT NULL
+                        AND to_regclass('aegis.model_budgets') IS NOT NULL
+                        AND to_regclass('aegis.model_reservations') IS NOT NULL
+                        AND to_regclass(
+                            'aegis.model_reservation_settlements'
+                        ) IS NOT NULL
+                        AND to_regclass('aegis.model_call_events') IS NOT NULL
+                        AND to_regclass('aegis.model_usage_projection') IS NOT NULL
+                        AND to_regclass(
+                            'aegis.provider_health_projection'
+                        ) IS NOT NULL
                         AND (
-                            SELECT relforcerowsecurity
+                            SELECT relrowsecurity AND relforcerowsecurity
                             FROM pg_class
                             WHERE oid = 'aegis.audit_events'::regclass
                         )
                         AND (
-                            SELECT bool_and(relforcerowsecurity)
+                            SELECT bool_and(
+                                relrowsecurity AND relforcerowsecurity
+                            )
                             FROM pg_class
                             WHERE oid IN (
                                 'aegis.application_events'::regclass,
                                 'aegis.outbox_messages'::regclass,
-                                'aegis.investigation_runs'::regclass
+                                'aegis.investigation_runs'::regclass,
+                                'aegis.model_policies'::regclass,
+                                'aegis.model_catalog'::regclass,
+                                'aegis.model_budgets'::regclass,
+                                'aegis.model_reservations'::regclass,
+                                'aegis.model_reservation_settlements'::regclass,
+                                'aegis.model_call_events'::regclass,
+                                'aegis.model_usage_projection'::regclass,
+                                'aegis.provider_health_projection'::regclass
                             )
                         ) AS ready
                     """

@@ -1,4 +1,4 @@
-# Layer 3 limitations
+# Layer 4 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -25,8 +25,8 @@
 - In-memory durability is a deterministic reference/test adapter only. Production must
   use the PostgreSQL adapter and cannot fall back to memory.
 - The durable API demo records/reads application intent but does not start a production
-  worker. Production evidence/model adapters remain intentionally unavailable; there
-  is no fixture fallback in production.
+  worker. Official OpenAI/Anthropic adapters exist, but production wiring is deliberately
+  unavailable without qualified credentials, model policy/catalog, and worker deployment.
 - Evidence snapshots in application events are tenant-scoped and API-redacted. Source
   signatures, retention classification, connector credentials, and live provenance
   remain deferred.
@@ -44,5 +44,22 @@
   throughput or a cross-repository load benchmark.
 - Live IdP rotation, KMS/Vault, approvals/effects, sandbox, memory/RAG, UI/BFF, MCP/A2A,
   and deployment remain deferred.
+- OpenAI 3.1.0 and Anthropic 0.122.0 adapter shape tests use fake SDK clients. No live
+  credentials, network, provider retention policy, regional processing, model snapshot,
+  abuse-filter, tokenizer, latency, rate-limit, or billing behavior is qualified.
+- Conservative byte-based token estimation can over-reserve and cannot prove provider
+  context fit for every tokenizer. Catalog limits/prices are declared inputs, not a live
+  price feed; unknown declarations fail closed.
+- A provider can bill a request when the client sees timeout/cancellation/crash. Pending
+  intent and ambiguous settlement reserve the ceiling and block silent duplicate calls.
+  Provider reconciliation is required; exactly-once billing is not claimed.
+- In-process circuit/rate/concurrency state is availability control, not durable truth or
+  distributed global enforcement. Production multi-worker limits need a qualified
+  application-owned coordination adapter without creating another retry authority.
+- Model usage and provider health are RLS-filtered projections rebuilt from immutable call
+  facts. Health is observed history, not a provider SLA or permission to route.
+- PostgreSQL model reservation/reconciliation integration is environment-gated. It does
+  not qualify HA, multi-region budget order, price updates during long runs, or high-volume
+  ledger partitioning.
 
 These are explicit non-production boundaries, not implied capabilities.

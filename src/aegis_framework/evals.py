@@ -38,6 +38,14 @@ class EvalCase(StrictModel):
         "durable-cancellation",
         "policy-revocation-wait",
         "framework-outage",
+        "model-routing",
+        "model-malformed",
+        "model-budget",
+        "model-fallback-circuit",
+        "model-timeout-cancel",
+        "model-duplicate-ambiguous",
+        "model-policy-revocation",
+        "model-tenant-isolation",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -83,6 +91,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 
 def _run_case(case: EvalCase) -> EvalOutcome:
+    if case.kind.startswith("model-"):
+        return _run_model_case(case)
     if case.kind in {
         "durable-recovery",
         "durable-duplicate-request",
@@ -151,6 +161,261 @@ def _run_case(case: EvalCase) -> EvalOutcome:
             details.append("cross_tenant_citation_overlap")
         if secondary.tenant_id != "tenant-beta":
             details.append("secondary_tenant_mismatch")
+
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details),
+    )
+
+
+def _run_model_case(case: EvalCase) -> EvalOutcome:
+    from pydantic import Field
+
+    from aegis_framework.domain import RiskLevel
+    from aegis_framework.model_gateway import (
+        BillingDisposition,
+        CredentialReference,
+        DataClassification,
+        FakeModelProvider,
+        InMemoryModelControlStore,
+        ModelCallBinding,
+        ModelCapability,
+        ModelCatalogEntry,
+        ModelErrorCode,
+        ModelFinishReason,
+        ModelGateway,
+        ModelMessage,
+        ModelPrice,
+        ModelProvider,
+        ModelRequest,
+        ModelRole,
+        ModelRoute,
+        ModelUsage,
+        ProviderInvocationError,
+        ProviderResult,
+        SafetyAssessment,
+        StructuredOutputDefinition,
+        TenantModelPolicy,
+        TextContent,
+    )
+
+    class _Output(StrictModel):
+        answer: str = Field(min_length=1, max_length=32)
+
+    def entry(model: str) -> ModelCatalogEntry:
+        return ModelCatalogEntry(
+            tenant_id="tenant-acme",
+            provider=ModelProvider.FAKE,
+            model=model,
+            region="local",
+            capabilities=frozenset({ModelCapability.JSON_SCHEMA}),
+            context_tokens=8_192,
+            maximum_output_tokens=1_024,
+            tokenizer=None,
+            tokenizer_limitations="Conservative byte estimate.",
+            usage_limitations="Synthetic deterministic usage.",
+            price=ModelPrice(
+                version=f"{model}-v1",
+                currency="USD",
+                input_microunits_per_million_tokens=1_000,
+                output_microunits_per_million_tokens=2_000,
+            ),
+            credential=CredentialReference(reference=f"secret:{model}", version=1),
+        )
+
+    entries = (entry("primary"), entry("fallback"))
+
+    def policy(
+        *,
+        tenant_id: str = "tenant-acme",
+        revision: int = 1,
+        ambiguous_fallback: bool = False,
+    ) -> TenantModelPolicy:
+        return TenantModelPolicy(
+            tenant_id=tenant_id,
+            policy_id="model-policy",
+            revision=revision,
+            allowed_providers=frozenset({ModelProvider.FAKE}),
+            allowed_models=frozenset(item.model for item in entries),
+            allowed_regions=frozenset({"local"}),
+            allowed_data_classifications=frozenset({DataClassification.INTERNAL}),
+            allowed_purposes=frozenset({"incident-response"}),
+            required_capabilities=frozenset({ModelCapability.JSON_SCHEMA}),
+            risk_ceiling=RiskLevel.MEDIUM,
+            routes=tuple(
+                ModelRoute(
+                    provider=item.provider,
+                    model=item.model,
+                    region=item.region,
+                    priority=index,
+                )
+                for index, item in enumerate(entries, start=1)
+            ),
+            maximum_input_tokens=4_096,
+            maximum_output_tokens=1_024,
+            maximum_cost_microunits=10_000,
+            maximum_calls_per_run=8,
+            repair_attempts=1,
+            fallback_on_ambiguous_billing=ambiguous_fallback,
+        )
+
+    def request(
+        call_id: str = "call:eval",
+        *,
+        tenant_id: str = "tenant-acme",
+    ) -> ModelRequest:
+        return ModelRequest(
+            binding=ModelCallBinding(
+                tenant_id=tenant_id,
+                run_id="run:eval",
+                call_id=call_id,
+                purpose="incident-response",
+                data_classification=DataClassification.INTERNAL,
+                risk=RiskLevel.MEDIUM,
+            ),
+            messages=(
+                ModelMessage(
+                    role=ModelRole.SYSTEM,
+                    content=(TextContent(text="Return strict JSON."),),
+                ),
+            ),
+            max_output_tokens=100,
+            structured_output=StructuredOutputDefinition(
+                name="eval_output",
+                json_schema=_Output.model_json_schema(),
+            ),
+        )
+
+    success = ProviderResult(
+        structured_output={"answer": "safe"},
+        usage=ModelUsage(
+            input_tokens=10,
+            output_tokens=2,
+            provider_reported=True,
+        ),
+        finish_reason=ModelFinishReason.STOP,
+        safety=SafetyAssessment(blocked=False, provider_reported=True),
+    )
+    tenant_limits = {"tenant-acme": 1_000, "tenant-beta": 1_000}
+    store = InMemoryModelControlStore(
+        policies=(policy(),),
+        catalog=entries,
+        tenant_cost_limits=tenant_limits,
+    )
+    details: list[str] = []
+
+    if case.kind == "model-routing":
+        fake = FakeModelProvider((success,))
+        output = ModelGateway(store=store, adapters=(fake,)).generate(
+            request(), _Output
+        )
+        if output.answer != "safe" or fake.calls[0][0] != entries[0].key:
+            details.append("routing_was_not_deterministic")
+    elif case.kind == "model-malformed":
+        fake = FakeModelProvider(
+            (
+                success.model_copy(update={"structured_output": {"wrong": True}}),
+                success,
+            )
+        )
+        ModelGateway(store=store, adapters=(fake,)).generate(request(), _Output)
+        if len(fake.calls) != 2:
+            details.append("repair_attempt_was_not_bounded")
+    elif case.kind == "model-budget":
+        exhausted = InMemoryModelControlStore(
+            policies=(policy(),),
+            catalog=entries,
+            tenant_cost_limits={"tenant-acme": 0},
+        )
+        try:
+            ModelGateway(
+                store=exhausted,
+                adapters=(FakeModelProvider((success,)),),
+            ).generate(request(), _Output)
+        except PolicyDenied:
+            pass
+        else:
+            details.append("budget_exhaustion_did_not_fail_closed")
+    elif case.kind == "model-fallback-circuit":
+        transient = ProviderInvocationError(
+            ModelErrorCode.TRANSIENT,
+            retryable=True,
+            billing=BillingDisposition.NOT_BILLED,
+        )
+        fake = FakeModelProvider((transient, success))
+        output = ModelGateway(
+            store=store,
+            adapters=(fake,),
+            circuit_failure_threshold=1,
+        ).generate(request(), _Output)
+        if output.answer != "safe" or len(fake.calls) != 2:
+            details.append("fallback_or_circuit_behavior_changed")
+    elif case.kind == "model-timeout-cancel":
+        timeout = ProviderInvocationError(
+            ModelErrorCode.TIMEOUT,
+            retryable=True,
+            billing=BillingDisposition.AMBIGUOUS,
+        )
+        try:
+            ModelGateway(
+                store=store,
+                adapters=(FakeModelProvider((timeout,)),),
+            ).generate(request(), _Output)
+        except ProviderInvocationError:
+            pass
+        else:
+            details.append("ambiguous_timeout_was_retried")
+        try:
+            ModelGateway(
+                store=store,
+                adapters=(FakeModelProvider((success,)),),
+                cancellation_requested=lambda: True,
+            ).generate(request("call:cancel"), _Output)
+        except ProviderInvocationError:
+            pass
+        else:
+            details.append("cancelled_call_reached_provider")
+    elif case.kind == "model-duplicate-ambiguous":
+        gateway = ModelGateway(
+            store=store,
+            adapters=(FakeModelProvider((success, success)),),
+        )
+        gateway.generate(request(), _Output)
+        try:
+            gateway.generate(request(), _Output)
+        except PolicyDenied:
+            pass
+        else:
+            details.append("duplicate_call_reached_provider")
+    elif case.kind == "model-policy-revocation":
+
+        class _RevokingProvider:
+            provider = ModelProvider.FAKE
+
+            def invoke(self, **kwargs: object) -> ProviderResult:
+                del kwargs
+                store.replace_policy(policy(revision=2))
+                return success
+
+        try:
+            ModelGateway(store=store, adapters=(_RevokingProvider(),)).generate(
+                request(), _Output
+            )
+        except ProviderInvocationError:
+            pass
+        else:
+            details.append("stale_policy_result_was_accepted")
+    elif case.kind == "model-tenant-isolation":
+        try:
+            ModelGateway(
+                store=store,
+                adapters=(FakeModelProvider((success,)),),
+            ).generate(request(tenant_id="tenant-beta"), _Output)
+        except PolicyDenied:
+            pass
+        else:
+            details.append("cross_tenant_model_policy_was_used")
 
     return EvalOutcome(
         case_id=case.case_id,

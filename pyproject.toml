@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aegis-framework-platform"
-version = "0.3.0"
-description = "Framework-first durable enterprise investigation platform"
+version = "0.4.0"
+description = "Framework-first governed enterprise model investigation platform"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
 license = "MIT"
@@ -39,6 +39,10 @@ framework-observability = [
 postgres = [
   "langgraph-checkpoint-postgres==3.1.2",
   "psycopg[binary,pool]==3.3.4",
+]
+model-providers = [
+  "openai==3.1.0",
+  "anthropic==0.122.0",
 ]
 
 [dependency-groups]
@@ -122,6 +126,7 @@ branch = true
 source = ["aegis_framework"]
 omit = [
   "src/aegis_framework/durable_postgres.py",
+  "src/aegis_framework/model_postgres.py",
   "src/aegis_framework/postgres.py",
 ]
 

@@ -48,6 +48,13 @@ compared layer.
 27. malformed/oversized Temporal payload containment;
 28. workflow history replay/version compatibility;
 29. framework history/checkpoint loss reconciliation boundary.
+30. deterministic model route and exact capability/price denial;
+31. structured repair bound and malformed/hostile provider response;
+32. provider budget exhaustion before network intent;
+33. fallback/circuit/rate/concurrency behavior;
+34. timeout/cancellation and explicit billing ambiguity;
+35. duplicate call suppression and policy revocation during I/O;
+36. model usage/catalog/health RLS and projection rebuild.
 
 Inputs, expected status, citation rules, and authority boundaries must match. A
 framework feature cannot be credited if the custom implementation is tested against
@@ -69,6 +76,8 @@ Capture on a clean checkout:
 - implementation elapsed time from first commit to green PR.
 - framework mechanics removed, remaining application-owned controls, and an explicit
   port/escape hatch for every selected framework.
+- model gateway equivalent scenario against custom Aegis Layer 5, including provider
+  dependency/operational cost and whether framework use increased code.
 
 Record OS, architecture, Python, framework versions, CPU/memory limits, network
 policy, and run count. Do not compare local Apple Silicon numbers with cloud x86

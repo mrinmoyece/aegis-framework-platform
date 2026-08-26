@@ -1,4 +1,4 @@
-# Layer 3 qualification status
+# Layer 4 qualification status
 
 ## Delivered
 
@@ -15,24 +15,38 @@
 - provider-neutral worker runtime that drains explicitly configured trusted tenant
   partitions; it is an embeddable runtime rather than a production CLI because live
   evidence/model adapters are deliberately deferred;
-- manual OTel/optional Langfuse privacy boundary with no payload export.
+- manual OTel/optional Langfuse privacy boundary with no payload export;
+- immutable provider-neutral message/content/tool/schema/safety/usage/pricing/error
+  contracts with canonical digests and tenant/run/purpose bindings;
+- deny-by-default tenant model policy/catalog, deterministic routing, exact capability and
+  price declarations, worst-case reservation, stable call intent, billing reconciliation,
+  fallback/circuit/rate/concurrency controls, and stale-result rejection;
+- deterministic fake plus official OpenAI 3.1.0 and Anthropic 0.122.0 adapters with SDK
+  retries disabled and secret references only;
+- strict Pydantic structured generation in LangGraph nodes, evidence framing, bounded
+  repair, exact tool allowlists, citation rejection, and safe abstention;
+- forced-RLS model policy/catalog/reservation/call/usage/health tables and authorized
+  redacted model operations APIs.
 
 ## Qualification snapshot
 
-- 138 deterministic tests pass with 91.61% branch coverage;
-- 13 deterministic evals pass;
-- four local PostgreSQL integration tests pass;
+- 163 deterministic tests pass with at least 90% branch coverage;
+- 21 deterministic evals pass;
+- five local PostgreSQL integration tests cover the Layer 3 controls plus model
+  reservation races, crash-window ambiguity, reconciliation, RLS, immutability and
+  projection rebuild;
 - two local Temporal integration tests cover no-worker recovery, Activity retry,
   duplicate signal, cancellation, timeout, replay, and the real application
   outbox/Activity/projection path;
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer3-metrics.json`.
+`comparison/layer4-metrics.json`.
 
 ## Not proven
 
 Production Temporal HA/upgrade/failover, PostgreSQL HA/PITR/restore, multi-region order,
 load/capacity, WORM witnessing, retention/erasure execution, live IdP rotation, live
-evidence/model credentials, approvals/effects/fencing/reconciliation, sandbox tools,
-memory/RAG, UI/BFF, MCP/A2A, and deployment admission remain unproven.
+evidence connectors, live model credentials/provider qualification,
+approvals/effects/fencing/reconciliation, sandbox tools, memory/RAG, UI/BFF, MCP/A2A,
+and deployment admission remain unproven.

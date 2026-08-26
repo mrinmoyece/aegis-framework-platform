@@ -1,15 +1,16 @@
-# Layer 3 durable investigation architecture
+# Layer 4 governed model gateway architecture
 
 ## Product boundary
 
-Layer 3 accepts a tenant-authorized investigation command, records immutable
+Layer 4 accepts a tenant-authorized investigation command, records immutable
 application intent, schedules a crash-resilient lifecycle, runs the existing bounded
 LangGraph investigation, optionally waits for a signal, and publishes application-owned
 status and timeline projections.
 
-It still cannot approve, execute, or verify a production change. Live evidence
-connectors and model providers, controlled effects/approvals, sandboxing, memory/RAG,
-UI/BFF, MCP/A2A, and production deployment remain deferred.
+It still cannot approve, execute, or verify a production change. Official provider
+adapters are implemented but live provider qualification and credential brokering remain
+deferred, as do live evidence connectors, controlled effects/approvals, sandboxing,
+memory/RAG, UI/BFF, MCP/A2A, and production deployment.
 
 ## Three durable owners
 
@@ -18,6 +19,7 @@ UI/BFF, MCP/A2A, and production deployment remain deferred.
 | PostgreSQL application ledger | Tenant/aggregate event order, command idempotency, inbox/outbox, run projection, audit facts | Framework scheduling or graph checkpoints |
 | Temporal 1.29.1 server + Python SDK 1.31.0 | Cross-process scheduling, Activity retry/backoff, durable timers, signals, cancellation delivery, workflow replay | Tenant grants, policy, quota, audit, API status, external-effect truth |
 | LangGraph 1.2.11 | Bounded cognitive fan-out/fan-in, reducers, specialist/critic state, graph checkpoints | Workflow lifecycle, authorization, audit, idempotency, approval, effects |
+| Official OpenAI 3.1.0 / Anthropic 0.122.0 SDKs | Provider HTTP protocol and response decoding | Routing, policy, pricing, budget, usage, safety, retry truth |
 
 Framework histories and checkpoints can be deleted and reconstructed operationally
 without changing application facts. Losing the application ledger is data loss.
@@ -175,3 +177,43 @@ timestamp, status, and bounded failure code. Payloads and tenant IDs are not ret
 Removing Temporal requires a replacement that passes the worker loss, timer, retry,
 signal, cancellation, duplicate delivery, and replay suite. Removing LangGraph does not
 change the workflow or ledger contracts.
+
+## Model call control order
+
+`GatewayStructuredModel` translates a typed specialist task into neutral messages and a
+strict JSON Schema. No vendor object crosses the adapter boundary.
+
+1. Reload the current tenant model policy; deny unknown tenant, purpose,
+   classification, risk, provider, model, region, capability, context, or pricing.
+2. Resolve deterministic catalog routes and calculate a conservative token ceiling.
+3. Reserve the worst-case token/cost envelope across bounded routes/repair attempts.
+4. Append immutable `requested` intent with stable tenant/run/call/attempt IDs and
+   request digest before network intent.
+5. Invoke one official SDK adapter with SDK retries disabled. Aegis owns bounded repair,
+   fallback, concurrency/rate limiting, and circuit state inside the Activity attempt.
+6. Recheck current policy and cancellation before accepting output. Stale output is
+   settled for billing but rejected from graph state.
+7. Append `settled` success/failure/ambiguous billing fact and update replaceable usage
+   and derived health projections.
+
+Temporal may retry the graph Activity only when the application operation is still safe.
+An existing model call intent suppresses a second provider call until reconciliation.
+A provider may have billed a timeout/crash window; the ledger reports ambiguity and never
+claims exactly once.
+
+## Structured generation and safety
+
+Message, content, tool, schema, usage, price, policy, and error contracts are immutable
+strict Pydantic models with byte/token/count bounds and canonical SHA-256 digests.
+Evidence is framed as untrusted data after fact allowlisting. Tools must exactly match the
+application allowlist. Provider output can populate only the declared schema; specialist
+identity and evidence citations are revalidated, malformed output receives at most the
+policy repair bound, and unsafe/unsupported output becomes abstention. Model-created
+roles, policy, approval, credentials, or effect intent have no application path.
+
+## Model operations API
+
+Current policy authorizes redacted `/v1/models/catalog`, `/v1/models/usage/{run_id}`, and
+`/v1/models/health`. Catalog views omit tenant and credential references. Usage/cost facts
+come from the application ledger. Health is a replaceable projection of observed outcomes,
+not provider or product truth. Forced RLS applies to every Layer 4 model table.

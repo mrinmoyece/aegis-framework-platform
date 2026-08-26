@@ -35,6 +35,9 @@ class Action(StrEnum):
     QUOTA_READ = "quota:read"
     QUOTA_WRITE = "quota:write"
     AUDIT_READ = "audit:read"
+    MODEL_CATALOG_READ = "model:catalog:read"
+    MODEL_USAGE_READ = "model:usage:read"
+    MODEL_HEALTH_READ = "model:health:read"
     EFFECT_EXECUTE = "effect:execute"
 
 

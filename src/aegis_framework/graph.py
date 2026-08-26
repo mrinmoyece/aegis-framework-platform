@@ -97,6 +97,8 @@ class LangGraphInvestigator:
         specialist: Specialist,
     ) -> dict[str, object]:
         task = SpecialistTask(
+            tenant_id=state["tenant_id"],
+            run_id=state["request_id"],
             incident_id=state["incident_id"],
             specialist=specialist,
             evidence=tuple(
@@ -282,7 +284,43 @@ class LangGraphInvestigator:
             "proposal": None,
         }
         try:
+            existing = self._graph.get_state(config).values
+            if (
+                existing.get("tenant_id") == tenant_id
+                and existing.get("request_id") == request_id
+                and "critic" in existing
+                and "hypotheses" in existing
+            ):
+                critic = CriticVerdict.model_validate(existing["critic"])
+                hypotheses = tuple(
+                    Hypothesis.model_validate(item) for item in existing["hypotheses"]
+                )
+                proposal = (
+                    RemediationProposal.model_validate(existing["proposal"])
+                    if existing.get("proposal") is not None
+                    else None
+                )
+                return InvestigationResult(
+                    status=(
+                        InvestigationStatus.COMPLETE
+                        if critic.decision is CriticDecision.ACCEPTED
+                        and proposal is not None
+                        else InvestigationStatus.ABSTAINED
+                    ),
+                    tenant_id=tenant_id,
+                    incident_id=request.incident_id,
+                    request_id=request_id,
+                    thread_ref=thread_ref,
+                    hypotheses=hypotheses,
+                    critic=critic,
+                    proposal=proposal,
+                    replayed=True,
+                )
             raw_state = self._graph.invoke(initial, config)
+        except (KeyError, TypeError, ValidationError) as exc:
+            raise OrchestrationFailure(
+                "LangGraph checkpoint returned invalid state"
+            ) from exc
         except Exception as exc:
             raise OrchestrationFailure("LangGraph invocation failed") from exc
 

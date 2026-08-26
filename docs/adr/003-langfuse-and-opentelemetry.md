@@ -21,6 +21,10 @@ LangChain instrumentation scopes and apply masking as defense in depth.
 Do not configure LangSmith. Its client may appear transitively through LangGraph, but
 no Layer 1 code calls it.
 
+Layer 4 provider calls follow the same boundary: automatic OpenAI, Anthropic and
+LangChain instrumentation stays disabled. Langfuse may receive only manual redacted OTel
+counts/status and aggregate eval outcomes; the application model ledger owns usage/cost.
+
 ## Consequences
 
 The default demo and all tests/evals are offline. Operators must deliberately supply

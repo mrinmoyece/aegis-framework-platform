@@ -109,6 +109,24 @@ resolve it and never places values in graph, API, audit or trace state.
 Provider-neutral interface that accepts a typed specialist task and returns output
 that must pass domain validation.
 
+**Model gateway**
+Application-owned policy and accounting boundary that converts neutral model requests
+into one or more provider adapter calls (each with a distinct durable attempt ID for
+reservation, resilience, and settlement). It owns routing, reservation, resilience,
+settlement and stale-result rejection; it is not a hosted vendor gateway.
+
+**Model catalog**
+Tenant-authorized declaration of exact provider/model/region capabilities, context/output
+limits, tokenizer limitations, pricing version and secret reference. Unknown data denies.
+
+**Billing ambiguity**
+A durable state where provider acceptance or charging cannot be proven after timeout,
+cancellation or crash. It blocks an exactly-once claim and requires reconciliation.
+
+**Provider health projection**
+Rebuildable aggregate of observed application call outcomes. It is an availability hint,
+not authorization, billing truth, provider SLA, or audit.
+
 **Temporal**
 A durable workflow engine deferred until long-running approvals/effects need replay
 across process boundaries.

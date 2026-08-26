@@ -1,4 +1,4 @@
-# Layer 3 threat model
+# Layer 4 threat model
 
 ## Assets and trust boundaries
 
@@ -36,6 +36,15 @@ trusted to provide their documented mechanics, not enterprise authority.
 | Framework history/checkpoint loss | Reconcile from application intent; never infer outcome | Manual recovery error |
 | Trace payload leak | Fixed names, allowlists, tenant buckets, no automatic LangGraph capture | Exporter/runtime changes need redaction tests |
 | Dependency/image substitution | Exact Python pins, lockfile, Action SHAs, image digests, CodeQL/audit | Registry/toolchain compromise |
+| Provider/vendor shape crosses boundary | Strict neutral contracts; vendor parsing only in adapters | Adapter mapping defect |
+| Model chooses tenant/role/policy/approval | Binding comes from application context; output schema has no authority fields | Application wiring defect |
+| Unknown model capability/price | Deny by default before reservation/network | Stale catalog availability |
+| Context/tool abuse | Byte/token bounds, strict schema, exact tool allowlist, evidence framing | Provider tokenizer variance |
+| Retry/billing multiplication | SDK retries disabled; stable intent suppresses duplicate; ambiguous billing blocks fallback by default | Provider may bill an unknown outcome |
+| Budget race | Locked PostgreSQL budget and immutable tenant reservation | DBA boundary |
+| Policy revoked during call | Current revision/cancellation recheck; settle billing then reject output | Revocation-store latency |
+| Circuit/health treated as truth | Circuit is bounded availability control; health is derived projection | Small-sample false signal |
+| Prompt/completion telemetry leak | No automatic tracing; manual redacted OTel counts/status only | SDK/operator instrumentation changes |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.
@@ -63,4 +72,6 @@ server schema upgrades, worker version routing, backup/restore, multi-cluster
 replication, load limits, and disaster recovery are not proven. PostgreSQL HA/PITR,
 external event witnessing, retention/erasure, live connectors/models, approvals,
 effects, fencing, reconciliation, sandbox tools, UI, MCP/A2A, and deployment are also
-unproven.
+unproven. Official provider adapters are present, but live credentials, regional data
+handling, model/version qualification, tokenizer accuracy, pricing feed freshness,
+provider retention/abuse policy, and load/failover are unproven.

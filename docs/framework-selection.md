@@ -17,9 +17,14 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | PyJWT/cryptography | 2.13.0 / 50.0.0 | IdP/JWKS | JOSE/JWK/signature/registered claims | Issuer/cache bounds/current principal/grants | `AuthenticatorPort` |
 | OpenTelemetry | 1.44.0 | Exporter/backend optional | Span/metric transport APIs | Redaction, cardinality, sampling, SLO | Canonical telemetry |
 | Langfuse | 4.14.4 | Hosted/self-hosted backend | Optional model/graph trace/eval UI | Payload minimization, retention | Optional behind `ObservabilityPort` |
+| OpenAI SDK | 3.1.0 | Provider network when enabled | OpenAI Responses protocol/decoding | Policy, routing, budget, pricing, usage, safety | Optional behind `ModelProviderAdapter` |
+| Anthropic SDK | 0.122.0 | Provider network when enabled | Anthropic Messages protocol/decoding | Policy, routing, budget, pricing, usage, safety | Optional behind `ModelProviderAdapter` |
 | Keycloak | 26.7.1 local digest | JVM + database | Local OIDC compatibility | Realm/client/grants/production operations | Optional |
 | Redis/Valkey | Not installed | Additional state service | Queue primitives | Leases, truth, retry, tenancy still custom | Reject: Temporal owns workflow queue |
-| OpenAI/Anthropic | Deferred | Credentials/network | Provider calls | Data policy, routing, quotas, schema | `StructuredModelPort` |
+| LiteLLM | 1.98.0 evaluated, not installed | Proxy/SDK and broad dependencies | Unified provider API/routing | Enterprise controls still remain | Reject: OpenAI 3 conflict, overlap, footprint |
+| Instructor | 1.16.0 evaluated, not installed | Validation/retry wrapper | Structured parsing/repair | Policy/budget/ledger still remain | Reject: version/retry overlap |
+| LangChain provider interfaces | 1.5.1 evaluated, not installed | LangChain messages/tracing/tokenizer | Provider runnable wrappers | Enterprise controls still remain | Reject: coupling without control removal |
+| Portkey/OpenRouter | Not installed | External gateway/SaaS | Hosted routing/retry/cost UI | Application truth and privacy controls | Reject: external authority/trace/retry plane |
 | pgvector/RAG | Deferred | Extension/index | Vector search | Tenant/provenance/relevance | `EvidencePort` |
 | UI, MCP/A2A, sandbox | Deferred | New runtimes/services | N/A | Session/tool/effect security | Later layers |
 
@@ -54,6 +59,25 @@ retries the Activity, not individual nodes. LangGraph has no independent retry l
 Provider SDK retries must be disabled or included inside the Activity attempt. This
 keeps one visible retry owner per boundary.
 
+## Layer 4 model framework decision
+
+Official package metadata checked on 2026-08-15 reports `openai==3.1.0` and
+`anthropic==0.122.0` as current stable releases supporting the repository Python range.
+Both expose retry disablement through `max_retries=0`. Aegis uses their protocol clients
+only in `provider_adapters.py`; neutral messages, tools, structured schemas, errors,
+usage, pricing, policy, reservations, ledger, and health live in application contracts.
+
+LiteLLM 1.98.0 requires OpenAI `<3`, carries boto3/tiktoken/aiohttp and multiple
+retry/routing/telemetry axes. Instructor 1.16.0 also requires OpenAI `<3`, its Anthropic
+extra pins 0.93.0, and Tenacity duplicates bounded repair. `langchain-openai==1.5.1`
+would fit `langchain-core==1.5.5` but adds LangChain message/tiktoken coupling and tracing
+risk without removing enterprise code. Portkey/OpenRouter place retry, model catalog,
+cost, and potentially prompt/completion observation in another control plane.
+
+The selected pair increases direct optional dependencies and adapter code. It does not
+reduce policy, budget, ledger, resilience, safety, or evaluation code. Official SDKs
+remove only provider wire-protocol maintenance.
+
 Temporal workflow history can resume mechanics but is not an authorization, tenant
 grant, audit record, application outcome, approval, fencing token, or effect receipt.
 The API reads PostgreSQL projections only.
@@ -76,7 +100,8 @@ a qualified server topology and schema upgrade process.
 Pinned custom targets:
 
 - Layer 3 durable ledger: `87cefe58adbf62e6a419d38e57e0928581b7003c`;
-- Layer 4 worker runtime: `171fa485819334a892684544c0a993a6e2fc4ace`.
+- Layer 4 worker runtime: `171fa485819334a892684544c0a993a6e2fc4ace`;
+- Layer 5 model gateway: `7c22d380a66f57aad943fe926ffff3ca8fc06ed6`.
 
 Custom Layer 3 uses 3,765 production LOC and 2,239 test LOC. Its change from Layer 2 is
 3,901 additions across 42 files. Custom Layer 4 grows to 7,452 production LOC and
@@ -88,7 +113,19 @@ history, and crash-recovery machinery. It does not remove application event enve
 expected versions, RLS, idempotency, inbox/outbox, stale-result controls, projections,
 authorization, audit, or redaction. It adds one operational control plane and workflow
 history/versioning lock-in. The exact framework branch measurements are in
-`comparison/layer3-metrics.json`.
+`comparison/layer4-metrics.json`.
+
+Custom Layer 5 has 11,079 production LOC and 5,479 test LOC (16,558 total); its Layer 5
+increment adds 6,568 lines across 55 files. Framework Layer 4 has 12,136 production LOC
+and 5,463 test LOC (17,599 total). Framework use therefore increases production LOC by
+1,057 and total LOC by 1,041. Official SDKs eliminate wire protocol code but none of the
+enterprise controls.
+
+On the same arm64/Python 3.14.7 machine, 50 equivalent in-process fake calls covering
+catalog route, reservation and settlement measured 0.348 ms median/0.510 ms p95 for
+Framework Layer 4 and 0.166/0.206 ms for custom Layer 5. These are not service benchmarks:
+they exclude PostgreSQL, Temporal, Redis, provider network, serialization and process
+boundaries.
 
 ## Versioning and lock-in
 
@@ -104,6 +141,7 @@ Escape hatches:
 - PostgreSQL: repository ports + canonical SQL/JSON export;
 - PyJWT/IdP: `AuthenticatorPort` + standard JWT/JWK/OIDC;
 - Langfuse: `ObservabilityPort` + OpenTelemetry.
+- OpenAI/Anthropic: `ModelProviderAdapter` + neutral `ModelRequest`/`ProviderResult`.
 
 ## Primary sources
 
@@ -123,6 +161,11 @@ Accessed 2026-08-15:
 - [PostgreSQL version policy](https://www.postgresql.org/support/versioning/)
 - [OpenTelemetry](https://opentelemetry.io/docs/)
 - [Langfuse repository/license](https://github.com/langfuse/langfuse)
+- [OpenAI Python SDK](https://github.com/openai/openai-python)
+- [Anthropic Python SDK](https://github.com/anthropics/anthropic-sdk-python)
+- [LiteLLM routing](https://docs.litellm.ai/docs/routing)
+- [Instructor retry behavior](https://python.useinstructor.com/concepts/retrying/)
+- [Portkey AI Gateway](https://portkey.ai/docs/product/ai-gateway)
 
 Package metadata is the source for exact SDK pins. Production service/license/security
 qualification remains an organizational responsibility.

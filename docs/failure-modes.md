@@ -1,4 +1,4 @@
-# Layer 3 failure modes
+# Layer 4 failure modes
 
 | Failure | Fail-closed behavior | Durable owner | Qualification |
 |---|---|---|---|
@@ -31,12 +31,22 @@
 | Budget exhausted | Authorization Activity records fail-closed outcome before evidence/graph | Application budget | eval |
 | Audit/ledger unavailable | Operation cannot be represented as durable success | PostgreSQL | fail-closed adapter |
 | OTel/Langfuse unavailable | Product truth unaffected; export remains optional | Observability adapter | non-authoritative |
+| Missing/unknown model policy/catalog/price | Deny before network intent | Application model control store | unit/eval/integration |
+| Model reservation race | Row lock allows only budget-fitting reservations | PostgreSQL | integration |
+| Crash after call intent | Pending call appears as ambiguous reserved cost; duplicate network call suppressed | Immutable model ledger | unit/integration |
+| Provider timeout/connection loss | Settle explicit billing ambiguity; no fallback unless policy opts in | Application gateway/ledger | eval |
+| Provider rate/unavailable | Bounded deterministic fallback and circuit; no SDK retries | Application gateway | unit/eval |
+| Malformed/hostile structured output | Strict schema, bounded repair, then fail/abstain | Pydantic/application graph | unit/eval |
+| Unsupported tool/citation | Exact tool allowlist and citation triple validation reject output | Application safety | unit/eval |
+| Policy revoked/cancel during call | Usage is settled but stale result is rejected | Current policy + ledger | unit/eval |
+| Usage/health projection loss | Rebuild from immutable reservations/call events | PostgreSQL application ledger | integration |
 
 ## Retry rules
 
 The application dispatcher retries command delivery. Temporal retries whole Activities.
 LangGraph owns graph checkpoints but not a second retry loop. Connector/provider retries
-must be disabled or included in the Activity attempt. No framework retry converts an
+must be disabled. Bounded repair/fallback is application gateway work within the Activity
+attempt and uses distinct durable attempt IDs. No framework retry converts an
 at-least-once external operation into exactly-once behavior.
 
 ## Operator rules

@@ -39,7 +39,9 @@ replayed in integration CI.
 ## Retry and history decisions
 
 Temporal retries whole Activities at most three times. LangGraph has no overlapping
-retry loop. Provider SDK retry must be disabled or included in the Activity budget.
+retry loop. Provider SDK retry is disabled. The application model gateway may perform only
+policy-bounded repair/fallback under distinct durable attempt IDs and a pre-reserved
+worst-case envelope. Ambiguous provider billing blocks implicit fallback by default.
 The bounded one-investigation/32-signal/two-day workflow does not justify
 continue-as-new. Revisit only from measured history growth.
 
