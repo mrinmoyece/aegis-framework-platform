@@ -20,7 +20,6 @@ def _login(client: TestClient) -> dict[str, object]:
         json={
             "code": "deterministic-demo-code",
             "state": body["state"],
-            "code_verifier": body["code_verifier"],
         },
     )
     assert callback.status_code == 200
@@ -52,7 +51,6 @@ def test_operator_oidc_emulator_rotates_session_and_rejects_replay() -> None:
         json={
             "code": "deterministic-demo-code",
             "state": start["state"],
-            "code_verifier": start["code_verifier"],
         },
     )
     assert first.status_code == 200
@@ -63,13 +61,12 @@ def test_operator_oidc_emulator_rotates_session_and_rejects_replay() -> None:
         json={
             "code": "deterministic-demo-code",
             "state": start["state"],
-            "code_verifier": start["code_verifier"],
         },
     )
     assert replay.status_code == 401
     invalid = client.post(
         "/operator/session/callback",
-        json={"code": "wrong-code", "state": "x" * 43, "code_verifier": "v" * 43},
+        json={"code": "wrong-code", "state": "x" * 43},
     )
     assert invalid.status_code == 401
 
