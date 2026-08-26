@@ -12,6 +12,14 @@ tenant facts, immutable events, delivery records, projections, and audit.
 Jobs while keeping policy, ledger, claims, artifacts, and attestations outside Temporal,
 Kubernetes, and LangGraph.**
 
+**Layer 9 adds event-grounded three-tier memory and pgvector-backed retrieval-augmented
+generation: an immutable ledger of memory facts, a derived rebuildable hybrid index, a
+live forced-RLS pgvector hybrid SQL query proven at the store layer, digest-only
+retrieval/context ledger facts, an explicit `MemoryAcceptance` decision contract, and
+LangGraph-bounded untrusted context — with production wiring of the SQL query into the
+retrieval-serving path, a real embedding provider, and KMS-qualified erasure still
+deferred.**
+
 ## Delivered Layer 8
 
 - additive strict application events with aggregate sequence, commit-order tenant
@@ -109,6 +117,41 @@ Kubernetes, and LangGraph.**
   deterministic output allowlists, scanning/redaction/quarantine, retention references,
   and provenance digests. Sandbox output remains untrusted data.
 
+## Delivered Layer 9
+
+- immutable versioned memory record/fact/projection contracts with citations, ACL,
+  classification/trust, embedder/chunker version binding, retention/legal-hold, and an
+  erasable blob reference, banning raw text/query/prompt/completion/tenant/locator from
+  every ledger fact payload;
+- intent-before-effect ingest lifecycle gated by an explicit `MemoryAcceptance`
+  human/policy decision, with expected-version fencing, deterministic bounded chunking,
+  and neutral `EmbeddingPort`/`SummarizationPort` ports behind a
+  budget/concurrency/timeout-bounded gateway;
+- derived, rebuildable `InMemoryHybridIndex` (lexical/vector/recency/quality/MMR) with a
+  tenant-scoped bounded cache, plus a durable PostgreSQL pgvector chunk-storage adapter
+  under forced RLS and immutability triggers, and a live forced-RLS `hybrid_candidates`
+  SQL query (cosine ANN + lexical + recency/quality + ACL/classification/time/retention
+  prefilters, deterministic tie-break ordering) proven by a PostgreSQL integration test
+  including cross-tenant isolation;
+- digest-only `MemoryOperationFact`s (`RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/
+  `CONTEXT_BUILT`) recorded around every retrieval and context build, with strict
+  sequencing and idempotent replay;
+- `LangGraphMemoryContextBuilder` producing bounded context with a fixed untrusted-data
+  instruction boundary, and a citation-enforcing compactor with deterministic fallback;
+- `aegis.memory.v1` Temporal workflow for ingest/compact/purge/rebuild Activities with
+  periodic 10-second heartbeating, plus legal-hold-gated tombstone/crypto-erase through
+  an injected erase-blob callback;
+- authorized redacted memory status/retrieval APIs and a deterministic `memory-demo` CLI
+  scenario under the same tenant/policy authorization boundary as every other action.
+- **Candid gaps**: `hybrid_candidates` is proven at the store/integration-test layer but
+  not yet wired into `MemoryRetrievalService`/`InMemoryMemoryControl` or
+  `/v1/memories/retrieve`, so production retrieval still serves from
+  `InMemoryHybridIndex`; final MMR/context-budget selection remains application-owned
+  regardless of candidate source; no real embedding/summarization provider is wired;
+  `erase_blob` is a callback, not a
+  qualified KMS/blob integration. See [status](docs/status.md) and
+  [limitations](docs/limitations.md).
+
 ## Ownership
 
 | Owner | Responsibility | Not authoritative for |
@@ -120,6 +163,8 @@ Kubernetes, and LangGraph.**
 | Sandbox backend | One ephemeral provider execution and observation | Authorization, approval, policy, ledger, artifact trust, cluster-isolation claim |
 | Official provider SDKs | OpenAI/Anthropic wire protocol and decoding | Model policy, routing, budget, pricing, usage, safety, retry truth |
 | Connector libraries | HTTPX transport, Kubernetes decoding, PyYAML syntax | Tenant/source policy, SSRF, secrets, provenance, pagination truth, quarantine |
+| Memory ledger/lifecycle | Immutable `memory_facts`/`MemoryLifecycleService` | Derived index/cache, retrieval quality, framework state |
+| Derived memory index/cache | `InMemoryHybridIndex` + PostgreSQL `memory_chunks`/cache | Tenancy, retention, legal hold, audit — never authority |
 
 A framework history, checkpoint, trace, prompt, completion, message, or tool result is
 never an authorization, tenant grant, quota receipt, approval, audit record, fencing
@@ -137,6 +182,7 @@ docker compose config --quiet
 uv run aegis-framework remediation-demo --scenario success
 uv run aegis-framework remediation-demo --scenario ambiguity
 uv run aegis-framework remediation-demo --scenario rollback
+uv run aegis-framework memory-demo
 ```
 
 Run the deterministic API:
@@ -217,6 +263,7 @@ never the repository or workflow history.
 | Optional model trace/eval | Langfuse 4.14.4 | Counts/status only |
 | Provider adapters | OpenAI 3.1.0 + Anthropic 0.122.0 | `ModelProviderAdapter`; retries disabled |
 | Evidence adapters | HTTPX 0.28.1 + Kubernetes 36.0.3 + PyYAML 6.0.3 | Neutral ports; disabled by default |
+| Memory storage | PostgreSQL 17 + Psycopg 3.3.4 + pgvector extension | Raw `vector` cast write path plus live `hybrid_candidates` hybrid SQL query (store-tested; not yet wired into the serving path) |
 
 ## Qualification status
 
@@ -227,8 +274,16 @@ never the repository or workflow history.
   source revocation, non-causal correlation and SSRF;
 - 331 deterministic tests pass at 90.01% branch coverage, 40 evals pass, and ten
   PostgreSQL plus five Temporal integration tests pass locally;
+- 350 deterministic tests pass at 90.19% branch coverage, 44 evals pass — including
+  memory retrieval/tenant-cache/context/retention cases — and eleven PostgreSQL plus six
+  Temporal integration tests pass locally;
+- 352 deterministic tests pass at 90.17% branch coverage, 44 evals pass — including a
+  live forced-RLS pgvector `hybrid_candidates` query exercised by an integration test
+  with cross-tenant isolation, and digest-only retrieval/context-build ledger facts — and
+  eleven PostgreSQL plus six Temporal integration tests pass locally;
 - one Keycloak compatibility test remains environment-gated;
-- tests/evals use no live credentials, real models, or cloud services.
+- tests/evals use no live credentials, real models, real embedding providers, or cloud
+  services.
 
 See [status](docs/status.md) and [limitations](docs/limitations.md) before interpreting
 these as production evidence.
@@ -244,6 +299,15 @@ process boundaries. The conclusion is deliberately critical: Temporal and Kubern
 remove workflow/Job mechanics, not policy, approval, tenant controls, artifacts, fencing,
 reconciliation, cleanup, or live-isolation qualification.
 
+`comparison/layer9-metrics.json` pins custom Aegis Layer 10 and records the equivalent
+memory/RAG comparison: LOC, dependencies, the 200-run deterministic demo benchmark,
+framework code removed, retained controls, and lock-in/escape. Both implementations now
+implement a live pgvector hybrid SQL query; the candid remaining difference is that this
+framework's `hybrid_candidates` query is proven at the store/integration-test layer but
+not yet wired into its own production retrieval-serving path — this framework does not
+independently verify the custom target's serving-path wiring, and retrieval-quality
+parity is not measured by either benchmark.
+
 ## Commands
 
 | Command | Purpose |
@@ -255,7 +319,7 @@ reconciliation, cleanup, or live-isolation qualification.
 | `make docs` | Documentation, parity, pin, and measurement checks |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 8 comparison metrics |
+| `make measure` | Refresh Layer 9 comparison metrics |
 
 Start with [architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
@@ -264,9 +328,11 @@ Start with [architecture](docs/architecture.md),
 [ADR 011](docs/adr/011-governed-specialist-orchestration.md),
 [ADR 012](docs/adr/012-temporal-approval-and-effects.md),
 [ADR 013](docs/adr/013-kubernetes-job-sandbox.md),
+[ADR 014](docs/adr/014-pgvector-sql-event-grounded-memory.md),
 [connector runbook](docs/connector-runbook.md), [runbook](docs/runbook.md),
 [approval/effect runbook](docs/approval-effect-runbook.md),
 [sandbox runbook](docs/sandbox-runbook.md),
+[memory runbook](docs/memory-runbook.md),
 [threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).
 

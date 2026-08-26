@@ -64,6 +64,14 @@ from aegis_framework.evidence import EvidenceCursorView, EvidenceQueryView
 from aegis_framework.evidence_runtime import EvidenceStatusPort
 from aegis_framework.fixtures import DemoBundle, DemoScenario, build_demo_bundle
 from aegis_framework.identity import UnavailableAuthenticator
+from aegis_framework.memory import (
+    MemoryProjection,
+    MemoryRetrievalPort,
+    MemoryStatusPort,
+    RetrievalPolicy,
+    RetrievalQuery,
+    RetrievalResult,
+)
 from aegis_framework.model_gateway import (
     CredentialReference,
     DataClassification,
@@ -230,6 +238,30 @@ class SandboxArtifactApiView(StrictModel):
     retention_expires_at: str
 
 
+class MemoryApiView(StrictModel):
+    memory_ref: Identifier
+    tier: str
+    status: str
+    version: int = Field(ge=1)
+    record_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    chunk_count: int = Field(ge=0)
+    indexed: bool
+    tombstoned: bool
+    legal_hold_count: int = Field(ge=0)
+    derived_purged: bool
+    blob_erased: bool
+
+
+class ApiMemoryRetrievalRequest(StrictModel):
+    query_id: Identifier
+    run_id: Identifier
+    incident_id: Identifier
+    text: str = Field(min_length=1, max_length=8_192)
+    top_k: int = Field(default=8, ge=1, le=20)
+    maximum_tokens: int = Field(default=2_048, ge=16, le=8_192)
+    maximum_bytes: int = Field(default=32_768, ge=256, le=65_536)
+
+
 class BodySizeLimitMiddleware:
     """Reject request bodies over the bound even without Content-Length."""
 
@@ -308,6 +340,8 @@ class ApiRuntime:
     orchestration_cursor_codec: CursorCodec | None = None
     approvals: ApprovalService | None = None
     sandbox_control: SandboxReadPort | None = None
+    memory_status_control: MemoryStatusPort | None = None
+    memory_retrieval_control: MemoryRetrievalPort | None = None
 
     def ready(self) -> bool:
         return self.authenticator.ready() and self.governance.ready()
@@ -369,8 +403,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.8.0",
-        description="Authenticated Layer 8 approval-bound sandbox control API.",
+        version="0.9.0",
+        description="Authenticated Layer 9 event-grounded memory and RAG control API.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.state.mode = mode
@@ -743,6 +777,94 @@ def create_app(
             )
         )
 
+    @app.get(
+        "/v1/memories/{memory_id}",
+        response_model=MemoryApiView,
+    )
+    def memory_status(
+        memory_id: Annotated[str, Path(min_length=1, max_length=128)],
+        identity: IdentityContext = Depends(authenticated),
+    ) -> MemoryApiView:
+        control = _require_memory_status_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.MEMORY_READ,
+            resource_tenant_id=identity.tenant_id,
+        )
+        projection = control.projection(
+            tenant_id=identity.tenant_id,
+            memory_id=memory_id,
+        )
+        if projection is None:
+            _not_found()
+        return _memory_view(projection)
+
+    @app.post(
+        "/v1/memories/retrieve",
+        response_model=RetrievalResult,
+    )
+    def memory_retrieve(
+        payload: ApiMemoryRetrievalRequest,
+        identity: IdentityContext = Depends(authenticated),
+    ) -> RetrievalResult:
+        from datetime import UTC, datetime
+        from hashlib import sha256
+
+        from aegis_framework.evidence import DataClassification
+        from aegis_framework.memory import canonical_text
+
+        control = _require_memory_retrieval_control(selected_runtime)
+        _authorize_resource(
+            selected_runtime,
+            identity,
+            Action.MEMORY_RETRIEVE,
+            resource_tenant_id=identity.tenant_id,
+        )
+        try:
+            now = datetime.now(UTC)
+            query = RetrievalQuery(
+                query_id=payload.query_id,
+                tenant_id=identity.tenant_id,
+                run_id=payload.run_id,
+                incident_id=payload.incident_id,
+                principal_ref=stable_id(
+                    "actor",
+                    identity.issuer,
+                    identity.subject_id,
+                    length=32,
+                ),
+                roles=identity.roles,
+                allowed_classifications=frozenset(
+                    {
+                        DataClassification.PUBLIC,
+                        DataClassification.INTERNAL,
+                    }
+                ),
+                text=payload.text,
+                query_digest=sha256(canonical_text(payload.text).encode()).hexdigest(),
+                requested_at=now,
+                as_of=now,
+                policy=RetrievalPolicy(
+                    policy_id="memory-retrieval-api-v1",
+                    revision=1,
+                    lexical_weight=0.35,
+                    vector_weight=0.35,
+                    recency_weight=0.15,
+                    quality_weight=0.15,
+                    mmr_lambda=0.7,
+                    maximum_candidates=100,
+                    top_k=payload.top_k,
+                    maximum_tokens=payload.maximum_tokens,
+                    maximum_bytes=payload.maximum_bytes,
+                    cache_ttl_seconds=60,
+                    freshness_seconds=604_800,
+                ),
+            )
+            return control.retrieve(query)
+        except (IntegrityFailure, PolicyDenied, ValidationError, ValueError):
+            _not_found()
+
     @app.post(
         "/v1/approvals/{approval_id}/decisions",
         response_model=ApprovalApiView,
@@ -1027,6 +1149,9 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
     from aegis_framework.remediation_demo import build_remediation_api_demo
 
     remediation_demo = build_remediation_api_demo()
+    from aegis_framework.memory_demo import run_memory_demo
+
+    memory_demo = run_memory_demo()
     return ApiRuntime(
         authenticator=primary.authenticator,
         governance=primary.governance,
@@ -1047,6 +1172,8 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
             b"aegis-demo-artifact-cursor-test-only-01"
         ),
         approvals=remediation_demo.approvals,
+        memory_status_control=memory_demo.control,
+        memory_retrieval_control=memory_demo.retrieval_service,
     )
 
 
@@ -1083,6 +1210,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
         IssuerConfiguration,
         JwtAuthenticator,
     )
+    from aegis_framework.memory_postgres import PostgresMemoryStore
     from aegis_framework.model_postgres import PostgresModelControlStore
     from aegis_framework.orchestration_postgres import PostgresOrchestrationLedger
     from aegis_framework.postgres import PostgresRepository, open_runtime_pool
@@ -1143,6 +1271,7 @@ def _production_runtime_from_environment() -> ApiRuntime:
             cursor_codec=cursor_codec,
         ),
         model_control=PostgresModelControlStore(pool=pool),
+        memory_status_control=PostgresMemoryStore(pool=pool),
         orchestration_control=PostgresOrchestrationLedger(
             pool=orchestration_pool,
             clock=clock,
@@ -1266,6 +1395,40 @@ def _require_sandbox_control(runtime: ApiRuntime) -> SandboxReadPort:
             detail="sandbox control is unavailable",
         )
     return runtime.sandbox_control
+
+
+def _memory_view(projection: MemoryProjection) -> MemoryApiView:
+    return MemoryApiView(
+        memory_ref=projection.memory_id,
+        tier=projection.tier.value,
+        status=projection.status.value,
+        version=projection.version,
+        record_digest=projection.record_digest,
+        chunk_count=projection.chunk_count,
+        indexed=projection.indexed,
+        tombstoned=projection.tombstoned,
+        legal_hold_count=projection.legal_hold_count,
+        derived_purged=projection.derived_purged,
+        blob_erased=projection.blob_erased,
+    )
+
+
+def _require_memory_status_control(runtime: ApiRuntime) -> MemoryStatusPort:
+    if runtime.memory_status_control is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="memory status is unavailable",
+        )
+    return runtime.memory_status_control
+
+
+def _require_memory_retrieval_control(runtime: ApiRuntime) -> MemoryRetrievalPort:
+    if runtime.memory_retrieval_control is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="memory retrieval is unavailable",
+        )
+    return runtime.memory_retrieval_control
 
 
 def _approval_view(value: ApprovalView) -> ApprovalApiView:

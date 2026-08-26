@@ -1,4 +1,4 @@
-# Layer 8 qualification status
+# Layer 9 qualification status
 
 ## Delivered
 
@@ -85,24 +85,55 @@
   external proxy policy registration is not implemented, with no false FQDN claim;
 - bounded atomic archive staging and output allowlists with hashing, scanning, redaction,
   quarantine, retention references and provenance.
+- immutable versioned memory record/fact/projection contracts with citations, ACL,
+  classification/trust, embedder/chunker version binding, retention/legal-hold, and an
+  erasable blob reference, plus banned raw-text/query/prompt/completion/tenant/locator
+  fields in every ledger fact payload;
+- intent-before-effect ingest lifecycle (candidate through scan/chunk/embed/index) gated
+  by an explicit `MemoryAcceptance` human/policy decision record (disposition, reviewer
+  kind, policy digest, reason code), with expected-version fencing, deterministic bounded
+  chunking, and neutral `EmbeddingPort`/`SummarizationPort` ports behind a
+  budget/concurrency/timeout-bounded gateway;
+- derived, rebuildable `InMemoryHybridIndex` (lexical/vector/recency/quality/MMR) with a
+  tenant-scoped bounded cache, plus a durable PostgreSQL pgvector chunk-storage adapter
+  under forced RLS and immutability triggers, and a live forced-RLS `hybrid_candidates`
+  SQL query combining cosine ANN distance, lexical `ts_rank_cd`, recency/quality scoring
+  and ACL/classification/time/retention prefilters with deterministic tie-break ordering,
+  exercised by a PostgreSQL integration test including cross-tenant isolation;
+- digest-only `MemoryOperationFact`s (`RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/
+  `CONTEXT_BUILT`) recorded by `MemoryRetrievalService` around every retrieval and context
+  build, appended to an in-memory or durable immutable ledger with strict sequencing and
+  idempotent replay, carrying only policy/query/result digests;
+- `LangGraphMemoryContextBuilder` producing bounded JSON-compatible context with a fixed
+  untrusted-data instruction boundary, and a citation-enforcing compactor with a
+  deterministic extractive fallback;
+- `aegis.memory.v1` Temporal workflow for ingest/compact/purge/rebuild Activities carrying
+  only opaque references, with an initial heartbeat plus a periodic 10-second heartbeat
+  under every long-running Activity, plus legal-hold-gated tombstone/crypto-erase
+  lifecycle through an injected erase-blob callback;
+- authorized redacted memory status/retrieval API endpoints and a deterministic
+  `memory-demo` CLI scenario under the same tenant/policy authorization boundary as every
+  other Layer 2+ action.
 
 ## Qualification snapshot
 
-- 331 deterministic tests pass with 90.01% meaningful branch coverage;
-- 40 deterministic evals pass, including pagination, poisoning, source revocation,
-  deterministic non-causal correlation and private-destination rejection;
-- ten local PostgreSQL integration tests cover forced RLS/tenant isolation,
-  immutable audit/events/model/evidence/orchestration facts, quota/model races,
-  checkpoint isolation, dedicated-pool concurrency, crash ambiguity/reconciliation
+- 352 deterministic tests pass with 90.17% meaningful branch coverage;
+- 44 deterministic evals pass, including pagination, poisoning, source revocation,
+  deterministic non-causal correlation, private-destination rejection, and memory
+  retrieval/tenant-cache/context/retention cases;
+- eleven local PostgreSQL integration tests cover forced RLS/tenant isolation,
+  immutable audit/events/model/evidence/orchestration/sandbox/memory facts, quota/model
+  races, checkpoint isolation, dedicated-pool concurrency, crash ambiguity/reconciliation,
+  the live pgvector `hybrid_candidates` query with cross-tenant/classification isolation,
   and deterministic rebuild;
-- five local Temporal integration tests cover no-worker recovery, Activity retry,
-  duplicate signal, cancellation, timeout, replay, opaque evidence pagination, and the
-  real application outbox/Activity/projection path, and sandbox provision/capture/
-  attestation/cleanup replay;
+- six local Temporal integration tests cover no-worker recovery, Activity retry,
+  duplicate signal, cancellation, timeout, replay, opaque evidence pagination, the
+  real application outbox/Activity/projection path, sandbox provision/capture/
+  attestation/cleanup replay, and memory ingest retry/fencing/completion/replay;
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer8-metrics.json`.
+`comparison/layer9-metrics.json`.
 
 ## Not proven
 
@@ -111,5 +142,11 @@ load/capacity, WORM witnessing, retention/erasure execution, live IdP rotation, 
 connector/model credentials and provider qualification, production DNS/egress,
 complex-document parser isolation, live Kubernetes credentials/RBAC/admission,
 independent production verification, live Kata/gVisor/admission/CNI/CSI/egress-proxy/
-workload-identity sandbox qualification, memory/RAG, UI/BFF, MCP/A2A and deployment
-admission remain unproven.
+workload-identity sandbox qualification, UI/BFF, MCP/A2A and deployment admission remain
+unproven. For memory specifically: `PostgresMemoryStore.hybrid_candidates` is implemented
+and integration-tested at the store layer, and retrieval/context-build now emit
+digest-only ledger facts — but wiring that SQL query into the production retrieval
+control path (`MemoryRetrievalService`/`InMemoryMemoryControl`, `/v1/memories/retrieve`),
+a real embedding/summarization provider, and KMS/blob-qualified crypto-erasure are not
+proven. Final MMR diversification and `ContextBudget` selection also remain an
+application-owned step regardless of candidate source.

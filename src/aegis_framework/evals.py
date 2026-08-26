@@ -26,12 +26,15 @@ from aegis_framework.errors import (
     OrchestrationFailure,
     PolicyDenied,
 )
+from aegis_framework.evidence import DataClassification as MemoryClassification
 from aegis_framework.fixtures import (
     DemoScenario,
     build_demo_bundle,
     demo_identity,
     demo_request,
 )
+from aegis_framework.memory import RetrievalPolicy, RetrievalQuery
+from aegis_framework.memory_demo import DEMO_MEMORY_TIME, run_memory_demo
 from aegis_framework.remediation import RemediationStatus
 from aegis_framework.remediation_demo import (
     RemediationDemoScenario,
@@ -85,6 +88,10 @@ class EvalCase(StrictModel):
         "sandbox-input-security",
         "sandbox-archive-security",
         "sandbox-egress-security",
+        "memory-retrieval",
+        "memory-tenant-cache",
+        "memory-context",
+        "memory-retention",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -130,6 +137,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 
 def _run_case(case: EvalCase) -> EvalOutcome:
+    if case.kind.startswith("memory-"):
+        return _run_memory_case(case)
     if case.kind.startswith("sandbox-"):
         return _run_sandbox_case(case)
     if case.kind.startswith("remediation-"):
@@ -209,6 +218,78 @@ def _run_case(case: EvalCase) -> EvalOutcome:
         if secondary.tenant_id != "tenant-beta":
             details.append("secondary_tenant_mismatch")
 
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details),
+    )
+
+
+def _run_memory_case(case: EvalCase) -> EvalOutcome:
+    from datetime import timedelta
+    from hashlib import sha256
+
+    details: list[str] = []
+    demo = run_memory_demo()
+    if case.kind == "memory-retrieval":
+        if (
+            not demo.retrieval.hits
+            or demo.retrieval.insufficient_context
+            or any(not hit.citation.provenance_digest for hit in demo.retrieval.hits)
+        ):
+            details.append("provenance_preserving_retrieval_failed")
+    elif case.kind == "memory-context":
+        if (
+            demo.context.insufficient_context
+            or not demo.context.snippets
+            or any(
+                "<untrusted-memory" not in snippet.framed_text
+                for snippet in demo.context.snippets
+            )
+        ):
+            details.append("bounded_untrusted_context_failed")
+    elif case.kind == "memory-retention":
+        projection = demo.control.projection(
+            tenant_id=demo.projection.tenant_id,
+            memory_id=demo.projection.memory_id,
+        )
+        if projection is None or not projection.indexed or projection.tombstoned:
+            details.append("memory_lifecycle_projection_failed")
+    elif case.kind == "memory-tenant-cache":
+        text = "deployment rollback"
+        policy = RetrievalPolicy(
+            policy_id="eval-memory-policy",
+            revision=1,
+            lexical_weight=0.35,
+            vector_weight=0.35,
+            recency_weight=0.15,
+            quality_weight=0.15,
+            mmr_lambda=0.7,
+            maximum_candidates=20,
+            top_k=5,
+            maximum_tokens=512,
+            maximum_bytes=8192,
+            cache_ttl_seconds=60,
+            freshness_seconds=604800,
+        )
+        foreign = RetrievalQuery(
+            query_id="eval-memory-tenant-cache",
+            tenant_id="tenant-beta",
+            run_id="run:eval-memory",
+            incident_id="incident:checkout-001",
+            principal_ref="actor:responder",
+            roles=("incident-responder",),
+            allowed_classifications=frozenset({MemoryClassification.INTERNAL}),
+            text=text,
+            query_digest=sha256(text.encode()).hexdigest(),
+            requested_at=DEMO_MEMORY_TIME + timedelta(seconds=1),
+            as_of=DEMO_MEMORY_TIME,
+            policy=policy,
+        )
+        if demo.control.retrieve(foreign).hits:
+            details.append("cross_tenant_memory_cache_leak")
+    else:
+        details.append("unknown_memory_case")
     return EvalOutcome(
         case_id=case.case_id,
         passed=not details,

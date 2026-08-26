@@ -475,3 +475,82 @@
      Live Kata/gVisor isolation, admission/CNI/CSI/proxy/workload identity, node escape,
      cluster upgrades, load/chaos, scanner efficacy, retention deletion, managed vendors,
      and production credentials. Unit manifest tests cannot qualify those controls.
+
+## Layer 9: event-grounded memory and pgvector RAG
+
+101. **Why must a memory candidate bind to accepted or redacted evidence rather than raw
+     text?**
+     Untrusted or quarantined content must never become a durable memory authority. Binding
+     to an evidence ID/digest keeps memory provenance traceable and rejects anything not
+     already through the evidence disposition gate.
+
+102. **What fields are banned from every `MemoryFact` payload, and why?**
+     Raw text, query text, prompt, completion, tenant ID and locator. Facts are the audit
+     trail; leaking any of these would put untrusted or sensitive content directly into an
+     immutable, potentially long-lived ledger.
+
+103. **Why is the derived vector/lexical index never authoritative?**
+     `InMemoryHybridIndex` and the PostgreSQL `memory_chunks`/cache tables are rebuildable
+     projections of `memory_facts`. Losing or corrupting them changes nothing about tenancy,
+     retention, or what actually happened; only replaying `reduce_memory` does.
+
+104. **What does `MemoryContext.instruction_boundary` do, and why is it fixed?**
+     It is a constant literal prefixed to every retrieved snippet, marking the content as
+     untrusted LangGraph state. A model or downstream node must never treat retrieved
+     memory as an instruction, approval, or effect trigger.
+
+105. **Why does `tombstone_and_erase` check legal hold before purging anything?**
+     Retention/legal obligations must outrank a deletion request. The service raises
+     `PolicyDenied` before appending a tombstone fact, purging the derived index, or
+     invoking the erase-blob callback whenever `legal_hold_count` is nonzero.
+
+106. **Is `erase_blob` a KMS integration?**
+     No. It is an injected callback contract point. This repository does not ship or claim a
+     qualified KMS/blob-storage crypto-erasure integration; key rotation and cross-region
+     erasure durability are unproven.
+
+107. **Does this framework run a live pgvector similarity query?**
+     Yes, at the store layer. `PostgresMemoryStore.hybrid_candidates` implements a single
+     forced-RLS SQL query combining cosine ANN distance (`embedding <=> %s::vector`),
+     lexical `ts_rank_cd`, recency/quality scoring, and ACL/classification/time/retention
+     prefilters into one deterministic weighted score, exercised by a PostgreSQL
+     integration test including a cross-tenant/classification isolation assertion. It is
+     not yet wired into `MemoryRetrievalService`/`InMemoryMemoryControl` or
+     `/v1/memories/retrieve`; production retrieval still serves from
+     `InMemoryHybridIndex` until that wiring lands. Final MMR diversification and
+     `ContextBudget` selection remain application-owned regardless of candidate source.
+
+108. **Are retrieval and context-build part of the immutable audit trail?**
+     Yes. `MemoryRetrievalService` wraps every retrieval and context build, appending
+     digest-only `MemoryOperationFact`s (`RETRIEVE_REQUESTED`, `RETRIEVE_COMPLETED`,
+     `CONTEXT_BUILT`) with strict per-operation sequencing and idempotent replay to
+     `InMemoryMemoryOperationLedger` or the durable, immutable `aegis
+     .memory_operation_facts` table. These facts carry only policy/query/result digests —
+     never raw query text or content — and are a separate, purpose-built ledger from the
+     primary `MemoryFact` ingest/lifecycle ledger; they share the `MemoryFactType` enum
+     values but not a table or class. Ingest, supersession, legal hold, tombstone/erasure,
+     and now retrieval/context-build are all ledger-audited.
+
+109. **How does `MemoryCompactor` avoid uncited summarization claims?**
+     It requires citation coverage over the candidate snippet set; when coverage is
+     insufficient it marks `insufficient_context=true` or falls back to a deterministic
+     extractive summary rather than fabricate an uncited claim.
+
+110. **What does Temporal's `aegis.memory.v1` workflow add, and what does it not add?**
+     Durable retry/backoff/timeout for ingest/compact/purge/rebuild Activities carrying only
+     opaque references. It adds no authority: version fencing, legal-hold checks, and fact
+     ordering remain enforced entirely by the application lifecycle service.
+
+111. **What is `MemoryAcceptance`, and why does `ingest` require one?**
+     An explicit, digested decision record (`disposition` accept/reject, `reviewer_kind`
+     human/policy, policy ID/revision/digest, reason code) bound by tenant/memory ID.
+     `MemoryLifecycleService.ingest` validates the binding and raises `IntegrityFailure`
+     if it is missing or mismatched, so a memory candidate can never become durable from
+     evidence disposition alone — a human or policy decision is always on record.
+
+112. **How does `TemporalMemoryActivities` detect a stalled long-running operation?**
+     It calls `activity.heartbeat()` immediately, then spawns a background task that
+     heartbeats every 10 seconds for the duration of the Activity, against a 30-second
+     `heartbeat_timeout`. A worker that stops heartbeating — crash, stuck adapter call —
+     is detected and the Activity retried well before the timeout, not only discovered at
+     Activity completion.

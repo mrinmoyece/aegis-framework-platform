@@ -34,6 +34,14 @@ from aegis_framework.fixtures import (
     demo_identity,
     demo_request,
 )
+from aegis_framework.memory_temporal import (
+    AegisMemoryWorkflow,
+    MemoryActivityInput,
+    MemoryActivityOutcome,
+    MemoryWorkflowInput,
+    MemoryWorkflowResult,
+    TemporalMemoryActivities,
+)
 from aegis_framework.remediation_temporal import (
     AegisRemediationWorkflow,
     RemediationActivityInput,
@@ -68,6 +76,7 @@ _TASK_QUEUE = "aegis-integration-v1"
 _EVIDENCE_TASK_QUEUE = "aegis-evidence-integration-v1"
 _REMEDIATION_TASK_QUEUE = "aegis-remediation-integration-v1"
 _SANDBOX_TASK_QUEUE = "aegis-sandbox-integration-v1"
+_MEMORY_TASK_QUEUE = "aegis-memory-integration-v1"
 
 
 class _RetryOnceOperations(CallbackActivityOperations):
@@ -81,6 +90,57 @@ class _RetryOnceOperations(CallbackActivityOperations):
             if self.retry_attempts == 1:
                 raise RepositoryUnavailable("synthetic activity outage")
         return ActivityOutcome(outcome="evidence_ready")
+
+
+class _MemoryOperations:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+        self.fences: set[str] = set()
+        self.embed_attempts = 0
+
+    def _outcome(
+        self,
+        value: MemoryActivityInput,
+        name: str,
+        outcome: str,
+    ) -> MemoryActivityOutcome:
+        self.calls.append(name)
+        self.fences.add(value.fence_token)
+        return MemoryActivityOutcome(outcome=outcome)
+
+    async def record_candidate(
+        self, value: MemoryActivityInput
+    ) -> MemoryActivityOutcome:
+        return self._outcome(value, "record_candidate", "recorded")
+
+    async def authorize(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "authorize", "authorized")
+
+    async def scan(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "scan", "scanned")
+
+    async def chunk(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "chunk", "chunked")
+
+    async def embed(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        self.embed_attempts += 1
+        self.fences.add(value.fence_token)
+        if self.embed_attempts == 1:
+            raise RepositoryUnavailable("synthetic embedding outage")
+        self.calls.append("embed")
+        return MemoryActivityOutcome(outcome="embedded")
+
+    async def index(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "index", "indexed")
+
+    async def compact(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "compact", "compacted")
+
+    async def purge(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "purge", "purged")
+
+    async def rebuild(self, value: MemoryActivityInput) -> MemoryActivityOutcome:
+        return self._outcome(value, "rebuild", "rebuilt")
 
 
 class _EvidenceOperations(EvidenceActivityOperations):
@@ -783,6 +843,63 @@ def test_temporal_remediation_wait_signal_reconcile_cancel_and_replay() -> None:
             history = await success.fetch_history()
             replayed = await Replayer(
                 workflows=[AegisRemediationWorkflow],
+                data_converter=temporal_data_converter(),
+            ).replay_workflow(history)
+            assert replayed.replay_failure is None
+        finally:
+            if environment is not None:
+                await environment.shutdown()
+
+    asyncio.run(execute())
+
+
+@pytest.mark.temporal
+def test_temporal_memory_retry_fencing_completion_and_replay() -> None:
+    async def execute() -> None:
+        client, environment = await _client()
+        operations = _MemoryOperations()
+        activities = TemporalMemoryActivities(operations)
+        worker = Worker(
+            client,
+            task_queue=_MEMORY_TASK_QUEUE,
+            workflows=[AegisMemoryWorkflow],
+            activities=list(activities.registered()),
+        )
+        value = MemoryWorkflowInput(
+            tenant_ref="tenant:opaque",
+            actor_ref="actor:opaque",
+            request_ref="request:opaque",
+            memory_id="memory:temporal",
+            workflow_id="workflow:memory",
+            fence_token="fence:memory:one",
+            operation="ingest",
+            activity_timeout_seconds=60,
+        )
+        try:
+            async with worker:
+                handle = await client.start_workflow(
+                    AegisMemoryWorkflow.run,
+                    value,
+                    id=f"workflow:memory:{uuid4().hex}",
+                    task_queue=_MEMORY_TASK_QUEUE,
+                    execution_timeout=timedelta(minutes=2),
+                )
+                result = await handle.result()
+                assert isinstance(result, MemoryWorkflowResult)
+                assert result.status == "active"
+                assert operations.embed_attempts == 2
+                assert operations.calls == [
+                    "record_candidate",
+                    "authorize",
+                    "scan",
+                    "chunk",
+                    "embed",
+                    "index",
+                ]
+                assert operations.fences == {"fence:memory:one"}
+            history = await handle.fetch_history()
+            replayed = await Replayer(
+                workflows=[AegisMemoryWorkflow],
                 data_converter=temporal_data_converter(),
             ).replay_workflow(history)
             assert replayed.replay_failure is None

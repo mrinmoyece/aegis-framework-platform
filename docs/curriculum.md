@@ -1,4 +1,4 @@
-# Layer 7 curriculum
+# Layer 9 curriculum
 
 ## Learning outcomes
 
@@ -48,6 +48,23 @@ After this layer, an engineer should be able to:
 42. require fresh independent evidence/postconditions instead of API acceptance;
 43. constrain a Kubernetes official-client adapter to one exact operation without shell;
 44. compare Temporal Layer 7 candidly with custom Aegis Layer 8.
+45. bind a memory candidate to accepted/redacted evidence, current chunker/embedder
+    versions, and an explicit `MemoryAcceptance` human/policy decision before appending
+    any candidate/scan/chunk/embed/index fact;
+46. keep the derived vector/lexical index and cache rebuildable and never authoritative
+    for tenancy, retention or audit, including the live `hybrid_candidates` SQL query,
+    which returns scored candidates only, never a final authorized context;
+47. frame retrieved memory as untrusted LangGraph state via a fixed instruction boundary,
+    never as an instruction or effect trigger;
+48. gate `tombstone_and_erase` on current legal hold and treat crypto-erasure callbacks
+    as contract points rather than qualified KMS/blob integrations;
+49. distinguish immutable memory ledger facts, the live pgvector `hybrid_candidates` query
+    (store-tested, not yet wired into the serving path), and digest-only
+    `MemoryOperationFact` retrieval/context-build facts (a separate, purpose-built ledger
+    from the primary `MemoryFact` lifecycle ledger);
+50. compare Framework Layer 9 candidly with custom Aegis Layer 10, including what the
+    live pgvector-query implementations now share and what still differs (application
+    wiring into the serving path, final MMR/bounds ownership).
 
 ## Suggested sequence
 
@@ -87,6 +104,10 @@ After this layer, an engineer should be able to:
 | Ambiguity and fencing | effect service/repository | Crash after request; submit stale result | What can fencing not undo? |
 | Verification/rollback | verification contracts/runbook | Fail postcondition and compensate | Why is API acceptance insufficient? |
 | Layer 7 persistence | migration 0006 | Probe RLS, immutable decision and atomic claim | Which rows are mutable mechanics? |
+| Memory contracts | `memory.py`, ADR 014 | Submit a quarantined-evidence candidate and prove rejection | Which fields may a memory fact never carry? |
+| Memory retrieval/context | `InMemoryHybridIndex`, `LangGraphMemoryContextBuilder` | Rebuild the index and diff retrieval before/after | Why is retrieved memory framed as untrusted state? |
+| Memory persistence | migration 0008, `memory_postgres.py` | Probe forced RLS and run `hybrid_candidates` against a wrong-tenant/classification query | What would wiring the SQL query into the serving path require? |
+| Memory lifecycle/Temporal | `memory_temporal.py`, memory runbook | Hold, attempt erase, release, then erase | Which fact blocks crypto-erasure? |
 
 ## Practical exercises
 
@@ -137,6 +158,20 @@ After this layer, an engineer should be able to:
 39. Rebuild sandbox projection from immutable facts without Temporal or Kubernetes history.
 40. Compare the framework layer with custom Layer 9 by LOC, dependencies, mechanics removed,
     controls retained, runtime, lock-in, escape, and unproven live-isolation claims.
+41. Submit a quarantined-disposition evidence item as a memory candidate and prove `ingest`
+    rejects it before any candidate fact is appended.
+42. Reuse a stale chunker/embedder version on an existing record and prove `IntegrityFailure`
+    is raised before any embed/index fact.
+43. Delete the derived index/cache and rebuild it from `memory_facts` via `reduce_memory`
+    only, then diff retrieval results before and after.
+44. Attempt `tombstone_and_erase` under an open legal hold, then release the hold and erase;
+    prove the injected `erase_blob` callback is only invoked after the hold clears.
+45. Attempt to feed a `MemoryContext` snippet back into the graph as an instruction and show
+    the fixed `instruction_boundary` marks it as untrusted data only.
+46. Run `PostgresMemoryStore.hybrid_candidates` for a wrong-tenant/wrong-classification
+    query and prove it returns zero candidates; compare its scoring/prefilter design with
+    custom Aegis Layer 10's live pgvector query and explain what wiring it into the
+    production serving path would require.
 
 ## Assessment rubric
 

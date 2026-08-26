@@ -104,6 +104,65 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "output_byte_bucket",
         "cleanup_status",
         "runtime_profile",
+        "memory_tier",
+        "memory_outcome",
+        "candidate_count",
+        "chunk_count",
+        "cache_hit",
+        "context_token_bucket",
+        "purged_count",
+    }
+)
+_SAFE_AUDIT_KEYS = frozenset(
+    {
+        "approval_required",
+        "attempt",
+        "citation_count",
+        "error_code",
+        "evidence_count",
+        "policy_id",
+        "policy_revision",
+        "reason",
+        "request_ref",
+    }
+)
+_SAFE_AUDIT_KEYS = frozenset(
+    {
+        "approval_required",
+        "attempt",
+        "citation_count",
+        "error_code",
+        "evidence_count",
+        "policy_id",
+        "policy_revision",
+        "reason",
+        "request_ref",
+    }
+)
+_SAFE_AUDIT_KEYS = frozenset(
+    {
+        "approval_required",
+        "attempt",
+        "citation_count",
+        "error_code",
+        "evidence_count",
+        "policy_id",
+        "policy_revision",
+        "reason",
+        "request_ref",
+    }
+)
+_SAFE_AUDIT_KEYS = frozenset(
+    {
+        "approval_required",
+        "attempt",
+        "citation_count",
+        "error_code",
+        "evidence_count",
+        "policy_id",
+        "policy_revision",
+        "reason",
+        "request_ref",
     }
 )
 _SAFE_AUDIT_KEYS = frozenset(

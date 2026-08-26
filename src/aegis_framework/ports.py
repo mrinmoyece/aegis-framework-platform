@@ -64,6 +64,10 @@ class Action(StrEnum):
     SANDBOX_EXECUTE = "sandbox:execute"
     SANDBOX_READ = "sandbox:read"
     SANDBOX_ARTIFACT_READ = "sandbox:artifact:read"
+    MEMORY_WRITE = "memory:write"
+    MEMORY_READ = "memory:read"
+    MEMORY_RETRIEVE = "memory:retrieve"
+    MEMORY_DELETE = "memory:delete"
 
 
 class PolicyDecision(StrictModel):
@@ -286,6 +290,15 @@ class RemediationObservabilityPort(Protocol):
 
 class SandboxObservabilityPort(Protocol):
     def sandbox(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+
+class MemoryObservabilityPort(Protocol):
+    def memory(
         self,
         *,
         tenant_id: str,

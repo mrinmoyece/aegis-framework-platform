@@ -2,7 +2,7 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 8,
+  "layer": 9,
   "generated_on": "2026-08-17",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
@@ -15,129 +15,394 @@
       "id": "01-platform-foundation",
       "name": "Platform foundation",
       "status": "delivered",
-      "evidence": ["pyproject.toml", "src/aegis_framework", "tests", ".github/workflows/ci.yml"],
-      "framework_owned": ["graph/workflow scheduling", "API validation mechanics"],
-      "enterprise_owned": ["authority boundaries", "release policy"]
+      "evidence": [
+        "pyproject.toml",
+        "src/aegis_framework",
+        "tests",
+        ".github/workflows/ci.yml"
+      ],
+      "framework_owned": [
+        "graph/workflow scheduling",
+        "API validation mechanics"
+      ],
+      "enterprise_owned": [
+        "authority boundaries",
+        "release policy"
+      ]
     },
     {
       "id": "02-tenant-identity-authorization",
       "name": "Tenant identity and authorization",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/identity.py", "src/aegis_framework/authorization.py", "migrations/0001_layer2.sql"],
-      "framework_owned": ["JWT/JWS cryptography", "HTTP validation", "database driver/pool mechanics"],
-      "enterprise_owned": ["issuer registry", "current principals/grants", "purpose/risk policy", "forced tenant RLS"]
+      "evidence": [
+        "src/aegis_framework/identity.py",
+        "src/aegis_framework/authorization.py",
+        "migrations/0001_layer2.sql"
+      ],
+      "framework_owned": [
+        "JWT/JWS cryptography",
+        "HTTP validation",
+        "database driver/pool mechanics"
+      ],
+      "enterprise_owned": [
+        "issuer registry",
+        "current principals/grants",
+        "purpose/risk policy",
+        "forced tenant RLS"
+      ]
     },
     {
       "id": "03-durable-event-ledger",
       "name": "Durable PostgreSQL event ledger",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/durability.py", "src/aegis_framework/durable_postgres.py", "migrations/0002_layer3.sql", "tests/test_durability.py", "tests/test_postgres.py"],
-      "framework_owned": ["PostgreSQL transactions and locking primitives"],
-      "enterprise_owned": ["event envelope", "expected versions", "tenant cursor", "dual hash chains", "immutable facts", "legacy replay"]
+      "evidence": [
+        "src/aegis_framework/durability.py",
+        "src/aegis_framework/durable_postgres.py",
+        "migrations/0002_layer3.sql",
+        "tests/test_durability.py",
+        "tests/test_postgres.py"
+      ],
+      "framework_owned": [
+        "PostgreSQL transactions and locking primitives"
+      ],
+      "enterprise_owned": [
+        "event envelope",
+        "expected versions",
+        "tenant cursor",
+        "dual hash chains",
+        "immutable facts",
+        "legacy replay"
+      ]
     },
     {
       "id": "04-distributed-worker-runtime",
       "name": "Distributed worker runtime",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/temporal.py", "src/aegis_framework/activity_runtime.py", "tests/test_temporal.py", "tests/test_temporal_integration.py", "compose.yaml"],
-      "framework_owned": ["workflow replay", "timers", "signals", "activity retry and heartbeat", "worker recovery"],
-      "enterprise_owned": ["transactional outbox", "operation idempotency", "current authorization", "stale-result policy", "DLQ"]
+      "evidence": [
+        "src/aegis_framework/temporal.py",
+        "src/aegis_framework/activity_runtime.py",
+        "tests/test_temporal.py",
+        "tests/test_temporal_integration.py",
+        "compose.yaml"
+      ],
+      "framework_owned": [
+        "workflow replay",
+        "timers",
+        "signals",
+        "activity retry and heartbeat",
+        "worker recovery"
+      ],
+      "enterprise_owned": [
+        "transactional outbox",
+        "operation idempotency",
+        "current authorization",
+        "stale-result policy",
+        "DLQ"
+      ]
     },
     {
       "id": "05-provider-neutral-model-gateway",
       "name": "Provider-neutral model gateway",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/model_gateway.py", "src/aegis_framework/provider_adapters.py", "src/aegis_framework/model_postgres.py", "migrations/0003_layer4.sql", "tests/test_model_gateway.py"],
-      "framework_owned": ["official provider HTTP protocol and response decoding", "structured LangGraph node invocation"],
-      "enterprise_owned": ["tenant model policy/catalog", "capability and price declarations", "token/cost reservation", "routing and resilience", "immutable usage facts", "structured safety"]
+      "evidence": [
+        "src/aegis_framework/model_gateway.py",
+        "src/aegis_framework/provider_adapters.py",
+        "src/aegis_framework/model_postgres.py",
+        "migrations/0003_layer4.sql",
+        "tests/test_model_gateway.py"
+      ],
+      "framework_owned": [
+        "official provider HTTP protocol and response decoding",
+        "structured LangGraph node invocation"
+      ],
+      "enterprise_owned": [
+        "tenant model policy/catalog",
+        "capability and price declarations",
+        "token/cost reservation",
+        "routing and resilience",
+        "immutable usage facts",
+        "structured safety"
+      ]
     },
     {
       "id": "06-evidence-connectors-correlation",
       "name": "Durable evidence connectors and correlation",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/evidence.py", "src/aegis_framework/connector_adapters.py", "src/aegis_framework/ingestion.py", "src/aegis_framework/correlation.py", "src/aegis_framework/evidence_runtime.py", "src/aegis_framework/evidence_temporal.py", "src/aegis_framework/evidence_postgres.py", "migrations/0004_layer5.sql", "tests/test_evidence_layer5.py"],
-      "framework_owned": ["HTTP connection and streaming mechanics", "Kubernetes wire/object decoding", "safe YAML syntax parsing", "Temporal page scheduling/retry/heartbeat/cancellation"],
-      "enterprise_owned": ["tenant/source/resource allowlists", "secret references", "SSRF/DNS/redirect policy", "durable page intent and reconciliation", "cursor encryption", "canonicalization/scanning/redaction/quarantine", "provenance and citations", "deterministic non-causal correlation", "forced RLS and projection rebuild"]
+      "evidence": [
+        "src/aegis_framework/evidence.py",
+        "src/aegis_framework/connector_adapters.py",
+        "src/aegis_framework/ingestion.py",
+        "src/aegis_framework/correlation.py",
+        "src/aegis_framework/evidence_runtime.py",
+        "src/aegis_framework/evidence_temporal.py",
+        "src/aegis_framework/evidence_postgres.py",
+        "migrations/0004_layer5.sql",
+        "tests/test_evidence_layer5.py"
+      ],
+      "framework_owned": [
+        "HTTP connection and streaming mechanics",
+        "Kubernetes wire/object decoding",
+        "safe YAML syntax parsing",
+        "Temporal page scheduling/retry/heartbeat/cancellation"
+      ],
+      "enterprise_owned": [
+        "tenant/source/resource allowlists",
+        "secret references",
+        "SSRF/DNS/redirect policy",
+        "durable page intent and reconciliation",
+        "cursor encryption",
+        "canonicalization/scanning/redaction/quarantine",
+        "provenance and citations",
+        "deterministic non-causal correlation",
+        "forced RLS and projection rebuild"
+      ]
     },
     {
       "id": "07-specialist-orchestration",
       "name": "Governed durable specialist orchestration",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/orchestration.py", "src/aegis_framework/graph.py", "src/aegis_framework/orchestration_postgres.py", "migrations/0005_layer6.sql", "tests/test_orchestration_layer6.py"],
-      "framework_owned": ["LangGraph static fan-out/fan-in, reducers, conditional routing, checkpoint serialization/history", "Temporal lifecycle recovery around one bounded graph Activity"],
-      "enterprise_owned": ["fixed roles/capabilities", "typed artifacts/transitions/digests", "dispatch intent/result fencing", "policy/budget/citations/confidence/critic gates", "application facts/RLS/projection rebuild", "graph-version compatibility", "retry ownership"]
+      "evidence": [
+        "src/aegis_framework/orchestration.py",
+        "src/aegis_framework/graph.py",
+        "src/aegis_framework/orchestration_postgres.py",
+        "migrations/0005_layer6.sql",
+        "tests/test_orchestration_layer6.py"
+      ],
+      "framework_owned": [
+        "LangGraph static fan-out/fan-in, reducers, conditional routing, checkpoint serialization/history",
+        "Temporal lifecycle recovery around one bounded graph Activity"
+      ],
+      "enterprise_owned": [
+        "fixed roles/capabilities",
+        "typed artifacts/transitions/digests",
+        "dispatch intent/result fencing",
+        "policy/budget/citations/confidence/critic gates",
+        "application facts/RLS/projection rebuild",
+        "graph-version compatibility",
+        "retry ownership"
+      ]
     },
     {
       "id": "08-approval-remediation",
       "name": "Approval-gated remediation actions",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/remediation.py", "src/aegis_framework/remediation_temporal.py", "src/aegis_framework/action_adapters.py", "src/aegis_framework/remediation_postgres.py", "migrations/0006_layer7.sql", "tests/test_remediation_layer7.py", "tests/test_temporal_integration.py"],
-      "framework_owned": ["Temporal durable approval waits/timers/signals, Activity retry/heartbeat/cancellation and workflow replay", "official Kubernetes client request/object mechanics", "FastAPI/Pydantic delivery validation"],
-      "enterprise_owned": ["exact immutable plan/action/approval/effect/verification contracts", "current policy and approval invalidation", "SoD/quorum/expiry/revocation", "tenant idempotency and fencing", "intent/receipt/reconciliation", "fresh verification and compensation policy", "forced RLS and pure projection rebuild"]
+      "evidence": [
+        "src/aegis_framework/remediation.py",
+        "src/aegis_framework/remediation_temporal.py",
+        "src/aegis_framework/action_adapters.py",
+        "src/aegis_framework/remediation_postgres.py",
+        "migrations/0006_layer7.sql",
+        "tests/test_remediation_layer7.py",
+        "tests/test_temporal_integration.py"
+      ],
+      "framework_owned": [
+        "Temporal durable approval waits/timers/signals, Activity retry/heartbeat/cancellation and workflow replay",
+        "official Kubernetes client request/object mechanics",
+        "FastAPI/Pydantic delivery validation"
+      ],
+      "enterprise_owned": [
+        "exact immutable plan/action/approval/effect/verification contracts",
+        "current policy and approval invalidation",
+        "SoD/quorum/expiry/revocation",
+        "tenant idempotency and fencing",
+        "intent/receipt/reconciliation",
+        "fresh verification and compensation policy",
+        "forced RLS and pure projection rebuild"
+      ]
     },
     {
       "id": "09-sandbox-execution",
       "name": "Hardened sandbox execution",
       "status": "delivered",
-      "evidence": ["src/aegis_framework/sandbox.py", "src/aegis_framework/sandbox_adapters.py", "src/aegis_framework/sandbox_temporal.py", "src/aegis_framework/sandbox_postgres.py", "migrations/0007_layer8.sql", "tests/test_sandbox_layer8.py", "tests/test_temporal_integration.py", "docs/sandbox-runbook.md"],
-      "framework_owned": ["Temporal Activity scheduling/retry/heartbeat/cancellation/replay", "official Kubernetes Job and NetworkPolicy API mechanics", "Kubernetes Job scheduling/deadline/resource object mechanics"],
-      "enterprise_owned": ["exact approval/spec/policy contracts", "tenant policy/quota/idempotency/claims/fencing", "runtime/admission/network/workload-identity readiness", "path/archive/output security", "artifact scanning/redaction/quarantine/provenance", "ambiguous create/delete reconciliation and cleanup ownership"]
+      "evidence": [
+        "src/aegis_framework/sandbox.py",
+        "src/aegis_framework/sandbox_adapters.py",
+        "src/aegis_framework/sandbox_temporal.py",
+        "src/aegis_framework/sandbox_postgres.py",
+        "migrations/0007_layer8.sql",
+        "tests/test_sandbox_layer8.py",
+        "tests/test_temporal_integration.py",
+        "docs/sandbox-runbook.md"
+      ],
+      "framework_owned": [
+        "Temporal Activity scheduling/retry/heartbeat/cancellation/replay",
+        "official Kubernetes Job and NetworkPolicy API mechanics",
+        "Kubernetes Job scheduling/deadline/resource object mechanics"
+      ],
+      "enterprise_owned": [
+        "exact approval/spec/policy contracts",
+        "tenant policy/quota/idempotency/claims/fencing",
+        "runtime/admission/network/workload-identity readiness",
+        "path/archive/output security",
+        "artifact scanning/redaction/quarantine/provenance",
+        "ambiguous create/delete reconciliation and cleanup ownership"
+      ]
     },
     {
       "id": "10-memory-pgvector-rag",
       "name": "Event-grounded memory and pgvector RAG",
-      "status": "planned",
-      "evidence": ["docs/roadmap.md"],
-      "framework_owned": [],
-      "enterprise_owned": ["tenant filtering", "provenance", "relevance policy"]
+      "status": "delivered",
+      "evidence": [
+        "src/aegis_framework/memory.py",
+        "src/aegis_framework/memory_postgres.py",
+        "src/aegis_framework/memory_temporal.py",
+        "src/aegis_framework/memory_demo.py",
+        "migrations/0008_layer9.sql",
+        "docs/adr/014-pgvector-sql-event-grounded-memory.md",
+        "docs/memory-runbook.md",
+        "comparison/layer9-metrics.json"
+      ],
+      "framework_owned": [
+        "PostgreSQL/psycopg vector column storage and hybrid_candidates SQL scoring",
+        "LangGraph bounded context assembly",
+        "Temporal ingest/compact/purge/rebuild Activity retry and periodic heartbeat"
+      ],
+      "enterprise_owned": [
+        "immutable memory ledger facts",
+        "explicit human/policy MemoryAcceptance decision contract",
+        "tenant filtering",
+        "provenance/citation enforcement",
+        "relevance policy and final MMR/context-budget selection",
+        "retention and legal hold",
+        "crypto-erasure callback ordering",
+        "derived index/cache rebuildability",
+        "digest-only retrieval/context-build operation ledger and idempotent sequencing"
+      ]
     },
     {
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py", "tests/test_sandbox_layer8.py", "tests/test_temporal_integration.py"],
-      "framework_owned": ["Temporal replay", "optional Langfuse evaluator observation"],
-      "enterprise_owned": ["hermetic safety and approval/effect attack cases", "equivalence", "release thresholds", "load/chaos qualification"]
+      "evidence": [
+        "evals/cases.json",
+        "src/aegis_framework/evals.py",
+        "tests/test_model_gateway.py",
+        "tests/test_evidence_layer5.py",
+        "tests/test_orchestration_layer6.py",
+        "tests/test_remediation_layer7.py",
+        "tests/test_sandbox_layer8.py",
+        "tests/test_temporal_integration.py"
+      ],
+      "framework_owned": [
+        "Temporal replay",
+        "optional Langfuse evaluator observation"
+      ],
+      "enterprise_owned": [
+        "hermetic safety and approval/effect attack cases",
+        "equivalence",
+        "release thresholds",
+        "load/chaos qualification"
+      ]
     },
     {
       "id": "12-observability-replay",
       "name": "Observability and replay",
       "status": "partial",
-      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/remediation_temporal.py", "src/aegis_framework/sandbox_temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py", "src/aegis_framework/orchestration_postgres.py", "src/aegis_framework/remediation_postgres.py", "src/aegis_framework/sandbox_postgres.py"],
-      "framework_owned": ["OTel spans", "Temporal replay", "LangGraph checkpoints"],
-      "enterprise_owned": ["redaction", "cardinality", "event/model/evidence/artifact/remediation replay", "graph/workflow-version compatibility", "projection rebuild", "retention"]
+      "evidence": [
+        "src/aegis_framework/observability.py",
+        "src/aegis_framework/temporal.py",
+        "src/aegis_framework/remediation_temporal.py",
+        "src/aegis_framework/sandbox_temporal.py",
+        "src/aegis_framework/durability.py",
+        "src/aegis_framework/model_postgres.py",
+        "src/aegis_framework/evidence_postgres.py",
+        "src/aegis_framework/orchestration_postgres.py",
+        "src/aegis_framework/remediation_postgres.py",
+        "src/aegis_framework/sandbox_postgres.py"
+      ],
+      "framework_owned": [
+        "OTel spans",
+        "Temporal replay",
+        "LangGraph checkpoints"
+      ],
+      "enterprise_owned": [
+        "redaction",
+        "cardinality",
+        "event/model/evidence/artifact/remediation replay",
+        "graph/workflow-version compatibility",
+        "projection rebuild",
+        "retention"
+      ]
     },
     {
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
       "status": "partial",
-      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py", "tests/test_sandbox_layer8.py"],
-      "framework_owned": ["FastAPI delivery"],
-      "enterprise_owned": ["authorized redacted status/timeline/model/evidence/artifact/approval operations", "anti-enumeration", "opaque/encrypted cursor", "session security", "review UX"]
+      "evidence": [
+        "src/aegis_framework/api.py",
+        "tests/test_durability.py",
+        "tests/test_api_and_cli.py",
+        "tests/test_evidence_layer5.py",
+        "tests/test_orchestration_layer6.py",
+        "tests/test_remediation_layer7.py",
+        "tests/test_sandbox_layer8.py"
+      ],
+      "framework_owned": [
+        "FastAPI delivery"
+      ],
+      "enterprise_owned": [
+        "authorized redacted status/timeline/model/evidence/artifact/approval operations",
+        "anti-enumeration",
+        "opaque/encrypted cursor",
+        "session security",
+        "review UX"
+      ]
     },
     {
       "id": "14-mcp-a2a-interoperability",
       "name": "Secure MCP and A2A interoperability",
       "status": "planned",
-      "evidence": ["docs/roadmap.md"],
+      "evidence": [
+        "docs/roadmap.md"
+      ],
       "framework_owned": [],
-      "enterprise_owned": ["capability grants", "tool identity", "effect policy"]
+      "enterprise_owned": [
+        "capability grants",
+        "tool identity",
+        "effect policy"
+      ]
     },
     {
       "id": "15-production-deployment",
       "name": "Production deployment foundations",
       "status": "partial",
-      "evidence": ["Dockerfile", "compose.yaml", ".github/workflows/ci.yml"],
-      "framework_owned": ["dependency build tooling", "local Temporal server"],
-      "enterprise_owned": ["RLS/runtime role", "mTLS", "provenance", "admission", "HA", "DR"]
+      "evidence": [
+        "Dockerfile",
+        "compose.yaml",
+        ".github/workflows/ci.yml"
+      ],
+      "framework_owned": [
+        "dependency build tooling",
+        "local Temporal server"
+      ],
+      "enterprise_owned": [
+        "RLS/runtime role",
+        "mTLS",
+        "provenance",
+        "admission",
+        "HA",
+        "DR"
+      ]
     },
     {
       "id": "16-enterprise-qualification",
       "name": "Final enterprise qualification",
       "status": "partial",
-      "evidence": ["docs/threat-model.md", "docs/limitations.md", "docs/status.md", "docs/runbook.md"],
+      "evidence": [
+        "docs/threat-model.md",
+        "docs/limitations.md",
+        "docs/status.md",
+        "docs/runbook.md"
+      ],
       "framework_owned": [],
-      "enterprise_owned": ["security", "privacy", "legal", "load", "chaos", "DR sign-off"]
+      "enterprise_owned": [
+        "security",
+        "privacy",
+        "legal",
+        "load",
+        "chaos",
+        "DR sign-off"
+      ]
     }
   ]
 }

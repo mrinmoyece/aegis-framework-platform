@@ -71,6 +71,17 @@ def test_noop_observability_has_no_side_effects() -> None:
             )
             is None
         )
+    with NoopObservability().memory(
+        tenant_id="tenant-acme",
+        attributes={"memory_tier": "episodic"},
+    ) as observation:
+        assert (
+            observation.finish(
+                status="indexed",
+                attributes={"chunk_count": 2},
+            )
+            is None
+        )
 
 
 def test_service_can_emit_otel_without_exporter() -> None:
@@ -113,5 +124,39 @@ def test_remediation_span_exports_only_fixed_bounded_attributes() -> None:
     assert attributes["aegis.operation"] == "remediation_activity"
     assert attributes["aegis.action_kind"] == "kubernetes_rollout_restart"
     assert attributes["aegis.effect_outcome"] == "succeeded"
+    assert "tenant-sensitive" not in repr(attributes)
+    assert "never-export" not in repr(attributes)
+
+
+def test_memory_span_exports_counts_without_query_or_content() -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    observability = OpenTelemetryObservability(
+        provider.get_tracer("aegis-framework-memory-tests")
+    )
+    with observability.memory(
+        tenant_id="tenant-sensitive",
+        attributes={
+            "memory_tier": "episodic",
+            "candidate_count": 8,
+            "query": "never-export",
+        },
+    ) as observation:
+        observation.finish(
+            status="complete",
+            attributes={
+                "chunk_count": 2,
+                "cache_hit": False,
+                "content": "never-export",
+            },
+        )
+    span = exporter.get_finished_spans()[0]
+    assert span.name == "aegis.memory.activity"
+    attributes = dict(span.attributes)
+    assert attributes["aegis.operation"] == "memory_activity"
+    assert attributes["aegis.memory_tier"] == "episodic"
+    assert attributes["aegis.candidate_count"] == 8
+    assert attributes["aegis.chunk_count"] == 2
     assert "tenant-sensitive" not in repr(attributes)
     assert "never-export" not in repr(attributes)

@@ -1,4 +1,4 @@
-# Layer 8 threat model
+# Layer 9 threat model
 
 ## Assets and trust boundaries
 
@@ -98,6 +98,15 @@ trusted to provide their documented mechanics, not enterprise authority.
 | Egress to metadata/private service | Network-none default; exact public DNS declarations; external proxy required for exact destinations | Proxy/CNI/DNS compromise |
 | Kubernetes status treated as audit | APIs and replay use application ledger only | Operator misuse outside application |
 | Cluster prerequisite drift | Readiness fails closed for RuntimeClass, admission, CNI and workload identity | Drift after admission |
+| Sensitive field enters immutable memory fact | `MemoryFact` payload schema bans raw text/query/prompt/completion/tenant/locator fields | Application code defect |
+| Poisoned/injected content becomes memory authority | Only accepted/redacted evidence may become a candidate; retrieved memory is framed with a fixed untrusted-data boundary, never processed as instructions | Novel semantic injection at retrieval-consumer boundary |
+| Cross-tenant memory retrieval/cache hit | Tenant-scoped bounded cache and index; forced RLS on durable chunks/facts | Application wiring defect |
+| Stale chunker/embedder version silently reused | Ingest compares record binding against current `EmbeddingSpec`/chunker version and raises before embed/index | Version-registry defect |
+| Erasure proceeds under legal hold | `tombstone_and_erase` checks `legal_hold_count`/`retention.held` before purge/erase | Application wiring defect |
+| Crypto-erasure treated as qualified KMS deletion | `erase_blob` is an explicit injected callback; no KMS/blob integration is shipped or claimed | Callback implementation gap outside this repository |
+| pgvector retrieval treated as production-qualified serving path | `PostgresMemoryStore.hybrid_candidates` implements and integration-tests a live forced-RLS ANN/lexical/recency/quality query, but `/v1/memories/retrieve` and the demo still serve from `InMemoryHybridIndex`; the SQL path is not yet wired into production retrieval | Documentation/operator misreading |
+| Memory acceptance bypassed | `MemoryLifecycleService.ingest` requires a `MemoryAcceptance` bound by tenant/memory ID with an explicit human/policy disposition before any candidate/scan/chunk/embed/index fact | Application wiring defect |
+| Retrieved memory content escalated to instruction/effect | `MemoryContext.instruction_boundary` fixed literal; no graph edge from memory context to an effect | Downstream consumer defect |
 
 Layer 2 JWT/JWKS, grant freshness, purpose/risk policy, pool reset, audit, and checkpoint
 threats remain applicable.
@@ -125,6 +134,12 @@ threats remain applicable.
    enforcement.
 9. A worker dies after a GitHub page response but before result commit. The existing page
    intent becomes `reconciliation_required`; Temporal retry cannot issue a second call.
+10. An attacker submits quarantined evidence as a memory candidate. `ingest` rejects it
+    before any candidate fact because only `accepted`/`redacted` evidence dispositions may
+    become memory; no scan/chunk/embed/index fact is ever appended for it.
+11. An operator attempts `tombstone_and_erase` on a memory under an open legal hold. The
+    service raises `PolicyDenied` before appending a `tombstoned` fact, purging the
+    derived index, or invoking the erase-blob callback.
 
 ## Explicitly unproven
 
@@ -136,4 +151,12 @@ qualification, DNS-rebinding egress enforcement, live Kata/gVisor/admission/CNI,
 external reconciliation evidence, UI, MCP/A2A, and deployment are also unproven.
 Official adapters are present, but live credentials, regional data
 handling, model/version qualification, tokenizer accuracy, pricing feed freshness,
-provider retention/abuse policy, and load/failover are unproven.
+provider retention/abuse policy, and load/failover are unproven. `PostgresMemoryStore
+.hybrid_candidates` implements and integration-tests a live forced-RLS pgvector
+ANN/lexical/recency/quality query, and `MemoryRetrievalService` now records digest-only
+`RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/`CONTEXT_BUILT` facts around every retrieval and
+context build — but wiring that SQL query into the production retrieval control path
+(`/v1/memories/retrieve`, the demo), a real embedding/summarization provider, and
+KMS/blob-qualified crypto-erasure remain unproven; only ingest, supersession, legal hold,
+tombstone, digest-only retrieval/context facts, and the derived in-memory index/cache path
+are exercised by tests today.

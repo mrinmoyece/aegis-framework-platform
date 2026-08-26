@@ -66,6 +66,13 @@ compared layer.
 45. duplicate task intent/result fencing and cancellation race;
 46. graph-version/input/checkpoint compatibility and projection rebuild;
 47. malformed/hostile specialist output, fabricated citations and critic rejection.
+48. memory candidate binding to accepted/redacted evidence and rejection of quarantined
+    content;
+49. chunker/embedder version-mismatch integrity failure before embed/index;
+50. legal hold blocking tombstone/crypto-erasure and release-then-erase behavior;
+51. cross-tenant derived-index/cache isolation and rebuild-from-ledger determinism;
+52. retrieved-memory instruction-boundary framing and citation-coverage compaction
+    fallback.
 
 Inputs, expected status, citation rules, and authority boundaries must match. A
 framework feature cannot be credited if the custom implementation is tested against
@@ -93,6 +100,7 @@ Capture on a clean checkout:
   `7a685bc52772e1c92467baba58a1c668646e9bf7`, including connector/parser dependencies,
   retained security controls, operational cost and whether framework use removed code.
 - governed specialist equivalent scenario against custom Aegis Layer 7
+- approval-bound deterministic fake sandbox lifecycle against custom Aegis Layer 9
   `dce0054a40c34ab4cc9d515aa753bc71d73fab57`, including fixed roles/artifacts,
   scheduler/checkpoint LOC removed, remaining controls, operational cost and escape plan.
 - approval-bound deterministic fake sandbox lifecycle against custom Aegis Layer 9

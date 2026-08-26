@@ -213,5 +213,25 @@
     "case_id": "sandbox-egress-security",
     "kind": "sandbox-egress-security",
     "expected_reason": "sandbox_egress_default_deny"
+  },
+  {
+    "case_id": "memory-retrieval",
+    "kind": "memory-retrieval",
+    "expected_reason": "hybrid_provenance_retrieval"
+  },
+  {
+    "case_id": "memory-tenant-cache",
+    "kind": "memory-tenant-cache",
+    "expected_reason": "tenant_acl_cache_isolation"
+  },
+  {
+    "case_id": "memory-context",
+    "kind": "memory-context",
+    "expected_reason": "bounded_untrusted_context"
+  },
+  {
+    "case_id": "memory-retention",
+    "kind": "memory-retention",
+    "expected_reason": "ledger_and_blob_authority"
   }
 ]

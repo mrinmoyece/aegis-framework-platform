@@ -36,6 +36,9 @@ class RoleCatalog:
                 Action.SANDBOX_EXECUTE,
                 Action.SANDBOX_READ,
                 Action.SANDBOX_ARTIFACT_READ,
+                Action.MEMORY_WRITE,
+                Action.MEMORY_READ,
+                Action.MEMORY_RETRIEVE,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -52,6 +55,8 @@ class RoleCatalog:
                 Action.EFFECT_READ,
                 Action.SANDBOX_READ,
                 Action.SANDBOX_ARTIFACT_READ,
+                Action.MEMORY_READ,
+                Action.MEMORY_RETRIEVE,
                 Action.TENANT_READ,
                 Action.POLICY_READ,
                 Action.QUOTA_READ,
@@ -75,6 +80,10 @@ class RoleCatalog:
                 Action.EFFECT_READ,
                 Action.SANDBOX_READ,
                 Action.SANDBOX_ARTIFACT_READ,
+                Action.MEMORY_WRITE,
+                Action.MEMORY_READ,
+                Action.MEMORY_RETRIEVE,
+                Action.MEMORY_DELETE,
             }
         ),
         "tenant-auditor": frozenset(
@@ -91,6 +100,7 @@ class RoleCatalog:
                 Action.EFFECT_READ,
                 Action.SANDBOX_READ,
                 Action.SANDBOX_ARTIFACT_READ,
+                Action.MEMORY_READ,
             }
         ),
         "workload-investigator": frozenset(
@@ -105,6 +115,8 @@ class RoleCatalog:
                 Action.SANDBOX_EXECUTE,
                 Action.SANDBOX_READ,
                 Action.SANDBOX_ARTIFACT_READ,
+                Action.MEMORY_READ,
+                Action.MEMORY_RETRIEVE,
             }
         ),
         "incident-commander": frozenset(

@@ -191,3 +191,66 @@ for replay/pagination and does not grant access.
 **Workflow history**
 Temporal's deterministic scheduling/replay record. It is operational framework state,
 not authorization, application audit, or product status truth.
+
+**MemoryRecord**
+The immutable versioned memory record contract: tenant/ACL/classification, evidence
+binding, embedder/chunker version, retention/legal-hold state, and an optional
+`ErasableBlobReference`. It is truth for what a memory candidate is bound to, never a
+container for raw text.
+
+**MemoryFact**
+An append-only ledger entry (`MemoryFactType`) for one memory's lifecycle transition.
+Banned fields: raw text, query text, prompt, completion, tenant ID, locator. Ingest,
+supersession, legal hold, and tombstone/erasure are ledger-audited here; a separate,
+purpose-built `MemoryOperationFact` ledger now covers retrieval/context-build (see
+`RETRIEVE_REQUESTED`/`RETRIEVE_COMPLETED`/`CONTEXT_BUILT` below).
+
+**MemoryAcceptance**
+An explicit, digested human-or-policy decision record (`disposition` accept/reject,
+`reviewer_kind` human/policy, policy ID/revision/digest, reason code) bound by
+tenant/memory ID. `MemoryLifecycleService.ingest` validates it before appending any
+candidate/scan/chunk/embed/index fact; a missing or mismatched acceptance raises
+`IntegrityFailure`. Memory can never become durable from evidence disposition alone.
+
+**MemoryOperationFact**
+A digest-only, sequenced ledger entry (`RETRIEVE_REQUESTED`=1, `RETRIEVE_COMPLETED`=2,
+`CONTEXT_BUILT`=3 per operation ID) recorded by `MemoryRetrievalService` around every
+retrieval and context build, carrying only `policy_digest`/`query_digest`/
+`result_digest` — never raw query text. Appended to `InMemoryMemoryOperationLedger` or
+the durable, immutable `aegis.memory_operation_facts` table with idempotent replay and
+strict-sequence enforcement. A separate class/table from `MemoryFact`, though both share
+the `MemoryFactType` enum's fact-type values.
+
+**MemoryProjection**
+The rebuildable read model folded by `reduce_memory` from ordered `MemoryFact`s:
+status, indexed/tombstoned flags, hold count, derived-purged/blob-erased flags, and
+chunk count. Never a source of truth independent of the facts.
+
+**Derived hybrid index**
+`InMemoryHybridIndex` (and the durable PostgreSQL `memory_chunks`/cache tables):
+lexical/vector/recency/quality-weighted, MMR-diversified, tenant-scoped, and always
+rebuildable from `memory_facts`. Never authoritative for tenancy, retention, or audit.
+
+**instruction_boundary**
+The fixed literal `MemoryContext` prefixes onto every retrieved snippet, marking it as
+untrusted LangGraph state. It exists precisely so retrieved memory can never be treated
+as an instruction, approval, or effect trigger.
+
+**Legal hold (memory)**
+A `RetentionBinding`/`MemoryProjection.legal_hold_count` state that blocks
+`tombstone_and_erase` until released, regardless of retention expiry or operator intent.
+
+**Crypto-erasure callback**
+The injected `erase_blob` function invoked by `tombstone_and_erase` only after legal
+hold clears and the derived index is purged. A contract point, not a qualified KMS or
+blob-storage integration.
+
+**Live pgvector hybrid query**
+`PostgresMemoryStore.hybrid_candidates`: a single forced-RLS SQL query combining cosine
+ANN distance (`embedding <=> %s::vector`), lexical `ts_rank_cd`, recency/quality scoring,
+and ACL/classification/time/retention prefilters into one deterministic weighted score,
+with a stable tie-break order and a bounded candidate count. Implemented and
+integration-tested at the store layer, including a cross-tenant/classification isolation
+assertion; not yet wired into `MemoryRetrievalService`/`InMemoryMemoryControl` or
+`/v1/memories/retrieve` — production retrieval still serves from `InMemoryHybridIndex`
+until that wiring lands.

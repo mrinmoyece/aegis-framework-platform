@@ -1,9 +1,11 @@
-# Layer 8 local operations runbook
+# Layer 9 local operations runbook
 
 Evidence connector enablement, source-specific operations, cursor recovery and
 reconciliation are in the [connector runbook](connector-runbook.md). Connector code is
 disabled by default; this general runbook does not authorize enabling it. Sandbox
-activation and orphan cleanup are in the [sandbox runbook](sandbox-runbook.md).
+activation and orphan cleanup are in the [sandbox runbook](sandbox-runbook.md). Memory
+ingestion, retrieval, compaction, legal hold, and erasure incidents are in the
+[memory runbook](memory-runbook.md).
 
 ## Start application PostgreSQL
 
@@ -13,7 +15,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 through Layer 8 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 9 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -98,6 +100,13 @@ manifest/attestation/cleanup facts, record the immutable rebuild, then swap the 
 Never rebuild sandbox truth from Temporal history, Kubernetes Job status, Pod logs, CSI
 metadata, or traces.
 
+For memory, verify `memory_facts` sequence/previous-digest integrity, fold with
+`reduce_memory` in ordinal order, compare the resulting status/indexed/tombstoned/
+hold_count/derived_purged/blob_erased/chunk_count fields, drop and rebuild the derived
+`InMemoryHybridIndex`/cache and PostgreSQL `memory_chunks` entries from the rebuilt
+projection, then swap. Never rebuild memory truth, retention, or citation authority from
+the derived index, cache, or a LangGraph checkpoint.
+
 ## Specialist graph recovery
 
 1. Confirm current application run state and cancellation before reading a checkpoint.
@@ -126,6 +135,16 @@ metadata, or traces.
    security incidents.
 5. Rotate a credential by creating a new secret/source version. In-flight old-version
    results are stale and cannot be accepted.
+
+## Memory incident
+
+See the [memory runbook](memory-runbook.md) for activation gate, normal lifecycle,
+legal-hold/erasure, embedding-provider incident, ambiguous-ingestion, retrieval/context,
+and rebuild procedures. In summary: never authorize a memory candidate outside
+`accepted`/`redacted` evidence dispositions, never bypass an open legal hold to erase,
+never treat the derived index/cache as authoritative, and remember that retrieval and
+context-build activity does not yet append ledger facts — do not claim it is
+ledger-audited in an incident report.
 
 ## Model call and billing reconciliation
 
