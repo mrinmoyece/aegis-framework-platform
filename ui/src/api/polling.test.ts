@@ -84,6 +84,69 @@ describe("bounded snapshot polling", () => {
     expect(onAuthenticationExpired).toHaveBeenCalledOnce();
   });
 
+  it("silently swallows AbortError without reporting degraded state", async () => {
+    const onDegraded = vi.fn();
+    const abortError = new DOMException("aborted", "AbortError");
+    const fetchSnapshot = vi.fn().mockRejectedValue(abortError);
+    const poller = new SnapshotPoller({
+      tenantId: "tenant-acme",
+      sessionGeneration: "session-fixture-1",
+      fetchSnapshot,
+      onSnapshot: vi.fn(),
+      onAuthenticationExpired: vi.fn(),
+      onDegraded,
+      intervalMs: 100
+    });
+    poller.start();
+    await poller.pollNow();
+    expect(onDegraded).not.toHaveBeenCalled();
+    poller.stop();
+  });
+
+  it("reports degraded and retries on generic network errors", async () => {
+    const onDegraded = vi.fn();
+    const fetchSnapshot = vi.fn().mockRejectedValue(new Error("Network error"));
+    const poller = new SnapshotPoller({
+      tenantId: "tenant-acme",
+      sessionGeneration: "session-fixture-1",
+      fetchSnapshot,
+      onSnapshot: vi.fn(),
+      onAuthenticationExpired: vi.fn(),
+      onDegraded,
+      intervalMs: 100
+    });
+    poller.start();
+    await poller.pollNow();
+    expect(onDegraded).toHaveBeenCalledWith("Live updates are reconnecting.");
+    poller.stop();
+  });
+
+  it("schedules re-poll on visibilitychange when page becomes visible", async () => {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "hidden"
+    });
+    const fetchSnapshot = vi.fn().mockResolvedValue(fixtureSnapshot);
+    const poller = new SnapshotPoller({
+      tenantId: "tenant-acme",
+      sessionGeneration: "session-fixture-1",
+      fetchSnapshot,
+      onSnapshot: vi.fn(),
+      onAuthenticationExpired: vi.fn(),
+      onDegraded: vi.fn(),
+      intervalMs: 100
+    });
+    poller.start();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      value: "visible"
+    });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchSnapshot).toHaveBeenCalledOnce();
+    poller.stop();
+  });
+
   it("pauses offline and resumes on reconnect", async () => {
     Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
     const onDegraded = vi.fn();
