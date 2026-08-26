@@ -79,16 +79,11 @@ describe("typed BFF client", () => {
           nonce: "n".repeat(43),
           code_challenge: "p".repeat(43),
           code_challenge_method: "S256",
-          code_verifier: "v".repeat(43),
           expires_at: fixtureSession.expires_at
         })
       ),
       http.post("*/operator/session/callback", async ({ request }) => {
-        await expect(request.json()).resolves.toEqual({
-          code: "demo",
-          state,
-          code_verifier: "v".repeat(43)
-        });
+        await expect(request.json()).resolves.toEqual({ code: "demo", state });
         return HttpResponse.json(fixtureSession);
       }),
       http.post("*/operator/session/tenant", async ({ request }) => {

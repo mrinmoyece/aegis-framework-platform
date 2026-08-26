@@ -15,6 +15,7 @@ import {
   MemoryPage,
   ModelsPage,
   OverviewPage,
+  ProtocolPeersPage,
   ReplayPage,
   SandboxesPage
 } from "./pages";
@@ -30,7 +31,8 @@ const pages: [string, ReactElement][] = [
   ["memory", <MemoryPage />],
   ["evaluations", <EvaluationsPage />],
   ["audit", <AuditPage />],
-  ["replay", <ReplayPage />]
+  ["replay", <ReplayPage />],
+  ["protocol peers", <ProtocolPeersPage />]
 ];
 
 function renderPage(page: ReactElement, snapshot = fixtureSnapshot) {
@@ -118,25 +120,45 @@ describe("WCAG automated baseline", () => {
     expect(await screen.findByText(/denied: Server authority denied/)).toBeVisible();
   });
 
-  it("shows Submitting once… while mutation is pending", async () => {
+  it("requires exact protocol trust review before one mutation", async () => {
     const user = userEvent.setup();
-    const approval = fixtureSnapshot.approvals[0];
-    if (approval === undefined) throw new Error("approval fixture is unavailable");
-    vi.spyOn(operatorApi, "decideApproval").mockReturnValue(new Promise(() => undefined));
-    renderPage(<ApprovalsPage />, {
-      ...fixtureSnapshot,
-      approvals: [{ ...approval, can_decide: true, denial_reason: null }]
+    const mutate = vi.spyOn(operatorApi, "mutateProtocolTrust").mockResolvedValue({
+      command_id: "trust-command-1",
+      outcome: "accepted",
+      message: "Protocol peer trust changed to revoked.",
+      server_time: fixtureSession.server_time
     });
+    renderPage(<ProtocolPeersPage />);
+    expect(screen.getByText(/production ready no \(fail closed\)/)).toBeVisible();
+    const button = screen.getByRole("button", {
+      name: "Apply exact trust transition"
+    });
+    expect(button).toBeDisabled();
+    await user.selectOptions(screen.getByLabelText("Trust action"), "revoke");
     await user.click(screen.getByRole("checkbox"));
     await user.type(
       screen.getByLabelText("Independent rationale"),
-      "Independent exact-scope review."
+      "Verified card and schema drift requires revocation."
     );
     await user.type(
-      screen.getByLabelText(/Type APPROVE CHECKOUT-API/),
-      "APPROVE CHECKOUT-API"
+      screen.getByLabelText(/Type REVOKE partner-investigator/),
+      "REVOKE partner-investigator"
     );
-    await user.click(screen.getByRole("button", { name: "Submit exact-scope approval" }));
-    expect(await screen.findByText("Submitting once…")).toBeVisible();
+    await user.click(button);
+    expect(mutate).toHaveBeenCalledOnce();
+    expect(await screen.findByText(/accepted: Protocol peer trust/)).toBeVisible();
+  });
+
+  it("disables mutation for terminal protocol trust", () => {
+    const peer = fixtureSnapshot.protocol_peers[0];
+    if (peer === undefined) throw new Error("protocol peer fixture is unavailable");
+    renderPage(<ProtocolPeersPage />, {
+      ...fixtureSnapshot,
+      protocol_peers: [{ ...peer, status: "revoked" }]
+    });
+    expect(
+      screen.getByRole("button", { name: "Apply exact trust transition" })
+    ).toBeDisabled();
+    expect(screen.getByLabelText("Trust action")).toBeDisabled();
   });
 });

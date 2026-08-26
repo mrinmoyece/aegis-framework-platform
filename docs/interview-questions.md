@@ -135,6 +135,41 @@ TanStack removes generic query/router/table mechanics and reduces authored LOC, 
 three runtime dependencies and a larger bundle than custom Layer 13. All enterprise
 security and authority controls remain custom and framework-neutral.
 
+## Layer 13 MCP and A2A interoperability
+
+**L13-1. Why are official protocol messages not application authority?**
+The SDK proves wire shape and transport mechanics. Tenant, role, purpose, policy,
+approval, fencing, quota and audit come from current application stores. Peer content
+is untrusted even after authenticated transport.
+
+**L13-2. What changed in MCP `2026-07-28`?**
+Modern MCP is stateless, uses `server/discover` and per-request version/capability
+metadata, and removes session/GET-SSE/server-request assumptions. The SDK retains
+registered legacy `initialize` compatibility. Experimental Tasks are not an application
+durability mechanism.
+
+**L13-3. What does a signed A2A Agent Card prove?**
+It can prove integrity under a reviewed key. It does not grant tenant access, sign task
+artifacts, qualify a partner, or authorize the advertised capabilities. Aegis pins the
+card and independently validates every artifact/task.
+
+**L13-4. Why persist intent before protocol I/O?**
+At-least-once Activities and timeouts can leave an unknown outcome. Stable request,
+trust, policy, idempotency and fence digests let recovery observe/reconcile without a
+blind duplicate.
+
+**L13-5. Can an external agent request remediation?**
+It can submit a cited proposal candidate. Layer 7 application policy may record it for
+independent review. The protocol cannot open approval, satisfy quorum, fence, execute,
+verify, or claim a production effect.
+
+**L13-6. What did the frameworks remove?**
+Official SDKs remove current wire models, protobuf/ProtoJSON, discovery, version
+negotiation, route factories, stdio/HTTP/gRPC and stream mechanics. Trust registry,
+identity, SSRF, quotas, ledger, provenance, reconciliation and operator controls remain
+custom. This layer uses real SDK surfaces; the pinned custom Layer 14 only imports SDK
+packages as presence markers and hand-writes the wire mapping.
+
 **L10-1. Why is an evaluation report not production truth?**
     It is versioned release evidence over synthetic fixtures and deterministic
     adapters. Runtime state, authorization, approval, effects and audit still come

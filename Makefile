@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help bootstrap format lint type test integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security demo serve measure observability-config frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
+.PHONY: help bootstrap format lint type test protocol integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs security demo serve measure observability-config frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
 
 help:
 	@printf '%s\n' \
@@ -11,6 +11,7 @@ help:
 	  'lint            Run Ruff without mutation' \
 	  'type            Run strict mypy' \
 	  'test            Run branch coverage tests (minimum 90%%)' \
+	  'protocol        Run deterministic MCP/A2A protocol and operator gates' \
 	  'integration     Run configured local PostgreSQL/Keycloak integration tests' \
 	  'temporal-integration Run configured local Temporal workflow tests' \
 	  'eval            Run the complete governed deterministic evaluation suite' \
@@ -48,6 +49,10 @@ type:
 
 test:
 	$(UV) run pytest
+
+protocol:
+	$(UV) run pytest tests/test_interoperability_layer13.py tests/test_operator_layer12.py --no-cov
+	$(UV) run aegis-framework eval run --filter secure-protocol-interoperability
 
 integration:
 	$(UV) run pytest -m 'postgres or keycloak' --no-cov
@@ -133,9 +138,9 @@ frontend-csp:
 frontend-ci: frontend-lint frontend-type frontend-contracts frontend-test frontend-axe frontend-build frontend-bundle frontend-csp frontend-licenses frontend-audit
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer12 .
+	docker build --pull --tag aegis-framework-platform:layer13 .
 
 compose-config:
 	docker compose config --quiet
 
-ci: lint type test eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config frontend-ci
+ci: lint type test protocol eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config frontend-ci

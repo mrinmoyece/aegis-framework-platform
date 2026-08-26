@@ -205,6 +205,33 @@
         "telemetry-poisoning"
       ],
       "fault_points": ["outbox", "projection", "provider"]
+    },
+    {
+      "scenario_id": "secure-protocol-interoperability",
+      "version": 1,
+      "title": "MCP and A2A remain bounded untrusted external protocols",
+      "expected_outcome": "safe-failure",
+      "layers": [13],
+      "case_ids": [
+        "protocol-poisoning",
+        "protocol-confused-deputy",
+        "protocol-schema-bomb",
+        "protocol-ssrf",
+        "protocol-proposal-only",
+        "protocol-trust-revocation",
+        "protocol-ambiguity",
+        "protocol-denial-wallet"
+      ],
+      "attack_tags": [
+        "agent-card-forgery",
+        "confused-deputy",
+        "denial-of-wallet",
+        "protocol-poisoning",
+        "schema-attack",
+        "ssrf",
+        "tenant-exfiltration"
+      ],
+      "fault_points": ["intent", "provider", "projection"]
     }
   ],
   "scorers": [

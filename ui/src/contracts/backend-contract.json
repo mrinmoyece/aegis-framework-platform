@@ -1,5 +1,5 @@
 {
-  "api_version": "0.12.0",
+  "api_version": "0.13.0",
   "models": {
     "AuthorizationStart": [
       "authorization_url",
@@ -40,6 +40,7 @@
       "incidents",
       "memories",
       "model_usage",
+      "protocol_peers",
       "replay",
       "sandboxes",
       "schema_version",
@@ -52,6 +53,7 @@
   },
   "routes": [
     "/operator/api/approvals/{approval_id}/decisions",
+    "/operator/api/protocol-peers/{peer_id}/trust",
     "/operator/api/snapshot",
     "/operator/readyz",
     "/operator/session",

@@ -128,6 +128,7 @@ _LAYER6_MIGRATION = Path("migrations/0005_layer6.sql")
 _LAYER7_MIGRATION = Path("migrations/0006_layer7.sql")
 _LAYER8_MIGRATION = Path("migrations/0007_layer8.sql")
 _LAYER9_MIGRATION = Path("migrations/0008_layer9.sql")
+_LAYER13_MIGRATION = Path("migrations/0009_layer13.sql")
 _TENANT_ALPHA = "test-tenant-alpha"
 _TENANT_BETA = "test-tenant-beta"
 
@@ -294,6 +295,24 @@ def test_migration_declares_required_rls_indexes_roles_and_immutability() -> Non
     assert "(embedding <#> embedding) BETWEEN -1.000001 AND -0.999999" in layer9
     assert "FORCE ROW LEVEL SECURITY" in layer9
     assert "PASSWORD" not in layer9
+    layer13 = _LAYER13_MIGRATION.read_text(encoding="utf-8")
+    for table in (
+        "interop_trust_registry",
+        "interop_invocations",
+        "interop_tasks",
+        "interop_facts",
+        "interop_cursors",
+        "interop_quotas",
+        "interop_artifact_projections",
+        "interop_rebuilds",
+    ):
+        assert f"CREATE TABLE IF NOT EXISTS aegis.{table}" in layer13
+    assert "interop_trust_immutable" in layer13
+    assert "interop_facts_immutable" in layer13
+    assert "interop_artifacts_immutable" in layer13
+    assert "fence_token text NOT NULL" in layer13
+    assert "FORCE ROW LEVEL SECURITY" in layer13
+    assert "PASSWORD" not in layer13
 
 
 @pytest.mark.postgres
@@ -868,7 +887,7 @@ def test_live_orchestration_artifacts_are_rls_isolated_and_rebuildable() -> None
                   AND run_id = %s
                   AND task_id = %s
                   AND fact_type IN ('task.dispatch', 'task.fence_rotated')
-                ORDER BY (document->>'attempt')::int, recorded_at, fact_id
+                ORDER BY recorded_at, (document->>'attempt')::int
                 """,
                 (_TENANT_ALPHA, run_id, "task:stale-worker"),
             ).fetchall()

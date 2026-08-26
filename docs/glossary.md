@@ -31,8 +31,9 @@ A deliberate non-answer when evidence, budget, validation, or corroboration is
 insufficient. It is not a successful empty investigation.
 
 **A2A**
-Agent-to-Agent protocol work, deferred until official stable SDKs can be placed behind
-identity and capability controls.
+Agent2Agent protocol `1.0` for external agent cards, messages, tasks, streams and
+artifacts. Aegis uses official SDK mechanics behind application trust; peers never
+become internal roles or authorities.
 
 **Approval boundary**
 An application-owned service that turns a proposal into a separately governed
@@ -112,8 +113,19 @@ Validated opaque W3C trace/span coordinates used only for navigation and causal 
 It is not authorization, audit, approval, fencing, or proof of effect.
 
 **MCP**
-Model Context Protocol. Tool interoperability is deferred until identity, capability,
-and effect boundaries can govern it.
+Model Context Protocol `2026-07-28`. Aegis exposes a curated least-privilege server and
+registered clients through the official SDK while retaining identity, capability,
+tenant, budget, ledger and effect boundaries.
+
+**Peer trust registry**
+Tenant-scoped versioned owner/environment/tier/expiry/review and card/schema/
+certificate/key/capability/classification/risk/egress/quota record. Any drift requires a
+new review and invalidates stale work.
+
+**Protocol ambiguity**
+Durable state after external delivery may have occurred but no valid terminal result
+was accepted. The same operation is observed/reconciled before retry; ambiguity is
+never success.
 
 **Pregel / super-step**
 LangGraph's bulk-synchronous execution model: runnable parallel nodes execute within a

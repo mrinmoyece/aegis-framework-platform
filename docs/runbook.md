@@ -9,6 +9,8 @@ ingestion, retrieval, compaction, legal hold, and erasure incidents are in the
 tamper procedures are in the [evaluation runbook](evaluation-runbook.md).
 Telemetry outage, SLO response, dashboard use and ledger replay are in the
 [observability runbook](observability-runbook.md) and [SLO catalog](slo-catalog.md).
+MCP/A2A onboarding, quarantine, revocation, ambiguity and incident response are in the
+[protocol runbook](protocol-runbook.md).
 
 ## Start application PostgreSQL
 
@@ -18,7 +20,7 @@ export AEGIS_POSTGRES_RUNTIME_PASSWORD="$(openssl rand -hex 24)"
 docker compose --profile durable up -d postgres
 ```
 
-`tools/postgres-init.sh` applies Layer 2 through Layer 9 migrations, then creates the
+`tools/postgres-init.sh` applies Layer 2 through Layer 13 migrations, then creates the
 non-superuser application login. Never run application workers with the admin DSN.
 Production API configuration also requires an injected `AEGIS_CURSOR_SIGNING_KEY` of at
 least 32 bytes and a separate `AEGIS_REFERENCE_ENCRYPTION_KEY` of at least 32 bytes.
@@ -45,6 +47,7 @@ make eval-adversarial
 make eval-recovery
 make eval-baseline
 make eval-meta
+python3 -m uv run aegis-framework eval run --filter secure-protocol-interoperability
 make security
 make container
 docker compose config --quiet

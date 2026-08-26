@@ -241,5 +241,29 @@ These are explicit non-production boundaries, not implied capabilities.
   authored lifecycle/router/table code but is larger than the pinned custom Layer 13
   bundle; see `comparison/layer12-metrics.json`.
 - Live browser/IdP/TLS proxy qualification, penetration testing, deployment/IaC,
-  MCP/A2A, managed analytics/telemetry, load/chaos and compliance certification remain
+  managed analytics/telemetry, load/chaos and compliance certification remain
   deferred.
+
+# Layer 13 interoperability limitations
+
+- Official SDK adapters are implemented and tested with in-process/fake transports; no
+  live external peer, credential, certificate, partner endpoint or public registry is
+  contacted.
+- Production readiness intentionally fails closed without distributed token replay,
+  mTLS/certificate verification, secret brokerage and deny-by-default egress.
+- MCP `2026-07-28` Tasks are experimental and absent from SDK 2.0.0. Aegis uses
+  application-owned opaque handles/status/cancel instead.
+- The MCP SDK supplies modern/legacy compatibility. Legacy `2025-11-25` is accepted only
+  for an explicit registration; deprecated HTTP+SSE is not activated.
+- A2A Agent Card JWS covers the card, not task messages or artifacts. Aegis provenance
+  is a custom neutral contract/extension and has not been independently standardized.
+- A2A push notification webhooks are not enabled. Polling and snapshot-first subscribe
+  are the qualified deterministic reconciliation paths.
+- DNS/IP validation cannot close DNS resolution/connect TOCTOU without a production
+  egress proxy. Exact origins and redirect denial reduce but do not eliminate that risk.
+- The SDK dependency closure is materially larger. Upgrade compatibility, CVE response,
+  protocol conformance and transitive supply-chain review remain ongoing obligations.
+- Forced-RLS SQL and Temporal workflow definitions are environment-gated; local unit
+  tests do not prove PostgreSQL/Temporal HA, multi-region ordering, capacity or DR.
+- Public federation, production PKI/token brokerage, partner qualification, deployment,
+  and independent conformance/security certification are explicitly deferred.

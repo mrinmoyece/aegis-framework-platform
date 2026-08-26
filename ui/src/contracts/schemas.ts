@@ -40,7 +40,6 @@ export const authorizationStartSchema = z
     nonce: z.string().min(32).max(128),
     code_challenge: z.string().min(43).max(128),
     code_challenge_method: z.literal("S256"),
-    code_verifier: z.string().min(43).max(128),
     expires_at: instant
   })
   .strict();
@@ -205,6 +204,39 @@ const replayItemSchema = z
   })
   .strict();
 
+const protocolPeerItemSchema = z
+  .object({
+    peer_id: identifier,
+    protocol: z.enum(["mcp", "a2a"]),
+    owner_ref: identifier,
+    environment: z.enum(["development", "test", "staging", "production"]),
+    trust_tier: z.enum(["internal", "partner", "restricted"]),
+    status: z.enum([
+      "pending-review",
+      "active",
+      "quarantined",
+      "revoked",
+      "expired",
+      "emergency-disabled"
+    ]),
+    revision: z.number().int().positive(),
+    card_digest: digest.nullable(),
+    schema_digest: digest,
+    certificate_digest: digest.nullable(),
+    key_digest: digest.nullable(),
+    capabilities: z.array(identifier).max(32),
+    transports: z.array(identifier).max(4),
+    classifications: z
+      .array(z.enum(["public", "internal", "confidential", "restricted"]))
+      .max(4),
+    risks: z.array(z.enum(["low", "medium", "high"])).max(3),
+    review_after: instant,
+    expires_at: instant,
+    production_ready: z.boolean(),
+    can_administer: z.boolean()
+  })
+  .strict();
+
 export const snapshotSchema = z
   .object({
     schema_version: z.literal(1),
@@ -226,7 +258,8 @@ export const snapshotSchema = z
     memories: z.array(memoryItemSchema).max(100),
     evaluations: z.array(evaluationItemSchema).max(100),
     audit: z.array(auditItemSchema).max(200),
-    replay: z.array(replayItemSchema).max(100)
+    replay: z.array(replayItemSchema).max(100),
+    protocol_peers: z.array(protocolPeerItemSchema).max(100)
   })
   .strict();
 
@@ -242,4 +275,5 @@ export const mutationReceiptSchema = z
 export type OperatorSession = z.infer<typeof sessionSchema>;
 export type OperatorSnapshot = z.infer<typeof snapshotSchema>;
 export type ApprovalItem = OperatorSnapshot["approvals"][number];
+export type ProtocolPeerItem = OperatorSnapshot["protocol_peers"][number];
 export type MutationReceipt = z.infer<typeof mutationReceiptSchema>;

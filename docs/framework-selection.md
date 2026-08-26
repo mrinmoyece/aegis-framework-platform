@@ -41,7 +41,10 @@ Installed dependencies and Actions are exact-pinned; container images use digest
 | LangChain community loaders | 0.4.2 evaluated, not installed | Broad loader/network stack | Loader dispatch | Trust/provenance/sandbox remain | Reject: sunset/overlap |
 | LangChain Unstructured | 1.0.1 evaluated, not installed | External API or parser stack | Document extraction | Trust/provenance/sandbox remain | Reject: Python-range/privacy/footprint |
 | LlamaIndex readers / Unstructured | Evaluated, not installed | Overlapping ingestion/RAG stack | Broad format parsing | All enterprise controls remain | Reject: overlap without control removal |
-| UI, MCP/A2A, sandbox | Deferred | New runtimes/services | N/A | Session/tool/effect security | Later layers |
+| MCP Python SDK | 2.0.0 | Embedded or remote MCP peer | Current MCP models, discover/legacy negotiation, stdio/Streamable HTTP, route/tool mechanics | Trust, identity, allowlists, SSRF, quota, ledger, provenance, approval/effects | Select in `protocol_adapters.py` |
+| A2A Python SDK | 1.1.2 | Remote A2A peer | Protobuf/ProtoJSON, signed-card helpers, JSON-RPC/HTTP+JSON/gRPC client/server mechanics | Trust, identity, tenant task ledger, artifact provenance, reconciliation | Select in `protocol_adapters.py` |
+| MCP Tasks extension | Experimental | Additional extension coupling | Task polling/cancel wire shape | Durability/trust still custom; absent from SDK 2.0.0 | Reject for core flow |
+| UI and sandbox | Delivered in prior layers | Browser/Kubernetes when enabled | Delivery/runtime mechanics | Enterprise authority and isolation | Selected behind ports |
 | CrewAI / AutoGen | Not installed | Additional agent runtime | Agent chat/delegation abstractions | All Aegis authority/artifact/ledger controls | Reject: overlaps LangGraph and expands dynamic authority surface |
 
 ## Why Temporal now
@@ -595,3 +598,26 @@ JavaScript bundle versus 440,439 bytes here. This layer has materially less auth
 UI/BFF LOC because TanStack owns generic mechanics, but session, tenant, authorization,
 approval, XSS, accessibility and audit policy remain custom. See
 `comparison/layer12-metrics.json` and [ADR 017](adr/017-secure-operator-bff.md).
+
+## Layer 13 MCP and A2A decision
+
+The current selections are MCP specification `2026-07-28` with `mcp==2.0.0`, and A2A
+protocol `1.0`/spec tag `v1.0.1` with `a2a-sdk==1.1.2`. Both support Python 3.13/3.14.
+MCP modern stateless discovery is primary; registered legacy `initialize` compatibility
+is retained without deprecated HTTP+SSE. A2A uses signed cards and official
+JSON-RPC/HTTP+JSON/gRPC mechanics.
+
+The pinned custom Layer 14 is
+`mrinmoyece/aegis-agent-platform@0e21a38a89d71d183183e17bd225ab9f56dace1e`.
+It adds 10,691 lines across 71 files and contains 4,895 focused protocol LOC. It pins
+the same SDK versions but only imports each package as a presence marker; wire
+negotiation, JSON/protobuf shape mapping, transport and JWS behavior remain custom.
+Framework Layer 13 instantiates official server/client/card/route/transport types, so it
+removes more protocol maintenance, at the cost of a larger locked dependency closure
+and SDK compatibility surface.
+
+Neither implementation removes trust registry, identity/RBAC, SSRF/egress, quotas,
+intent/result ledger, fencing, reconciliation, provenance, operator or approval/effect
+security. Custom Layer 14 has no Temporal dependency; Framework Layer 13 reuses Temporal
+for protocol Activity scheduling while PostgreSQL remains truth. Exact measurements and
+the candid benchmark boundary are in `comparison/layer13-metrics.json`.

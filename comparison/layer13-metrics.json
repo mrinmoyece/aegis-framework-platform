@@ -1,0 +1,99 @@
+{
+  "schema_version": 13,
+  "layer": 13,
+  "generated_on": "2026-08-17",
+  "comparison_basis": {
+    "framework_layer13": {
+      "repository": "mrinmoyece/aegis-framework-platform",
+      "base_sha": "482489e581ce97401bd6c7205bb7933988cdd1ea"
+    },
+    "custom_layer14": {
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "0e21a38a89d71d183183e17bd225ab9f56dace1e",
+      "pull_request": 16
+    }
+  },
+  "source_loc": {
+    "framework_protocol_production": 5201,
+    "framework_protocol_tests": 2083,
+    "custom_protocol_production": 4895,
+    "custom_protocol_tests": 2239,
+    "method": "physical lines in the six focused framework protocol modules and one focused protocol test module; custom figures are the corresponding 14 production and five test files measured on the pinned branch"
+  },
+  "runtime_dependencies": {
+    "framework_direct_python": 14,
+    "framework_locked_python_packages": 151,
+    "custom_direct_python": 14,
+    "custom_locked_python_packages": null,
+    "selected": [
+      "mcp==2.0.0",
+      "a2a-sdk[fastapi,grpc,signing]==1.1.2"
+    ],
+    "candid_note": "The custom repository has no backend lockfile. Its observed environment closure is not a reproducible locked count."
+  },
+  "custom_increment": {
+    "files_changed": 71,
+    "additions": 10691,
+    "deletions": 143,
+    "commits": 1
+  },
+  "official_sdk_code_removed": [
+    "MCP 2026-07-28 wire models, result envelopes and capability negotiation",
+    "MCP modern server/discover with registered legacy initialize compatibility",
+    "MCP stdio and stateless Streamable HTTP framing, cancellation and shutdown mechanics",
+    "A2A protobuf and ProtoJSON request, task, stream, artifact and error mechanics",
+    "A2A signed Agent Card canonicalization/verifier helpers and resolver",
+    "A2A JSON-RPC, HTTP+JSON and gRPC client/server transport route mechanics"
+  ],
+  "remaining_custom_controls": [
+    "workload issuer/audience/scope/tenant/purpose/proof/replay and current application RBAC",
+    "tenant peer registry ownership/environment/tier/expiry/review and card/schema/certificate/key pins",
+    "capability, classification, risk, egress, timeout, quota and change invalidation policy",
+    "SSRF, DNS/IP/rebinding, redirect, proxy, TLS, secret, schema, Unicode, MIME, URL and byte controls",
+    "intent-before-network facts, idempotency, ambiguity, fencing, cancellation, reconciliation and quarantine",
+    "artifact provenance/citations, forced-RLS projections, audit and exact operator confirmation",
+    "proposal-only remediation and separate Layer 7 approval/effect authority"
+  ],
+  "sdk_use_comparison": {
+    "framework": "Instantiates official MCP server/client/tool/transport types and official A2A protobuf/card resolver/client factory/route/gRPC types in isolated adapters.",
+    "custom": "Pins both SDKs but only lazily imports package roots as presence markers; protocol mapping, transport, negotiation and JWS behavior are custom.",
+    "assessment": "Framework use removes more wire maintenance. It also accepts greater SDK/transitive coupling and still cannot delegate enterprise trust or effect controls."
+  },
+  "lock_in_and_escape": {
+    "lock_in": [
+      "MCP SDK 2.x modern/legacy negotiation and transport APIs",
+      "A2A protobuf schema, route factories and client transport selection",
+      "Temporal workflow history and PostgreSQL Layer 13 schema"
+    ],
+    "escape": [
+      "all persisted and application-facing protocol contracts are neutral Pydantic models",
+      "official SDK imports exist only in protocol_adapters.py",
+      "McpSdkClientPort, A2ASdkClientPort and application data ports accept deterministic fakes",
+      "application ledger, trust, identity, policy and operator controls do not depend on SDK objects",
+      "opaque Temporal inputs and canonical SQL/JSON permit adapter or workflow replacement"
+    ]
+  },
+  "equivalent_protocol_benchmark": {
+    "framework": {
+      "scenario": "construct, validate and canonically digest one bounded neutral text message",
+      "runs": 200,
+      "warmup_runs": 20,
+      "median_ms": 0.074021,
+      "p95_ms": 0.084917,
+      "machine": "local arm64, CPython 3.14.7"
+    },
+    "custom": {
+      "result": null,
+      "reason": "The custom branch has deterministic functional scenarios but no throughput/latency benchmark, and its runtime was not executed in this repository."
+    },
+    "candid_assessment": "This is a contract CPU microbenchmark, not protocol or service latency. It excludes SDK transport, network, TLS, PostgreSQL, Temporal and peer work, so it cannot establish production performance parity."
+  },
+  "deferred": [
+    "public federation",
+    "production PKI and token brokerage",
+    "partner qualification",
+    "deployment",
+    "independent MCP/A2A conformance and security certification",
+    "load, chaos, HA and disaster-recovery qualification"
+  ]
+}

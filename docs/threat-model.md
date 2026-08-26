@@ -205,3 +205,23 @@ penetration testing remain unproven.
 | Ambiguous effect shown healthy | Closed status enum and explicit alert styling/test | Operator training still required |
 | Poll replay/reorder | Runtime schema, generation watermark, dedupe, retry cap, tenant/auth teardown | Durable SSE cursor deferred |
 | Analytics/telemetry leak | No third-party analytics; fixed no-payload error handling | Browser RUM deliberately absent |
+
+# Layer 13 MCP and A2A threats
+
+| Threat | Control | Residual/deferred |
+|---|---|---|
+| Tool/card description poisoning | Treat every description/instruction/capability as untrusted data; registry policy wins | Novel semantic deception |
+| Peer grants role/tenant/approval | Workload identity and tenant purpose established before protocol; authority fields rejected | Application wiring defect |
+| Confused deputy/token passthrough | Exact audience/resource/scope/purpose, no downstream client-token forwarding, current RBAC | Token broker not deployed |
+| Replay | Token-ID replay cache, tenant idempotency digest, message/task dedupe | Distributed replay store deferred |
+| Schema/JSON/Unicode bomb | Strict models, byte/member/depth/count/NFC/control/bidi bounds | Native SDK/parser defect |
+| SSRF/DNS rebinding/redirect | Exact registry origin/path, global-IP validation, no redirects/proxy inheritance, production egress prerequisite | DNS/connect TOCTOU without egress proxy |
+| Forged Agent Card/artifact | Detached JWS verification, card/key/cert pin, task/peer/capability/content/citation provenance | Partner PKI not qualified |
+| MIME/URL exfiltration | Text/JSON allowlist; raw bytes and external artifact URLs quarantined | Future format admission risk |
+| Denial of wallet | Reserve quota before network; request/cost/byte/concurrency/time/page/event bounds and circuit | Distributed rate service deferred |
+| Crash/timeout after delivery | Intent first, stable idempotency/fence, explicit ambiguity, observe-before-retry | Peer may expose insufficient observation |
+| Revoked/drifted peer result | Reauthorize trust revision after wait; stale fence rejection and quarantine | External work cannot be undone |
+| MCP SDK telemetry leak | Remove default request middleware; manual fixed spans only | SDK internals/client spans require upgrade review |
+
+Public federation, production PKI/token brokerage, partner qualification, deployment,
+and independent conformance/security certification remain unproven.

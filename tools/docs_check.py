@@ -50,6 +50,9 @@ REQUIRED_DOCS = (
     "docs/slo-catalog.md",
     "docs/adr/016-provider-neutral-observability-replay.md",
     "docs/adr/017-secure-operator-bff.md",
+    "docs/adr/018-official-mcp-a2a-interoperability.md",
+    "docs/protocol-runbook.md",
+    "docs/protocol-compatibility.md",
     "docs/operator-runbook.md",
     "docs/operator-accessibility.md",
     "docs/operator-security.md",
@@ -226,6 +229,30 @@ def _measurement_errors() -> list[str]:
                 "equivalent_operator_benchmark",
             )
             if not layer12.get(field)
+        )
+    layer13_path = ROOT / "comparison/layer13-metrics.json"
+    if not layer13_path.is_file():
+        errors.append("missing comparison/layer13-metrics.json")
+    else:
+        layer13 = json.loads(layer13_path.read_text(encoding="utf-8"))
+        if layer13.get("schema_version") != 13 or layer13.get("layer") != 13:
+            errors.append("Layer 13 metrics schema/layer is invalid")
+        custom = layer13.get("comparison_basis", {}).get("custom_layer14", {})
+        if custom.get("sha") != "0e21a38a89d71d183183e17bd225ab9f56dace1e":
+            errors.append("Layer 14 custom comparison SHA is not pinned")
+        errors.extend(
+            f"Layer 13 metrics missing {field}"
+            for field in (
+                "source_loc",
+                "runtime_dependencies",
+                "official_sdk_code_removed",
+                "remaining_custom_controls",
+                "sdk_use_comparison",
+                "lock_in_and_escape",
+                "equivalent_protocol_benchmark",
+                "deferred",
+            )
+            if not layer13.get(field)
         )
     return errors
 

@@ -79,6 +79,9 @@ class Action(StrEnum):
     SUPPORT_READ = "support:read"
     REPLAY_READ = "replay:read"
     PROJECTION_REBUILD = "projection:rebuild"
+    INTEROPERABILITY_READ = "interoperability:read"
+    INTEROPERABILITY_INVOKE = "interoperability:invoke"
+    INTEROPERABILITY_TRUST_ADMIN = "interoperability:trust:admin"
 
 
 class PolicyDecision(StrictModel):
@@ -310,6 +313,15 @@ class SandboxObservabilityPort(Protocol):
 
 class MemoryObservabilityPort(Protocol):
     def memory(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]: ...
+
+
+class InteroperabilityObservabilityPort(Protocol):
+    def interoperability(
         self,
         *,
         tenant_id: str,

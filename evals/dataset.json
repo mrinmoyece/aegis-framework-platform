@@ -10,7 +10,7 @@
     "retention_policy": "repository-history",
     "created_at": "2026-08-15T00:00:00Z",
     "synthetic": true,
-    "source_content_digest": "654238958cad6295070b35d0972c38580d8efb5f4cebadee53637252e5ac9efc"
+    "source_content_digest": "e8810a0d694e75ca325f28a9114c36729481f3c6e7bc8a5d6e0edd2a63c7e88e"
   },
   "case_ids": [
     "budget-exhaustion",
@@ -38,6 +38,14 @@
     "observability-retry-counting",
     "observability-safety-alert-bounded",
     "observability-secret-absence",
+    "protocol-ambiguity",
+    "protocol-confused-deputy",
+    "protocol-denial-wallet",
+    "protocol-poisoning",
+    "protocol-proposal-only",
+    "protocol-schema-bomb",
+    "protocol-ssrf",
+    "protocol-trust-revocation",
     "model-budget",
     "model-duplicate-ambiguous",
     "model-fallback-circuit",
@@ -66,5 +74,5 @@
   ],
   "quarantined_case_ids": [],
   "deleted_case_ids": [],
-  "migration": "v1: canonical Layer 1-9 checkout corpus; quarantine or tombstone before removal"
+  "migration": "v1: canonical Layers 1-13 checkout corpus; quarantine or tombstone before removal"
 }

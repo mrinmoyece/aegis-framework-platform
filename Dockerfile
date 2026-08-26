@@ -22,7 +22,7 @@ RUN uv sync --frozen --no-dev --no-editable \
 
 FROM ${PYTHON_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/mrinmoyece/aegis-framework-platform" \
-      org.opencontainers.image.description="Aegis framework-first governed Layer 12"
+      org.opencontainers.image.description="Aegis framework-first governed Layer 13"
 ENV PATH="/app/.venv/bin:${PATH}" \
     LANGGRAPH_STRICT_MSGPACK=true \
     PYTHONUNBUFFERED=1 \

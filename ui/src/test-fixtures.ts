@@ -168,5 +168,28 @@ export const fixtureSnapshot: OperatorSnapshot = {
       truncated: false,
       report_digest: digest
     }
+  ],
+  protocol_peers: [
+    {
+      peer_id: "partner-investigator",
+      protocol: "a2a",
+      owner_ref: "team-response",
+      environment: "staging",
+      trust_tier: "partner",
+      status: "active",
+      revision: 3,
+      card_digest: digest,
+      schema_digest: digest,
+      certificate_digest: digest,
+      key_digest: digest,
+      capabilities: ["investigate-incident"],
+      transports: ["json-rpc-http"],
+      classifications: ["internal"],
+      risks: ["low", "medium"],
+      review_after: later,
+      expires_at: later,
+      production_ready: false,
+      can_administer: true
+    }
   ]
 };

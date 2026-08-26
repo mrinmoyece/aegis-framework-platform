@@ -8,7 +8,8 @@ import json
 import stat
 import tempfile
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from datetime import timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -19,6 +20,7 @@ from aegis_framework.domain import (
     Evidence,
     InvestigationRequest,
     InvestigationStatus,
+    RiskLevel,
     StrictModel,
 )
 from aegis_framework.errors import (
@@ -98,6 +100,14 @@ class EvalCase(StrictModel):
         "observability-outage-correctness",
         "observability-replay-convergence",
         "observability-safety-alert-bounded",
+        "protocol-poisoning",
+        "protocol-confused-deputy",
+        "protocol-schema-bomb",
+        "protocol-ssrf",
+        "protocol-proposal-only",
+        "protocol-trust-revocation",
+        "protocol-ambiguity",
+        "protocol-denial-wallet",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -144,6 +154,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 def run_eval_case(case: EvalCase) -> EvalOutcome:
     """Execute one canonical case for the governed Layer 10 runner."""
+    if case.kind.startswith("protocol-"):
+        return _run_protocol_case(case)
     if case.kind.startswith("observability-"):
         return _run_observability_case(case)
     if case.kind.startswith("memory-"):
@@ -231,6 +243,209 @@ def run_eval_case(case: EvalCase) -> EvalOutcome:
         case_id=case.case_id,
         passed=not details,
         details=tuple(details),
+    )
+
+
+def _run_protocol_case(case: EvalCase) -> EvalOutcome:
+    from aegis_framework.connector_adapters import (
+        HttpResponse,
+        NetworkPolicy,
+        SecureHttpClient,
+    )
+    from aegis_framework.errors import (
+        ConnectorRejected,
+        IntegrityFailure,
+        PayloadRejected,
+    )
+    from aegis_framework.interoperability import (
+        AgentSkillContract,
+        DataClassification,
+        InvocationQuota,
+        ProtocolKind,
+        TransportKind,
+        TrustEntry,
+        TrustRegistry,
+        TrustStatus,
+        TrustTier,
+        canonical_json,
+        reject_raw_ledger_payload,
+        validate_untrusted_text,
+    )
+    from aegis_framework.mcp_interop import (
+        McpCallRequest,
+        McpToolName,
+        curated_tools,
+    )
+
+    details: list[str] = []
+    if case.kind == "protocol-poisoning":
+        try:
+            validate_untrusted_text("trusted\u202eexe")
+        except ValueError:
+            pass
+        else:
+            details.append("unicode_protocol_poisoning_was_accepted")
+    elif case.kind == "protocol-confused-deputy":
+        try:
+            McpCallRequest(
+                call_id="eval-confused-deputy",
+                tool_name=McpToolName.STATUS_READ,
+                arguments={
+                    "resource_ref": "run-001",
+                    "tenant_id": "attacker",
+                    "roles": ["administrator"],
+                },
+                idempotency_key="eval-confused-deputy",
+            )
+        except ValidationError:
+            pass
+        else:
+            details.append("protocol_peer_granted_application_authority")
+    elif case.kind == "protocol-schema-bomb":
+        value: object = "leaf"
+        for _ in range(14):
+            value = [value]
+        try:
+            canonical_json(value)
+        except PayloadRejected:
+            pass
+        else:
+            details.append("protocol_json_bomb_was_accepted")
+    elif case.kind == "protocol-ssrf":
+        policy = NetworkPolicy(
+            base_url="https://peer.example.com",
+            allowed_hosts=("peer.example.com",),
+            allowed_content_types=("application/json",),
+        )
+
+        class _PrivateResolver:
+            def resolve(self, host: str, port: int) -> tuple[str, ...]:
+                del host, port
+                return ("127.0.0.1",)
+
+        class _NoTransport:
+            def request(
+                self,
+                *,
+                method: str,
+                url: str,
+                headers: Mapping[str, str],
+                timeout_seconds: float,
+                maximum_bytes: int,
+                content: bytes | None = None,
+            ) -> HttpResponse:
+                del method, url, headers, timeout_seconds, maximum_bytes, content
+                raise AssertionError("SSRF must fail before transport")
+
+        try:
+            SecureHttpClient(
+                policy=policy,
+                transport=_NoTransport(),
+                resolver=_PrivateResolver(),
+            ).validate_destination()
+        except ConnectorRejected:
+            pass
+        else:
+            details.append("private_protocol_destination_was_accepted")
+    elif case.kind == "protocol-proposal-only":
+        tools = curated_tools()
+        skill = AgentSkillContract(
+            skill_id="submit-remediation-proposal",
+            name="Submit remediation proposal",
+            description_digest="1" * 64,
+            capability_id="a2a-submit-remediation-proposal",
+            input_modes=("application/json",),
+            output_modes=("application/json",),
+            risk=RiskLevel.HIGH,
+        )
+        if any(tool.destructive for tool in tools) or skill.permits_effect:
+            details.append("protocol_exposed_direct_effect_authority")
+    elif case.kind == "protocol-trust-revocation":
+        registry = TrustRegistry()
+        pending = TrustEntry(
+            peer_id="eval-peer",
+            protocol=ProtocolKind.MCP,
+            owner_ref="team-platform",
+            environment="test",
+            trust_tier=TrustTier.RESTRICTED,
+            status=TrustStatus.PENDING_REVIEW,
+            revision=1,
+            expires_at=DEMO_MEMORY_TIME + timedelta(days=2),
+            review_after=DEMO_MEMORY_TIME + timedelta(days=1),
+            schema_digest="2" * 64,
+            certificate_digest="3" * 64,
+            key_digest="4" * 64,
+            allowed_classifications=(DataClassification.INTERNAL,),
+            allowed_risks=(RiskLevel.LOW,),
+            allowed_capabilities=("mcp-aegis-status-read",),
+            allowed_transports=(TransportKind.STREAMABLE_HTTP,),
+            egress_origins=("https://peer.example.com",),
+            maximum_request_bytes=4096,
+            maximum_response_bytes=4096,
+            maximum_requests_per_minute=10,
+            maximum_cost_units_per_hour=10,
+            change_digest="5" * 64,
+        )
+        registry.register(pending)
+        active = registry.review(
+            peer_id="eval-peer",
+            expected_revision=1,
+            reviewer_ref="reviewer-eval",
+            now=DEMO_MEMORY_TIME,
+            typed_confirmation="TRUST eval-peer",
+        )
+        registry.revoke(
+            peer_id="eval-peer",
+            expected_revision=active.revision,
+            reviewer_ref="reviewer-eval",
+            now=DEMO_MEMORY_TIME,
+            typed_confirmation="REVOKE eval-peer",
+        )
+        try:
+            registry.require_active(
+                peer_id="eval-peer",
+                protocol=ProtocolKind.MCP,
+                capability_id="mcp-aegis-status-read",
+                risk=RiskLevel.LOW,
+                classification=DataClassification.INTERNAL,
+                now=DEMO_MEMORY_TIME,
+            )
+        except PolicyDenied:
+            pass
+        else:
+            details.append("revoked_protocol_peer_remained_active")
+    elif case.kind == "protocol-ambiguity":
+        try:
+            reject_raw_ledger_payload(
+                {"request_digest": "6" * 64, "content": "raw-peer-result"}
+            )
+        except IntegrityFailure:
+            pass
+        else:
+            details.append("raw_protocol_content_entered_ledger")
+    elif case.kind == "protocol-denial-wallet":
+        quota = InvocationQuota(request_limit=1, cost_limit=1)
+        quota.reserve(
+            tenant_ref="tenant-ref-eval",
+            reservation_id="reservation-001",
+            cost_units=1,
+        )
+        try:
+            quota.reserve(
+                tenant_ref="tenant-ref-eval",
+                reservation_id="reservation-002",
+                cost_units=1,
+            )
+        except PolicyDenied:
+            pass
+        else:
+            details.append("protocol_denial_of_wallet_exceeded_quota")
+    else:
+        details.append("unknown_protocol_case")
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details) or (case.expected_reason,),
     )
 
 
@@ -649,7 +864,7 @@ def _run_orchestration_case(case: EvalCase) -> EvalOutcome:
 
 
 def _run_evidence_case(case: EvalCase) -> EvalOutcome:
-    from collections.abc import Callable, Mapping
+    from collections.abc import Callable
     from datetime import timedelta
     from typing import cast
 

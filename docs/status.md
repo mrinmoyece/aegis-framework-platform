@@ -214,3 +214,35 @@ load/chaos, managed telemetry, and production runtime integration remain deferre
 Credentialed PostgreSQL/Keycloak and Temporal integration suites were selected locally
 but skipped because their required environment variables/services were absent; CI keeps
 the existing environment-backed jobs.
+
+# Layer 13 qualification status
+
+## Delivered
+
+- MCP specification `2026-07-28` and official Python SDK `mcp==2.0.0`, including real
+  SDK server/tool, client negotiation, stdio and stateless Streamable HTTP surfaces;
+- A2A protocol `1.0`/spec tag `v1.0.1` and official SDK `a2a-sdk==1.1.2`, including
+  protobuf models, signed-card resolver, client factory, JSON-RPC/HTTP+JSON route
+  factories and gRPC handler;
+- neutral bounded/redacted principal, capability, resource, tool, task, message,
+  artifact, citation, status, error, idempotency, policy and audit contracts;
+- exact tenant trust registry, workload identity/replay/readiness, quota/circuit,
+  intent-before-network ledger, ambiguity/reconciliation/cancellation/quarantine;
+- seven curated MCP tools and four bounded A2A skills with proposal-only remediation;
+- two opaque Temporal workflows and forced-RLS PostgreSQL trust/invocation/task/fact/
+  cursor/quota/artifact/rebuild schema;
+- operator protocol peer review/quarantine/revocation/emergency-disable with exact
+  confirmation and current revision/digest checks;
+- eight deterministic protocol evaluation cases and deterministic official-SDK/fake
+  peer tests with no live credentials or peers.
+- 431 backend tests pass with 90.02% meaningful branch coverage; 58 deterministic eval
+  cases and 14 evaluation meta-tests pass; 32 frontend tests, 16 axe cases, and three
+  Chromium journeys pass; the production JavaScript bundle is 445,244 bytes.
+
+## Not proven
+
+Public federation, production PKI or token brokerage, partner qualification, live
+OIDC/mTLS/secret rotation, qualified egress/DNS, deployed protocol endpoints, load/
+chaos, and independent MCP/A2A conformance or security certification are deferred.
+MCP Tasks remain experimental and unused. A2A push notifications remain disabled until
+webhook SSRF/auth/idempotency operations are independently qualified.
