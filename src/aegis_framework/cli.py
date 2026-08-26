@@ -9,7 +9,7 @@ from pathlib import Path
 
 import uvicorn
 
-from aegis_framework.errors import OptionalDependencyMissing
+from aegis_framework.errors import IntegrityFailure, OptionalDependencyMissing
 from aegis_framework.evals import load_cases, run_eval_suite
 from aegis_framework.fixtures import (
     DemoScenario,
@@ -44,6 +44,18 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "memory-demo",
         help="run deterministic three-tier memory ingestion and retrieval",
+    )
+    replay = subparsers.add_parser(
+        "replay",
+        help="validate and inspect an exported application-ledger event array",
+    )
+    replay.add_argument("--events", type=Path, required=True)
+    replay.add_argument("--run-id", required=True)
+    replay.add_argument("--cursor", type=int)
+    replay.add_argument(
+        "--view",
+        choices=("verify", "state", "causal", "support", "projection"),
+        default="support",
     )
     remediation.add_argument(
         "--scenario",
@@ -152,6 +164,59 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         memory_result = run_memory_demo()
         print(memory_result.context.model_dump_json(indent=2))
+        return 0
+    if args.command == "replay":
+        from aegis_framework.replay import (
+            ReplayDebugger,
+            load_events,
+            projection_document,
+        )
+
+        try:
+            payload = json.loads(args.events.read_text(encoding="utf-8"))
+            debugger = ReplayDebugger(load_events(payload))
+            integrity = debugger.verify()
+            if not integrity.valid:
+                raise IntegrityFailure(
+                    f"export integrity check failed: {integrity.failure_code}"
+                )
+            if args.view == "verify":
+                replay_result: object = integrity.model_dump(mode="json")
+            elif args.view == "state":
+                replay_result = debugger.state_at(
+                    aggregate_id=args.run_id,
+                    cursor=args.cursor,
+                ).model_dump(mode="json")
+            elif args.view == "causal":
+                replay_result = [
+                    item.model_dump(mode="json")
+                    for item in debugger.causal_chain(aggregate_id=args.run_id)
+                ]
+            elif args.view == "projection":
+                replay_result = projection_document(
+                    debugger,
+                    aggregate_id=args.run_id,
+                    cursor=args.cursor,
+                )
+            else:
+                replay_result = debugger.support_report(
+                    aggregate_id=args.run_id,
+                ).model_dump(mode="json")
+        except (
+            OSError,
+            UnicodeError,
+            json.JSONDecodeError,
+            ValueError,
+            IntegrityFailure,
+        ) as exc:
+            print(
+                json.dumps(
+                    {"status": "rejected", "error": type(exc).__name__},
+                    sort_keys=True,
+                )
+            )
+            return 2
+        print(json.dumps(replay_result, indent=2, sort_keys=True))
         return 0
 
     uvicorn.run(

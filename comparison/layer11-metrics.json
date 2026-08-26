@@ -1,0 +1,576 @@
+{
+  "comparison_basis": {
+    "custom_layer10": {
+      "branch": "mrinmoyece-aegis-layer-10-memory-rag",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer9": {
+        "additions": 13545,
+        "changed_files": 58,
+        "commits": 1,
+        "deletions": 104
+      },
+      "notes": [
+        "Implements a live pgvector cosine ANN query (`embedding <=> %s::vector`) in its hybrid retrieval SQL, exercised by its own retrieval path. This framework now also implements and integration-tests an equivalent live forced-RLS hybrid query (`PostgresMemoryStore.hybrid_candidates`), but only at the store layer: it is not yet wired into this framework's `MemoryRetrievalService`/API retrieval-serving path. This framework's own comparison does not independently verify whether the custom target's query is wired into its serving path."
+      ],
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "c9474184af756ce93d19d86360c339541e8263fb",
+      "source_loc": {
+        "production": 44117,
+        "tests": 22194,
+        "total": 66311
+      },
+      "test_functions": 395
+    },
+    "custom_layer11": {
+      "branch": "mrinmoyece-aegis-layer-11-evaluation",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "evaluation": {
+        "adversarial_cases": 12,
+        "deterministic_cases": 91,
+        "evaluator_meta_tests": 22,
+        "fault_cut_points": 22
+      },
+      "incremental_effort_from_layer10": {
+        "additions": 19012,
+        "changed_files": 44,
+        "commits": 1,
+        "deletions": 105
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "d17447f016cfd335ad9ff9900e9478b9d25844ea",
+      "source_loc": {
+        "production": 49758,
+        "tests": 23390,
+        "total": 73148
+      },
+      "test_functions": 418
+    },
+    "custom_layer12": {
+      "branch": "mrinmoyece-aegis-layer-12-observability",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 12
+      },
+      "incremental_effort_from_layer11": {
+        "additions": 6011,
+        "changed_files": 71,
+        "commits": 1,
+        "deletions": 55
+      },
+      "observability_files": 28,
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "b63915659e8bcd49ca2ebd1f901f0f1cdc370c3b",
+      "source_loc": {
+        "observability_config": 420,
+        "observability_production": 2672,
+        "observability_tests": 691,
+        "production": 52834,
+        "tests": 24193,
+        "total": 77027
+      },
+      "test_functions": 364
+    },
+    "custom_layer3": {
+      "branch": "mrinmoyece-aegis-durable-ledger",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 4,
+        "locked_total": null
+      },
+      "implementation_effort_proxy": {
+        "additions": 3901,
+        "changed_files": 42,
+        "commits": 1,
+        "deletions": 176
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "87cefe58adbf62e6a419d38e57e0928581b7003c",
+      "source_loc": {
+        "production": 3765,
+        "tests": 2239,
+        "total": 6004
+      },
+      "test_functions": 77
+    },
+    "custom_layer4": {
+      "branch": "mrinmoyece-aegis-worker-runtime",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 6,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer3": {
+        "additions": 6301,
+        "changed_files": 47,
+        "commits": 1,
+        "deletions": 198
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "171fa485819334a892684544c0a993a6e2fc4ace",
+      "source_loc": {
+        "production": 7452,
+        "tests": 3687,
+        "total": 11139
+      },
+      "test_functions": 99
+    },
+    "custom_layer5": {
+      "branch": "mrinmoyece-aegis-model-gateway",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 9
+      },
+      "incremental_effort_from_layer4": {
+        "additions": 6568,
+        "changed_files": 55,
+        "commits": 1,
+        "deletions": 109
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6",
+      "source_loc": {
+        "production": 11079,
+        "tests": 5479,
+        "total": 16558
+      },
+      "test_functions": 141
+    },
+    "custom_layer6": {
+      "branch": "mrinmoyece-aegis-evidence-connectors",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 5,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer5": {
+        "additions": 10954,
+        "changed_files": 50,
+        "commits": 1,
+        "deletions": 123
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "7a685bc52772e1c92467baba58a1c668646e9bf7",
+      "source_loc": {
+        "production": 17119,
+        "tests": 8780,
+        "total": 25899
+      },
+      "test_functions": 204
+    },
+    "custom_layer7": {
+      "branch": "mrinmoyece-aegis-specialist-dag",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer6": {
+        "additions": 6749,
+        "changed_files": 41,
+        "commits": 3,
+        "deletions": 177
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "dce0054a40c34ab4cc9d515aa753bc71d73fab57",
+      "source_loc": {
+        "production": 21581,
+        "tests": 9975,
+        "total": 31556
+      },
+      "test_functions": 221
+    },
+    "custom_layer8": {
+      "branch": "mrinmoyece-aegis-remediation-approvals",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 6,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer7": {
+        "additions": 12030,
+        "changed_files": 48,
+        "commits": 1,
+        "deletions": 162
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "0ce9368d60f3b2fce7b805d7d7699d585f13cef2",
+      "source_loc": {
+        "production": 28056,
+        "tests": 14031,
+        "total": 42087
+      },
+      "test_functions": 275
+    },
+    "custom_layer9": {
+      "branch": "mrinmoyece-aegis-layer-9-sandbox",
+      "dependencies": {
+        "direct_development": 0,
+        "direct_optional": 7,
+        "direct_runtime": 12,
+        "locked_total": null
+      },
+      "incremental_effort_from_layer8": {
+        "additions": 14283,
+        "changed_files": 53,
+        "commits": 1,
+        "deletions": 95
+      },
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "ed16fb8bb62ca6d18bc53ec8ee4e0191ed6caa63",
+      "source_loc": {
+        "production": 35980,
+        "tests": 18558,
+        "total": 54538
+      },
+      "test_functions": 307
+    },
+    "effort_definition": "Git additions/deletions and changed files from each prior layer",
+    "equivalent_evaluation_scenario": "one canonical checkout success case through deterministic application code, neutral scorer contracts, reviewed baseline comparison, and bounded redacted reporting with no network, process, or model judge",
+    "equivalent_evidence_scenario": "three tenant-bound cited records correlated in process with stable timeline ordering, shared-fact links, no network, and no causal claim",
+    "equivalent_gateway_scenario": "tenant-scoped structured fake-provider call with explicit catalog, pre-call reservation, deterministic route, normalized usage/cost settlement, no network, and no production effect",
+    "equivalent_memory_scenario": "one tenant-bound incident memory candidate ingested from accepted evidence through the full scan/chunk/embed/index fact chain, deterministic hash-based embedding/chunking, hybrid in-memory retrieval, and a bounded LangGraph context build; no network, no real embedding provider, and no PostgreSQL round trip (the separately store-tested `hybrid_candidates` pgvector query is not exercised by this in-memory demo scenario)",
+    "equivalent_observability_scenario": "one accepted tenant-scoped durable investigation verified from the application ledger, projected at its last cursor, compared with the live projection, and rendered as a bounded digest-only support report; no exporter, network, model, connector, tool, sandbox, or effect",
+    "equivalent_orchestration_scenario": "fixed-role checkout specialist fan-out/fan-in through critic, proposal-only planner and verification-plan gate using deterministic models, in-memory application facts, no network or production effect",
+    "equivalent_remediation_scenario": "high-risk checkout Kubernetes rollout-restart with exact immutable plan/action/target/policy digests, two distinct human approvals, dry-run, stable idempotency, deterministic fake effect and fresh verification; in-memory, no network or production credentials",
+    "equivalent_sandbox_scenario": "approval-bound immutable testing spec, current deny-default policy, application request/policy/approval facts, deterministic fake provision/result/cleanup, no process, cluster, network or credentials",
+    "foundation_sha": "754e536d10b9643b40cac2f7b6c0d1de870fd630",
+    "loc_definition": "non-blank, non-comment physical Python lines"
+  },
+  "custom_comparison": {
+    "layer10_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer10_tradeoff": "Both implementations avoid LangChain, LlamaIndex, Haystack and pgvector-python, choosing raw SQL over pgvector instead; neither adds a new dependency for memory. Custom Layer 10 implements a live pgvector cosine ANN query actually exercised by its own retrieval path. Framework Layer 9 now implements and integration-tests an equivalent live forced-RLS hybrid SQL query (`hybrid_candidates`), closing the prior in-memory-only gap, but it is proven only at the store layer: this framework's `MemoryRetrievalService`/API retrieval path still serves from `InMemoryHybridIndex` pending that wiring. This framework does not independently verify whether the custom target's query is wired into its own serving path",
+    "layer11_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer11_tradeoff": "Both implementations keep deterministic safety gates custom and offline rather than adopting a hosted evaluator. Custom Layer 11 has a broader 91-case catalog, 22 fault points, per-case nullable metrics, signed reports, and bounded async concurrency. Framework Layer 10 reuses 44 real cross-layer application scenarios plus 17 deterministic fault simulations, uses strict Pydantic contracts, and optionally publishes sanitized aggregates to Langfuse. The framework version is smaller but has less granular per-case metric applicability and no signed report or live/statistical adapter.",
+    "layer12_services": [
+      "PostgreSQL",
+      "Redis Streams",
+      "OpenTelemetry Collector",
+      "Prometheus",
+      "Grafana"
+    ],
+    "layer12_tradeoff": "Custom Layer 12 implements 2,672 observability/replay production LOC and 420 configuration LOC with ten dashboards. Framework Layer 11 uses neutral OTel plus application-ledger replay and a smaller dashboard set, but still retains custom semantic/redaction/SLO/replay security. Langfuse stays optional in both; the framework escape is OTLP and canonical ledger JSON. Custom runtime was not executed under this interpreter, so no cross-repository latency claim is made.",
+    "layer3_services": [
+      "PostgreSQL"
+    ],
+    "layer4_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer5_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer6_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer6_tradeoff": "HTTPX, PyYAML, and the official Kubernetes client remove transport, syntax, and Kubernetes object decoding only. They do not remove tenant, provenance, SSRF, pagination, ledger, or quarantine controls",
+    "layer7_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer7_tradeoff": "LangGraph removes custom DAG scheduler, synchronized fan-in, reducers and checkpoint traversal, but application role policy, artifact transitions, fencing, facts, RLS, citations and final gates remain",
+    "layer8_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer8_tradeoff": "Custom Layer 8 implements its own asynchronous remediation lifecycle over PostgreSQL and Redis delivery. Framework Layer 7 delegates durable waits, timers, signals, Activity retry/heartbeat/cancellation and replay to Temporal, but retains nearly all approval/effect security controls",
+    "layer9_services": [
+      "PostgreSQL",
+      "Redis Streams"
+    ],
+    "layer9_tradeoff": "Both implementations retain approval, policy, ledger, artifact, fencing, reconciliation and cleanup security controls. Framework Layer 8 removes custom durable sandbox scheduling/waits/retry/heartbeat/cancellation/replay through Temporal and Kubernetes Job mechanics, at the cost of two operational control planes and their upgrade/lock-in surface",
+    "runtime_comparison_status": "Equivalent network-free fake gateway scenarios ran on the same machine; figures are local implementation latency, not provider or distributed throughput",
+    "temporal_tradeoff": "Temporal removes scheduler, timers, signal history, retry/backoff, and crash recovery code but adds a second operational control plane"
+  },
+  "dependencies": {
+    "direct_development": 8,
+    "direct_optional": 7,
+    "direct_runtime": 12,
+    "locked_total": 131
+  },
+  "environment": {
+    "machine": "arm64",
+    "platform": "Darwin",
+    "python": "3.14.7"
+  },
+  "equivalent_evaluation_benchmark": {
+    "custom_layer11": {
+      "adversarial_cases": 12,
+      "deterministic_cases": 91,
+      "evaluator_meta_tests": 22,
+      "fault_cut_points": 22,
+      "sha": "d17447f016cfd335ad9ff9900e9478b9d25844ea"
+    },
+    "framework_layer10": {
+      "median_ms": 1.592,
+      "p95_ms": 1.898
+    },
+    "limitations": "Framework latency measures one canonical case, scoring and baseline comparison in process. Custom Layer 11 metrics are static reviewed catalog counts from the pinned revision; its runtime was not executed under the same interpreter, so no cross-repository latency claim is made. Framework has 44 application cases plus 17 separately meta-tested fault cut points, not 91 directly comparable catalog cases.",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-canonical-case-governed-baseline"
+  },
+  "equivalent_evidence_benchmark": {
+    "custom_layer6": {
+      "median_ms": 0.015,
+      "p95_ms": 0.015,
+      "sha": "7a685bc52772e1c92467baba58a1c668646e9bf7"
+    },
+    "framework_layer5": {
+      "median_ms": 0.047,
+      "p95_ms": 0.051
+    },
+    "limitations": "Different Pydantic/dataclass contracts; excludes PostgreSQL, Temporal, Redis, connector networks, ingestion, and process boundaries",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-three-record-non-causal-correlation"
+  },
+  "equivalent_gateway_benchmark": {
+    "custom_layer5": {
+      "median_ms": 0.166,
+      "p95_ms": 0.206,
+      "sha": "7c22d380a66f57aad943fe926ffff3ca8fc06ed6"
+    },
+    "framework_layer4": {
+      "median_ms": 1.356,
+      "p95_ms": 4.242
+    },
+    "limitations": "Different internal sync/async APIs; no PostgreSQL, Temporal, Redis, provider network, serialization, or process boundary was included",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-fake-reserve-route-settle"
+  },
+  "equivalent_memory_benchmark": {
+    "custom_layer10": {
+      "median_ms": 10.285,
+      "p95_ms": 11.88,
+      "sha": "c9474184af756ce93d19d86360c339541e8263fb"
+    },
+    "framework_layer9": {
+      "median_ms": 0.872,
+      "p95_ms": 1.198
+    },
+    "limitations": "Both paths are deterministic and execute no process, network, or real embedding provider. Custom Layer 10 exercises its own async event/index machinery including a SQL-shaped ANN scoring path; framework Layer 9's demo scenario exercises strict Pydantic contracts and the in-memory hybrid index only \u2014 it does not call the separately store-tested `hybrid_candidates` pgvector query, which requires a live PostgreSQL connection. Neither benchmark includes PostgreSQL, Temporal, a live embedding provider, serialization, or process startup, and neither measures retrieval-quality (precision/recall) parity",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-tenant-incident-memory-ingest-retrieve-context"
+  },
+  "equivalent_observability_benchmark": {
+    "custom_layer12": {
+      "dashboard_count": 10,
+      "observability_config_loc": 420,
+      "observability_production_loc": 2672,
+      "observability_test_loc": 691,
+      "sha": "b63915659e8bcd49ca2ebd1f901f0f1cdc370c3b"
+    },
+    "framework_layer11": {
+      "median_ms": 0.072,
+      "p95_ms": 0.078
+    },
+    "limitations": "Framework latency measures in-process validation, projection, compare and support-report digesting. Custom Layer 12 measurements are static reviewed source/config counts from the pinned revision; its runtime was not executed under this interpreter. Neither path includes PostgreSQL, OTLP, Prometheus, Grafana, Langfuse or process startup.",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-ledger-verify-project-support"
+  },
+  "equivalent_orchestration_benchmark": {
+    "custom_layer7": {
+      "median_ms": 25.922,
+      "p95_ms": 29.305,
+      "sha": "dce0054a40c34ab4cc9d515aa753bc71d73fab57"
+    },
+    "framework_layer6": {
+      "median_ms": 6.516,
+      "p95_ms": 7.721
+    },
+    "limitations": "Both use deterministic in-memory fixtures, but custom includes its async event repository and creates an event loop per sample while framework includes strict Pydantic artifacts and LangGraph checkpoints; no PostgreSQL, Temporal, Redis, network or process boundary is included",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-fixed-role-specialist-investigation"
+  },
+  "equivalent_remediation_benchmark": {
+    "custom_layer8": {
+      "median_ms": 5.983,
+      "p95_ms": 7.21,
+      "sha": "0ce9368d60f3b2fce7b805d7d7699d585f13cef2"
+    },
+    "framework_layer7": {
+      "median_ms": 0.913,
+      "p95_ms": 0.953
+    },
+    "limitations": "Both execute deterministic in-memory high-risk approval/effect paths. Custom is async and includes its event repository/lease machinery; framework is sync and includes strict Pydantic contracts/pure ledger. Neither benchmark includes PostgreSQL, Temporal, Redis, Kubernetes, network, serialization or process boundaries",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-exact-scope-checkout-rollout-restart"
+  },
+  "equivalent_sandbox_benchmark": {
+    "custom_layer9": {
+      "median_ms": 4.055,
+      "p95_ms": 4.552,
+      "sha": "ed16fb8bb62ca6d18bc53ec8ee4e0191ed6caa63"
+    },
+    "framework_layer8": {
+      "median_ms": 0.228,
+      "p95_ms": 0.242
+    },
+    "limitations": "Both paths are deterministic, in-memory and execute no process. Custom includes its async event repository/orchestrator; framework includes strict Pydantic contracts, three application facts and fake backend lifecycle. Neither includes PostgreSQL, Temporal, Redis, Kubernetes, CSI, CNI, runtime isolation, serialization or network",
+    "network": false,
+    "runs": 200,
+    "scenario": "deterministic-approval-bound-fake-sandbox-lifecycle"
+  },
+  "framework_code_removed": [
+    "custom graph scheduler",
+    "parallel fan-out and deterministic join engine",
+    "checkpoint serialization and state-history plumbing",
+    "HTTP routing and OpenAPI generation",
+    "JWT signature and registered-claim cryptography",
+    "PostgreSQL connection-pool lifecycle",
+    "cross-process workflow scheduling and replay",
+    "durable timers and signal delivery",
+    "activity retry/backoff and worker crash recovery",
+    "OpenAI and Anthropic wire protocol and SDK exception transport",
+    "HTTP connection pooling and streaming response mechanics",
+    "Kubernetes API object decoding and list transport",
+    "safe YAML syntax parsing",
+    "fixed specialist DAG scheduling and synchronized fan-in",
+    "graph checkpoint serialization and replay traversal",
+    "approval wait poller and durable timer state",
+    "approval/effect signal history and workflow crash recovery",
+    "effect Activity scheduling, retry/backoff, heartbeat and cancellation",
+    "sandbox Job API wire/object mechanics and scheduling",
+    "sandbox Activity scheduling, retry, heartbeat, cancellation and replay",
+    "durable pgvector column storage and raw SQL cast plumbing",
+    "memory ingest/compact/purge/rebuild Activity scheduling, periodic heartbeat and retry",
+    "pytest discovery, assertion reporting and branch-coverage mechanics",
+    "optional Langfuse result/dataset transport mechanics",
+    "OTLP collection, batching, queueing and retry mechanics",
+    "Prometheus rule evaluation and Grafana dashboard rendering"
+  ],
+  "implementation_effort_proxy": {
+    "additions": 4310,
+    "changed_files": 67,
+    "commits": 1,
+    "deletions": 71
+  },
+  "layer": 11,
+  "lock_in_and_escape": {
+    "evaluation": "EvaluationExecutorPort and EvaluationPublisherPort plus canonical JSON artifacts; required CI has no hosted dependency",
+    "fastapi": "typed request/response models at the delivery adapter",
+    "httpx": "HttpTransport plus neutral connector records and pages",
+    "kubernetes": "KubernetesApi protocol plus neutral connector records",
+    "kubernetes_sandbox": "SandboxBackend plus neutral immutable requests/results/attestations",
+    "langfuse": "ObservabilityPort plus OpenTelemetry",
+    "langgraph": "OrchestratorPort plus JSON-compatible domain state",
+    "openai_anthropic": "ModelProviderAdapter plus neutral ModelRequest/ProviderResult",
+    "opentelemetry": "versioned semantic conventions plus standard W3C/OTLP contracts",
+    "pgvector": "EmbeddingPort/SummarizationPort/MemoryReadPort plus immutable memory_facts replay; the raw vector cast is portable SQL, not a vendor abstraction",
+    "prometheus_grafana": "OpenMetrics text, PromQL rules and provisioned JSON dashboards",
+    "psycopg_postgresql": "repository ports plus application-owned SQL migrations",
+    "pyjwt": "AuthenticatorPort plus standard OIDC/JWT claims and JWK documents",
+    "pyyaml": "canonical JSON/text boundary after safe syntax parsing",
+    "temporal": "opaque typed payloads plus application outbox, ActivityOperations, and application-owned ledger/projections"
+  },
+  "measured_at": "2026-08-17T18:10:53.049918+00:00",
+  "qualification_counts": {
+    "deterministic_evals_passed": 50,
+    "deterministic_fault_cut_points_passed": 20,
+    "deterministic_tests_passed": 386,
+    "keycloak_integration_environment_gated": 1,
+    "postgres_integration_passed": 11,
+    "temporal_integration_passed": 6
+  },
+  "remaining_custom_controls": [
+    "issuer registry and bounded JWKS rotation policy",
+    "authoritative principal and tenant resolution",
+    "immutable RBAC, purpose, risk, and policy evaluation",
+    "quota reservation and retry ownership",
+    "forced RLS schema and transaction tenant context",
+    "tenant-scoped checkpoint ownership",
+    "secret-reference boundary",
+    "redacted hash-chained durable audit",
+    "API anti-enumeration and readiness failure policy",
+    "event envelope and dual integrity chains",
+    "transactional inbox/outbox and idempotency",
+    "projection rebuild and redacted cursor API",
+    "activity authorization and retry ownership",
+    "stale-result, poison-payload, and DLQ policy",
+    "tenant model policy/catalog and price versions",
+    "worst-case model token/cost reservations",
+    "model routing, fallback, circuit, rate and concurrency policy",
+    "immutable provider call and ambiguous-billing facts",
+    "strict structured output, tools and citation controls",
+    "source/resource allowlists and tenant-bound secret references",
+    "SSRF, DNS, redirect, private-address and response bounds",
+    "evidence canonicalization, provenance, redaction and quarantine",
+    "durable page intent, cursor encryption and ambiguous-outcome handling",
+    "deterministic non-causal correlation and extended citation validation",
+    "fixed role capability and artifact transition policy",
+    "immutable orchestration dispatch/artifact/decision facts",
+    "graph-version and checkpoint compatibility gates",
+    "exact remediation/action/approval/effect/verification contracts",
+    "current action policy and approval invalidation",
+    "human SoD, quorum, expiry and revocation",
+    "effect quota reservation, idempotency, claims and fencing",
+    "ambiguous effect reconciliation and fresh verification",
+    "compensation policy and immutable effect audit",
+    "exact sandbox spec/request/result/artifact/attestation contracts",
+    "sandbox policy, approval invalidation, quotas, claims and fencing",
+    "safe path/archive/output scanning, redaction and quarantine",
+    "ambiguous provision/delete reconciliation and cleanup ownership",
+    "immutable memory ledger facts and banned-field payload discipline",
+    "memory candidate evidence binding, version fencing and explicit human/policy `MemoryAcceptance` decision",
+    "derived index/cache rebuildability, live pgvector hybrid-query prefilters, and tenant isolation",
+    "legal hold, tombstone and crypto-erasure ordering",
+    "retrieved-memory instruction-boundary framing and final MMR/context-budget selection atop any candidate source",
+    "digest-only retrieval/context-build operation ledger and idempotent per-operation sequencing",
+    "evaluation suite/dataset/scorer/result/baseline/comparison/waiver contracts",
+    "canonical evaluation digests and deterministic execution guard",
+    "dataset provenance, secret/PII scan, quarantine/deletion lifecycle",
+    "hard safety baseline, tolerance, waiver and anti-tamper policy",
+    "domain-specific deterministic scoring and fault convergence assertions",
+    "redacted bounded JSON, Markdown and JUnit release reports",
+    "semantic conventions, redaction/cardinality policy and SLO ownership",
+    "ledger-grounded replay validation, support reports and projection rebuild"
+  ],
+  "required_stateful_services": [
+    "PostgreSQL",
+    "Temporal Server"
+  ],
+  "runtime": {
+    "median_ms": 6.516,
+    "network": false,
+    "p95_ms": 7.721,
+    "runs": 200,
+    "scenario": "deterministic-success"
+  },
+  "schema_version": 11,
+  "source_loc": {
+    "observability_config": 264,
+    "production": 34492,
+    "tests": 15259,
+    "total": 49751
+  }
+}

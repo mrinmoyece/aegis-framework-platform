@@ -1,0 +1,16 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Evidence operations", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=\"connector\"}[5m])) by (operation, status)", "refId": "A"}]},
+    {"id": 2, "title": "Specialist graph operations", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=\"graph\"}[5m])) by (operation, status)", "refId": "A"}]},
+    {"id": 3, "title": "Approvals and effects", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=~\"approval|effect\"}[5m])) by (component, operation, status)", "refId": "A"}]}
+  ],
+  "schemaVersion": 41,
+  "tags": ["aegis", "evidence", "specialists", "approvals", "effects"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Aegis Investigation Controls",
+  "uid": "aegis-investigation-controls",
+  "version": 1
+}

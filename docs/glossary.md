@@ -99,6 +99,18 @@ super-steps, reducers, and checkpoints.
 LangChain's commercial tracing/evaluation platform. Its client is transitive, but the
 platform is not configured because it would duplicate Langfuse.
 
+**Application replay**
+Deterministic read-only validation and projection from application ledger events. It is
+distinct from Temporal workflow replay and LangGraph checkpoint recovery.
+
+**SLI / SLO**
+An allowlisted measurable service-level indicator and its objective/window. Safety
+violations are hard alerts and never consume availability error budget.
+
+**Trace reference**
+Validated opaque W3C trace/span coordinates used only for navigation and causal links.
+It is not authorization, audit, approval, fencing, or proof of effect.
+
 **MCP**
 Model Context Protocol. Tool interoperability is deferred until identity, capability,
 and effect boundaries can govern it.

@@ -560,3 +560,17 @@ Primary references: [LangSmith evaluation concepts](https://docs.langchain.com/l
 
 The full decision and authority boundary are in
 [ADR 015](adr/015-governed-deterministic-evaluation.md).
+
+## Layer 11 observability tool decision
+
+| Tool | Decision | Enterprise rationale |
+|---|---|---|
+| OpenTelemetry 1.44.0 | Selected neutral boundary | Standard propagation and OTLP preserve backend escape; application semantic/redaction policy remains explicit |
+| OTel Collector 0.132.0 | Selected local/adapter boundary | Memory limiter, filtering, batching and bounded queues/retries isolate exporters; no debug exporter |
+| Prometheus 3.5.0 | Selected local SLI/rule engine | Open metrics and PromQL rules are portable; labels remain application-allowlisted |
+| Grafana 12.1.0 | Selected provisioned dashboard renderer | Dashboard JSON is reviewable and replaceable; it is not incident or audit truth |
+| Langfuse 4.14.4 | Optional manual trace/eval UX | Useful model/graph navigation with MIT core; automatic capture remains disabled |
+| LangSmith | Rejected | Proprietary self-hosted control plane and automatic LangGraph capture add privacy/lock-in without removing application controls |
+
+Prometheus and Grafana are local qualification services, not production deployment or
+SLO evidence. See [ADR 016](adr/016-provider-neutral-observability-replay.md).

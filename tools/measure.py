@@ -1,4 +1,4 @@
-"""Measure repeatable Layer 10 size, dependencies, effort, and local runtime."""
+"""Measure repeatable Layer 11 size, dependencies, effort, and local runtime."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ from aegis_framework.domain import (
     StrictModel,
     evidence_hash,
 )
+from aegis_framework.durability import InMemoryDurability
 from aegis_framework.evals import load_cases
 from aegis_framework.evaluation import (
     EvaluationRunner,
@@ -37,7 +38,12 @@ from aegis_framework.evaluation import (
     load_dataset,
     load_suite,
 )
-from aegis_framework.fixtures import build_demo_bundle, demo_identity, demo_request
+from aegis_framework.fixtures import (
+    DEMO_TIME,
+    build_demo_bundle,
+    demo_identity,
+    demo_request,
+)
 from aegis_framework.memory_demo import run_memory_demo
 from aegis_framework.model_gateway import (
     DataClassification,
@@ -59,6 +65,7 @@ from aegis_framework.remediation_demo import (
     RemediationDemoScenario,
     run_remediation_demo,
 )
+from aegis_framework.replay import ReplayDebugger
 from aegis_framework.sandbox import (
     InMemorySandboxLedger,
     InMemorySandboxQuota,
@@ -81,6 +88,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FOUNDATION_SHA = "754e536d10b9643b40cac2f7b6c0d1de870fd630"
 LAYER6_SHA = "9a920b99e1f2eff34890e076cdd94bb3cdd034f3"
 LAYER9_SHA = "01945f43218c30a889c6a6d482303fa93ed8d3f7"
+LAYER10_SHA = "986bbb1023a3cbdb194991a44d15ef12b6ef283a"
 CUSTOM_LAYER3 = {
     "repository": "mrinmoyece/aegis-agent-platform",
     "branch": "mrinmoyece-aegis-durable-ledger",
@@ -304,6 +312,32 @@ CUSTOM_LAYER11 = {
         "evaluator_meta_tests": 22,
     },
 }
+CUSTOM_LAYER12 = {
+    "repository": "mrinmoyece/aegis-agent-platform",
+    "branch": "mrinmoyece-aegis-layer-12-observability",
+    "sha": "b63915659e8bcd49ca2ebd1f901f0f1cdc370c3b",
+    "source_loc": {
+        "production": 52834,
+        "tests": 24193,
+        "total": 77027,
+        "observability_production": 2672,
+        "observability_tests": 691,
+        "observability_config": 420,
+    },
+    "dependencies": {
+        "direct_runtime": 12,
+        "direct_optional": 7,
+        "direct_development": 0,
+    },
+    "incremental_effort_from_layer11": {
+        "additions": 6011,
+        "deletions": 55,
+        "changed_files": 71,
+        "commits": 1,
+    },
+    "test_functions": 364,
+    "observability_files": 28,
+}
 
 
 def main() -> int:
@@ -359,9 +393,10 @@ def measure(runs: int) -> dict[str, object]:
     sandbox_runtime = _sandbox_runtime(runs)
     memory_runtime = _memory_runtime(runs)
     evaluation_runtime = _evaluation_runtime(runs)
+    observability_runtime = _observability_runtime(runs)
     return {
-        "schema_version": 10,
-        "layer": 10,
+        "schema_version": 11,
+        "layer": 11,
         "comparison_basis": {
             "foundation_sha": FOUNDATION_SHA,
             "custom_layer3": CUSTOM_LAYER3,
@@ -373,6 +408,7 @@ def measure(runs: int) -> dict[str, object]:
             "custom_layer9": CUSTOM_LAYER9,
             "custom_layer10": CUSTOM_LAYER10,
             "custom_layer11": CUSTOM_LAYER11,
+            "custom_layer12": CUSTOM_LAYER12,
             "loc_definition": "non-blank, non-comment physical Python lines",
             "effort_definition": (
                 "Git additions/deletions and changed files from each prior layer"
@@ -416,6 +452,13 @@ def measure(runs: int) -> dict[str, object]:
                 "code, neutral scorer contracts, reviewed baseline comparison, and "
                 "bounded redacted reporting with no network, process, or model judge"
             ),
+            "equivalent_observability_scenario": (
+                "one accepted tenant-scoped durable investigation verified from the "
+                "application ledger, projected at its last cursor, compared with the "
+                "live projection, and rendered as a bounded digest-only support "
+                "report; no exporter, network, model, connector, tool, sandbox, or "
+                "effect"
+            ),
         },
         "measured_at": datetime.now(UTC).isoformat(),
         "environment": {
@@ -427,6 +470,7 @@ def measure(runs: int) -> dict[str, object]:
             "production": production_loc,
             "tests": test_loc,
             "total": production_loc + test_loc,
+            "observability_config": _config_loc(ROOT / "observability"),
         },
         "dependencies": {
             "direct_runtime": len(pyproject["project"]["dependencies"]),
@@ -464,6 +508,8 @@ def measure(runs: int) -> dict[str, object]:
             "heartbeat and retry",
             "pytest discovery, assertion reporting and branch-coverage mechanics",
             "optional Langfuse result/dataset transport mechanics",
+            "OTLP collection, batching, queueing and retry mechanics",
+            "Prometheus rule evaluation and Grafana dashboard rendering",
         ],
         "remaining_custom_controls": [
             "issuer registry and bounded JWKS rotation policy",
@@ -520,6 +566,8 @@ def measure(runs: int) -> dict[str, object]:
             "hard safety baseline, tolerance, waiver and anti-tamper policy",
             "domain-specific deterministic scoring and fault convergence assertions",
             "redacted bounded JSON, Markdown and JUnit release reports",
+            "semantic conventions, redaction/cardinality policy and SLO ownership",
+            "ledger-grounded replay validation, support reports and projection rebuild",
         ],
         "lock_in_and_escape": {
             "langgraph": "OrchestratorPort plus JSON-compatible domain state",
@@ -553,6 +601,12 @@ def measure(runs: int) -> dict[str, object]:
                 "EvaluationExecutorPort and EvaluationPublisherPort plus canonical "
                 "JSON artifacts; required CI has no hosted dependency"
             ),
+            "opentelemetry": (
+                "versioned semantic conventions plus standard W3C/OTLP contracts"
+            ),
+            "prometheus_grafana": (
+                "OpenMetrics text, PromQL rules and provisioned JSON dashboards"
+            ),
         },
         "required_stateful_services": ["PostgreSQL", "Temporal Server"],
         "custom_comparison": {
@@ -565,6 +619,13 @@ def measure(runs: int) -> dict[str, object]:
             "layer9_services": ["PostgreSQL", "Redis Streams"],
             "layer10_services": ["PostgreSQL", "Redis Streams"],
             "layer11_services": ["PostgreSQL", "Redis Streams"],
+            "layer12_services": [
+                "PostgreSQL",
+                "Redis Streams",
+                "OpenTelemetry Collector",
+                "Prometheus",
+                "Grafana",
+            ],
             "temporal_tradeoff": (
                 "Temporal removes scheduler, timers, signal history, retry/backoff, "
                 "and crash recovery code but adds a second operational control plane"
@@ -623,6 +684,15 @@ def measure(runs: int) -> dict[str, object]:
                 "and optionally publishes sanitized aggregates to Langfuse. The "
                 "framework version is smaller but has less granular per-case metric "
                 "applicability and no signed report or live/statistical adapter."
+            ),
+            "layer12_tradeoff": (
+                "Custom Layer 12 implements 2,672 observability/replay production LOC "
+                "and 420 configuration LOC with ten dashboards. Framework Layer 11 "
+                "uses neutral OTel plus application-ledger replay and a smaller "
+                "dashboard set, but still retains custom semantic/redaction/SLO/replay "
+                "security. Langfuse stays optional in both; the framework escape is "
+                "OTLP and canonical ledger JSON. Custom runtime was not executed under "
+                "this interpreter, so no cross-repository latency claim is made."
             ),
         },
         "runtime": {
@@ -764,6 +834,26 @@ def measure(runs: int) -> dict[str, object]:
                 "cases."
             ),
         },
+        "equivalent_observability_benchmark": {
+            "scenario": "deterministic-ledger-verify-project-support",
+            "network": False,
+            "runs": runs,
+            "framework_layer11": observability_runtime,
+            "custom_layer12": {
+                "observability_production_loc": 2672,
+                "observability_test_loc": 691,
+                "observability_config_loc": 420,
+                "dashboard_count": 10,
+                "sha": CUSTOM_LAYER12["sha"],
+            },
+            "limitations": (
+                "Framework latency measures in-process validation, projection, compare "
+                "and support-report digesting. Custom Layer 12 measurements are static "
+                "reviewed source/config counts from the pinned revision; its runtime "
+                "was not executed under this interpreter. Neither path includes "
+                "PostgreSQL, OTLP, Prometheus, Grafana, Langfuse or process startup."
+            ),
+        },
     }
 
 
@@ -772,7 +862,7 @@ def _git_effort() -> dict[str, int]:
     if git is None:
         raise RuntimeError("git is required to measure implementation effort")
     completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
-        [git, "diff", "--numstat", LAYER9_SHA, "--"],
+        [git, "diff", "--numstat", LAYER10_SHA, "--"],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -1932,6 +2022,430 @@ def _evaluation_runtime(runs: int) -> dict[str, float]:
     }
 
 
+def _git_effort() -> dict[str, int]:
+    git = shutil.which("git")
+    if git is None:
+        raise RuntimeError("git is required to measure implementation effort")
+    completed = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
+        [git, "diff", "--numstat", LAYER9_SHA, "--"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    additions = 0
+    deletions = 0
+    changed_files = 0
+    for row in completed.stdout.splitlines():
+        added, deleted, _ = row.split("\t", maxsplit=2)
+        if added.isdigit() and deleted.isdigit():
+            additions += int(added)
+            deletions += int(deleted)
+            changed_files += 1
+    untracked = subprocess.run(  # noqa: S603 - executable and arguments are fixed.
+        [git, "ls-files", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    for relative in untracked.stdout.splitlines():
+        path = ROOT / relative
+        if path.is_file():
+            additions += len(path.read_bytes().splitlines())
+            changed_files += 1
+    return {
+        "additions": additions,
+        "deletions": deletions,
+        "changed_files": changed_files,
+        "commits": 1,
+    }
+
+
+class _BenchmarkOutput(StrictModel):
+    answer: str = Field(min_length=1, max_length=32)
+
+
+def _gateway_runtime(runs: int) -> dict[str, float]:
+    result = ProviderResult(
+        structured_output={"answer": "safe"},
+        usage=ModelUsage(
+            input_tokens=10,
+            output_tokens=2,
+            provider_reported=True,
+        ),
+        finish_reason=ModelFinishReason.STOP,
+        safety=SafetyAssessment(blocked=False),
+    )
+    gateway = ModelGateway(
+        store=_demo_model_control(),
+        adapters=(FakeModelProvider((result,) * (runs + 1)),),
+        rate_limit_per_minute=runs + 1,
+    )
+
+    def request(index: int) -> ModelRequest:
+        return ModelRequest(
+            binding=ModelCallBinding(
+                tenant_id="tenant-acme",
+                run_id=f"run:measure-gateway-{index}",
+                call_id=f"call:measure-gateway-{index}",
+                purpose="incident-response",
+                data_classification=DataClassification.INTERNAL,
+                risk=RiskLevel.MEDIUM,
+            ),
+            messages=(
+                ModelMessage(
+                    role=ModelRole.SYSTEM,
+                    content=(TextContent(text="Return strict JSON."),),
+                ),
+            ),
+            max_output_tokens=64,
+            structured_output=StructuredOutputDefinition(
+                name="benchmark",
+                json_schema=_BenchmarkOutput.model_json_schema(),
+            ),
+        )
+
+    gateway.generate(request(-1), _BenchmarkOutput)
+    durations: list[float] = []
+    for index in range(runs):
+        started = time.perf_counter_ns()
+        gateway.generate(request(index), _BenchmarkOutput)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _evidence_runtime(runs: int) -> dict[str, float]:
+    now = datetime(2026, 8, 15, tzinfo=UTC)
+
+    def record(index: int, offset_seconds: int) -> Evidence:
+        observed_at = now + timedelta(seconds=offset_seconds)
+        locator = f"source://evidence-{index}"
+        facts = {"service": "checkout-api", "status": "error"}
+        return Evidence(
+            evidence_id=f"evidence-{index}",
+            tenant_id="tenant-acme",
+            kind=EvidenceKind.TELEMETRY,
+            source="benchmark",
+            locator=locator,
+            observed_at=observed_at,
+            summary="Checkout failure observed.",
+            facts=facts,
+            content_hash=evidence_hash(
+                tenant_id="tenant-acme",
+                kind=EvidenceKind.TELEMETRY,
+                locator=locator,
+                observed_at=observed_at,
+                facts=facts,
+            ),
+        )
+
+    evidence = (record(1, 0), record(2, 10), record(3, 20))
+    correlate_evidence(evidence, reference_time=now)
+    durations: list[float] = []
+    for _ in range(runs):
+        started = time.perf_counter_ns()
+        correlate_evidence(evidence, reference_time=now)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _remediation_runtime(runs: int) -> dict[str, float]:
+    run_remediation_demo(RemediationDemoScenario.SUCCESS)
+    durations: list[float] = []
+    for _ in range(runs):
+        started = time.perf_counter_ns()
+        result = run_remediation_demo(RemediationDemoScenario.SUCCESS)
+        if result.status.value != "verified":
+            raise RuntimeError("remediation measurement did not verify")
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+class _SandboxApplicationPolicy:
+    def authorize(
+        self,
+        identity: IdentityContext,
+        action: Action,
+        *,
+        resource_tenant_id: str,
+        purpose: str,
+        risk: RiskLevel,
+    ) -> PolicyDecision:
+        return PolicyDecision(
+            allowed=(
+                identity.tenant_id == resource_tenant_id
+                and action is Action.SANDBOX_EXECUTE
+            ),
+            policy_id="benchmark-application-policy",
+            policy_revision=1,
+            purpose=purpose,
+            risk=risk,
+            reason="benchmark",
+        )
+
+
+class _SandboxApprovals:
+    def __init__(self, binding: SandboxApprovalBinding) -> None:
+        self._binding = binding
+
+    def current(
+        self,
+        *,
+        tenant_id: str,
+        approval_id: str,
+    ) -> SandboxApprovalBinding | None:
+        if (
+            tenant_id == self._binding.tenant_id
+            and approval_id == self._binding.approval_id
+        ):
+            return self._binding
+        return None
+
+
+def _sandbox_runtime(runs: int) -> dict[str, float]:
+    now = datetime(2026, 8, 17, tzinfo=UTC)
+    clock = FixedClock(now)
+    resources = SandboxResources(
+        cpu_millicores=250,
+        memory_mib=256,
+        pid_limit=64,
+        ephemeral_storage_mib=512,
+        timeout_seconds=120,
+        output_bytes=1_048_576,
+        output_files=8,
+        output_file_bytes=262_144,
+    )
+    approval = SandboxApprovalBinding(
+        tenant_id="tenant-acme",
+        run_id="run-benchmark",
+        task_id="task-benchmark",
+        remediation_plan_id="plan-benchmark",
+        remediation_action_id="action-benchmark",
+        remediation_plan_digest="a" * 64,
+        remediation_action_digest="b" * 64,
+        approval_id="approval-benchmark",
+        approval_digest="c" * 64,
+        approval_policy_digest="d" * 64,
+        approval_expires_at=now + timedelta(hours=1),
+    )
+    spec_material = {
+        "schema_version": 1,
+        "spec_version": "sandbox-spec-v1",
+        "tenant_id": "tenant-acme",
+        "run_id": approval.run_id,
+        "task_id": approval.task_id,
+        "purpose": SandboxPurpose.TESTING,
+        "risk": RiskLevel.MEDIUM,
+        "approval": approval,
+        "image": ("registry.example.invalid/aegis/runner@sha256:" + ("e" * 64)),
+        "argv": ("python", "-m", "pytest", "-q"),
+        "working_directory": "workspace",
+        "inputs": (),
+        "mounts": (),
+        "environment": (),
+        "secrets": (),
+        "network": SandboxNetworkPolicy(),
+        "resources": resources,
+        "security": SandboxSecurityContext(
+            run_as_user=10001,
+            run_as_group=10001,
+            fs_group=10001,
+            apparmor_profile="aegis-sandbox-v1",
+        ),
+        "required_runtime_class": "kata-aegis",
+        "required_admission_policies": ("aegis-sandbox-baseline",),
+        "expected_outputs": (
+            OutputExpectation(
+                logical_path="reports/result.json",
+                media_types=("application/json",),
+            ),
+        ),
+        "retry": RetryAndCleanup(
+            maximum_attempts=3,
+            cleanup_timeout_seconds=120,
+            retain_failed_seconds=600,
+        ),
+    }
+    spec = SandboxSpec(
+        **spec_material,
+        spec_digest=canonical_digest(spec_material),
+    )
+    policy_material = {
+        "schema_version": 1,
+        "tenant_id": "tenant-acme",
+        "policy_id": "sandbox-policy",
+        "revision": 1,
+        "enabled": True,
+        "allowed_image_digests": ("e" * 64,),
+        "allowed_registries": ("registry.example.invalid",),
+        "allowed_commands": ("python",),
+        "allowed_purposes": (SandboxPurpose.TESTING,),
+        "allowed_mount_prefixes": (),
+        "allowed_secret_refs": (),
+        "allowed_egress": (),
+        "allowed_approval_policy_digests": ("d" * 64,),
+        "maximum_resources": resources,
+        "maximum_concurrency": 1,
+        "maximum_lifetime_seconds": 120,
+        "maximum_risk": RiskLevel.MEDIUM,
+        "require_runtime_class": "kata-aegis",
+        "require_admission_policies": ("aegis-sandbox-baseline",),
+    }
+    policy = SandboxPolicy(
+        **policy_material,
+        policy_digest=canonical_digest(policy_material),
+    )
+    identity = IdentityContext(
+        tenant_id="tenant-acme",
+        issuer="https://benchmark.example.invalid",
+        subject_id="sandbox-benchmark",
+        principal_kind=PrincipalKind.WORKLOAD,
+        roles=("sandbox-worker",),
+        permissions=(Action.SANDBOX_EXECUTE.value,),
+        purposes=("incident-response",),
+        grants=(
+            GrantBinding(
+                role="sandbox-worker",
+                purpose="incident-response",
+                permissions=(Action.SANDBOX_EXECUTE.value,),
+                risk_ceiling=RiskLevel.MEDIUM,
+                expires_at=now + timedelta(hours=1),
+            ),
+        ),
+        grant_version=1,
+        authenticated_at=now,
+        expires_at=now + timedelta(hours=1),
+        request_id="benchmark-request",
+        trace_id="benchmark-trace",
+    )
+
+    def execute(index: int) -> None:
+        request_material = {
+            "schema_version": 1,
+            "execution_id": f"sandbox-benchmark-{index}",
+            "tenant_id": "tenant-acme",
+            "run_id": spec.run_id,
+            "task_id": spec.task_id,
+            "spec": spec,
+            "spec_digest": spec.spec_digest,
+            "policy_digest": policy.policy_digest,
+            "approval_digest": approval.approval_digest,
+            "idempotency_key": f"sandbox-benchmark-key-{index}",
+            "attempt": 1,
+            "fence_token": f"sandbox-benchmark-fence-{index}",
+            "requested_at": now,
+        }
+        request = SandboxExecutionRequest(
+            **request_material,
+            request_digest=canonical_digest(request_material),
+        )
+        SandboxControlService(
+            application_policy=_SandboxApplicationPolicy(),
+            sandbox_policy=policy,
+            approvals=_SandboxApprovals(approval),
+            quotas=InMemorySandboxQuota({"tenant-acme": 1}),
+            ledger=InMemorySandboxLedger(),
+            clock=clock,
+        ).request(
+            identity,
+            request,
+            active_executions=0,
+            command_id=f"sandbox-benchmark-submit-{index}",
+        )
+        backend = DeterministicSandboxBackend(clock=clock)
+        execution = backend.provision(request)
+        if backend.wait(request, execution).outcome.value != "succeeded":
+            raise RuntimeError("sandbox measurement did not succeed")
+        backend.cleanup(request, execution)
+
+    execute(-1)
+    durations: list[float] = []
+    for index in range(runs):
+        started = time.perf_counter_ns()
+        execute(index)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _memory_runtime(runs: int) -> dict[str, float]:
+    run_memory_demo()
+    durations: list[float] = []
+    for _ in range(runs):
+        started = time.perf_counter_ns()
+        result = run_memory_demo()
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+        if result.context is None:
+            raise RuntimeError("memory measurement did not build a context")
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _evaluation_runtime(runs: int) -> dict[str, float]:
+    runner = EvaluationRunner(
+        suite=load_suite(ROOT / "evals/suite.json"),
+        dataset=load_dataset(ROOT / "evals/dataset.json"),
+        baseline=load_baseline(ROOT / "evals/baseline.json"),
+    )
+    cases = load_cases(ROOT / "evals/cases.json")
+    runner.run(cases, filters=("model-routing",))
+    durations: list[float] = []
+    for _ in range(runs):
+        started = time.perf_counter_ns()
+        report = runner.run(cases, filters=("model-routing",))
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+        if not report.passed:
+            raise RuntimeError("evaluation measurement did not pass")
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
+def _observability_runtime(runs: int) -> dict[str, float]:
+    store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
+    identity = demo_identity(request_id="measure-observability")
+    run = store.accept_run(
+        identity=identity,
+        request=demo_request(),
+        wait_for_signal=False,
+    )
+    debugger = ReplayDebugger(store.events(tenant_id=identity.tenant_id))
+    debugger.support_report(aggregate_id=run.run_id, live=run)
+    durations: list[float] = []
+    for _ in range(runs):
+        started = time.perf_counter_ns()
+        report = debugger.support_report(aggregate_id=run.run_id, live=run)
+        durations.append((time.perf_counter_ns() - started) / 1_000_000)
+        if not report.integrity.valid or report.projection is None:
+            raise RuntimeError("observability measurement did not converge")
+    ordered = sorted(durations)
+    return {
+        "median_ms": round(statistics.median(durations), 3),
+        "p95_ms": round(ordered[math.ceil(0.95 * len(ordered)) - 1], 3),
+    }
+
+
 def _source_loc(root: Path) -> int:
     total = 0
     for path in sorted(root.rglob("*.py")):
@@ -1939,6 +2453,17 @@ def _source_loc(root: Path) -> int:
             stripped = line.strip()
             if stripped and not stripped.startswith("#"):
                 total += 1
+    return total
+
+
+def _config_loc(root: Path) -> int:
+    total = 0
+    for suffix in ("*.yaml", "*.yml", "*.json", "*.toml"):
+        for path in sorted(root.rglob(suffix)):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    total += 1
     return total
 
 

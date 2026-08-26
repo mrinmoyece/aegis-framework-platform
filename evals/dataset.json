@@ -10,7 +10,7 @@
     "retention_policy": "repository-history",
     "created_at": "2026-08-15T00:00:00Z",
     "synthetic": true,
-    "source_content_digest": "d44a88c1f47c8d74ca900c1562e096e5fd387ff536674c6f428adf71c4a5f698"
+    "source_content_digest": "654238958cad6295070b35d0972c38580d8efb5f4cebadee53637252e5ac9efc"
   },
   "case_ids": [
     "budget-exhaustion",
@@ -32,6 +32,12 @@
     "memory-retention",
     "memory-retrieval",
     "memory-tenant-cache",
+    "observability-causal-coverage",
+    "observability-outage-correctness",
+    "observability-replay-convergence",
+    "observability-retry-counting",
+    "observability-safety-alert-bounded",
+    "observability-secret-absence",
     "model-budget",
     "model-duplicate-ambiguous",
     "model-fallback-circuit",

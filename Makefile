@@ -23,7 +23,8 @@ help:
 	  'security        Run static and dependency vulnerability checks' \
 	  'demo            Run the successful checkout investigation' \
 	  'serve           Start the local API on 127.0.0.1:8000' \
-	  'measure         Refresh framework comparison measurements' \
+	  'measure         Refresh Layer 11 framework comparison measurements' \
+	  'observability-config Validate Prometheus, Grafana, and OTel assets' \
 	  'container       Build the digest-pinned non-root image' \
 	  'compose-config  Validate the local dependency topology' \
 	  'ci              Run all fast, network-free quality gates'
@@ -83,12 +84,15 @@ serve:
 	$(UV) run aegis-framework serve
 
 measure:
-	$(UV) run python tools/measure.py --write comparison/layer10-metrics.json --runs 200
+	$(UV) run python tools/measure.py --write comparison/layer11-metrics.json --runs 200
+
+observability-config:
+	$(UV) run python tools/observability_check.py
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer10 .
+	docker build --pull --tag aegis-framework-platform:layer11 .
 
 compose-config:
 	docker compose config --quiet
 
-ci: lint type test eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs
+ci: lint type test eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta docs observability-config

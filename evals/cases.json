@@ -233,5 +233,35 @@
     "case_id": "memory-retention",
     "kind": "memory-retention",
     "expected_reason": "ledger_and_blob_authority"
+  },
+  {
+    "case_id": "observability-causal-coverage",
+    "kind": "observability-causal-coverage",
+    "expected_reason": "bounded_causal_chain"
+  },
+  {
+    "case_id": "observability-retry-counting",
+    "kind": "observability-retry-counting",
+    "expected_reason": "logical_operation_deduplication"
+  },
+  {
+    "case_id": "observability-secret-absence",
+    "kind": "observability-secret-absence",
+    "expected_reason": "telemetry_allowlist"
+  },
+  {
+    "case_id": "observability-outage-correctness",
+    "kind": "observability-outage-correctness",
+    "expected_reason": "telemetry_failure_containment"
+  },
+  {
+    "case_id": "observability-replay-convergence",
+    "kind": "observability-replay-convergence",
+    "expected_reason": "ledger_replay_convergence"
+  },
+  {
+    "case_id": "observability-safety-alert-bounded",
+    "kind": "observability-safety-alert-bounded",
+    "expected_reason": "non_budgetable_safety_alert"
   }
 ]

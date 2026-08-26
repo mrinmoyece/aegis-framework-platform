@@ -309,9 +309,17 @@
     {
       "id": "12-observability-replay",
       "name": "Observability and replay",
-      "status": "partial",
+      "status": "delivered",
       "evidence": [
         "src/aegis_framework/observability.py",
+        "src/aegis_framework/telemetry.py",
+        "src/aegis_framework/replay.py",
+        "src/aegis_framework/slos.py",
+        "observability/otel-collector.yaml",
+        "observability/prometheus/rules/aegis-slos.yaml",
+        "observability/grafana/dashboards",
+        "docs/observability-runbook.md",
+        "docs/slo-catalog.md",
         "src/aegis_framework/temporal.py",
         "src/aegis_framework/remediation_temporal.py",
         "src/aegis_framework/sandbox_temporal.py",
@@ -323,14 +331,17 @@
         "src/aegis_framework/sandbox_postgres.py"
       ],
       "framework_owned": [
-        "OTel spans",
+        "OTel propagation, spans and OTLP transport",
+        "Collector processing, Prometheus rule evaluation and Grafana rendering",
+        "optional Langfuse trace UX",
         "Temporal replay",
         "LangGraph checkpoints"
       ],
       "enterprise_owned": [
-        "redaction",
-        "cardinality",
-        "event/model/evidence/artifact/remediation replay",
+        "versioned semantics, redaction and cardinality budgets",
+        "SLI/SLO and non-budgetable safety policy",
+        "authenticated audited operational reads",
+        "event/model/evidence/artifact/remediation replay truth",
         "graph/workflow-version compatibility",
         "projection rebuild",
         "retention"

@@ -12,7 +12,6 @@ from aegis_framework.ports import Observation
 from aegis_framework.safety import (
     redact_value,
     safe_observability_attributes,
-    tenant_bucket,
 )
 
 if TYPE_CHECKING:
@@ -149,7 +148,7 @@ class LangfuseObservability:
     ) -> Iterator[Observation]:
         safe = safe_observability_attributes(attributes)
         safe.setdefault("operation", "checkout_investigation")
-        safe["tenant_bucket"] = tenant_bucket(tenant_id)
+        del tenant_id
         with self._client.start_as_current_observation(
             name=name,
             as_type="chain",

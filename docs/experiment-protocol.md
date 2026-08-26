@@ -168,3 +168,15 @@ environment-gated integration jobs. Time skipping may use only a preinstalled
 Temporal test-server binary; no test may download it. Model judges, live providers,
 production records, sleeps, and random process termination are excluded from
 required CI. See ADR 015 and `docs/evaluation-runbook.md`.
+
+## Layer 11 observability and replay protocol
+
+1. Lock semantic version, span/metric definitions, buckets and label enumerations.
+2. Run redaction/cardinality/hostile-context/exporter-outage tests without network.
+3. Validate Collector YAML, Prometheus recording/alert rules and every dashboard JSON.
+4. Prove retry/replay logical-operation deduplication and bounded drop behavior.
+5. Replay deterministic ledger fixtures twice and compare byte-stable state/support
+   digests; tampered hash/sequence/schema must fail.
+6. Run the Compose profile smoke without live credentials or a managed trace backend.
+7. Record local benchmark scope separately from managed-backend/SLO/on-call evidence.
+8. Score Langfuse/LangSmith/backend lock-in using the eight lock-in dimensions above.

@@ -1,4 +1,4 @@
-# Layer 10 qualification status
+# Layer 11 qualification status
 
 ## Delivered
 
@@ -123,17 +123,27 @@
 - adversarial taxonomy covering injection, Unicode/bidi/schema/citation, tenant/role/
   approval/confused-deputy, SSRF/path/archive/shell/secret/output, replay/fencing/
   idempotency/wallet, malicious adapter and framework-state poisoning;
-- all 17 named deterministic fault cut points with convergence, authorization,
+- all 20 named deterministic fault cut points with convergence, authorization,
   duplicate/stale-effect, reconciliation, cleanup, audit and isolation assertions;
 - reviewed exact baseline, non-waivable hard safety, scoped expiring waivers,
   missing/new/tamper detection, governed synthetic dataset lifecycle, deterministic
   JSON/Markdown/JUnit, six CLI operations, five dedicated CI eval gates, and optional
   sanitized Langfuse dataset/report publication.
+- versioned neutral semantic conventions, strict propagation/baggage/sampling/links,
+  bounded structured logs, cardinality-guarded Prometheus metrics and telemetry
+  failure containment;
+- nine measurable SLOs, multi-window burn-rate recording/alerts, hard safety alerts,
+  hardened OTel Collector, Prometheus/Grafana provisioning and validated dashboards;
+- authenticated audited operations readiness/SLO/support/rebuild APIs and
+  deterministic ledger replay CLI with hash/sequence/version/state/compare/causal
+  validation that never executes an external operation;
+- six deterministic observability evals covering causal coverage, retry counting,
+  secret absence, telemetry outage correctness, replay convergence and safety alerts.
 
 ## Qualification snapshot
 
-- 368 deterministic tests pass with 90.24% meaningful branch coverage;
-- 44 deterministic evals pass, including pagination, poisoning, source revocation,
+- 386 deterministic tests pass with 90.07% meaningful branch coverage;
+- 50 deterministic evals pass, including pagination, poisoning, source revocation,
   deterministic non-causal correlation, private-destination rejection, and memory
   retrieval/tenant-cache/context/retention cases;
 - eleven local PostgreSQL integration tests cover forced RLS/tenant isolation,
@@ -148,7 +158,7 @@
 - one Keycloak compatibility test remains environment-gated.
 
 Counts are refreshed by the final release run and recorded in
-`comparison/layer10-metrics.json`.
+`comparison/layer11-metrics.json`.
 
 ## Not proven
 
@@ -166,5 +176,5 @@ a real embedding/summarization provider, and KMS/blob-qualified crypto-erasure a
 proven. Final MMR diversification and `ContextBudget` selection also remain an
 application-owned step regardless of candidate source.
 Production model/connector qualification, independent penetration testing and human
-labeling, observability/SLOs, UI, MCP/A2A, deployment, and final load/chaos
-certification are explicitly deferred.
+labeling, UI, MCP/A2A, deployment, managed telemetry backends, live SLO/on-call
+evidence, and final load/chaos certification are explicitly deferred.

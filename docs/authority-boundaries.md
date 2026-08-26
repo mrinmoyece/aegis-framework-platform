@@ -47,6 +47,9 @@
 | Retrieved memory context | `MemoryContext` with fixed `instruction_boundary` | LangGraph state only; never instructions or authority | Re-derived from current retrieval |
 | Memory retention/legal hold/erasure | `RetentionBinding` + `MemoryProjection.legal_hold_count` | No | PostgreSQL memory facts |
 | Erasable blob reference | `ErasableBlobReference` on the immutable record | Reference only; erasure via injected callback, not authority | PostgreSQL memory record |
+| Trace/span/log/metric/dashboard | Optional telemetry pipeline | Sanitized bounded navigation/status only | Application ledger and current projections |
+| SLO/alert state | Application-owned SLO definition + Prometheus evaluation | Operational signal only | Underlying application facts and dependency health |
+| Replay support report | `ReplayDebugger` digest-only derivation | No authority; read-only diagnosis | Verified application event ledger |
 
 ## Retry matrix
 
@@ -75,6 +78,7 @@
 | Projection | Application replay | Cursor/hash checkpoint; deterministic reducer |
 | Memory ingest Activity | Temporal `aegis.memory.v1` + application fact expected-version | Resume at next expected fact type; never re-append a completed fact |
 | Memory compact/purge/rebuild | Temporal Activity + application ledger | Fold `reduce_memory` in ordinal order; no blind retry of ambiguous erasure |
+| Telemetry export | OTel Collector | Bounded queue/retry/drop; never retried by application correctness paths |
 
 ## Non-negotiable call order
 

@@ -2,8 +2,8 @@
   "baseline_id": "aegis-layer10-checkout-baseline",
   "schema_version": 1,
   "version": 1,
-  "suite_digest": "5a8a24983f1c4a98c5ecbacbc898a158ff37f3dd6702be315d1b7508e9442528",
-  "dataset_digest": "c88f6382144e8e8ead389e27c834802f3ba305c90b9f321355127a8e9ae9e653",
+  "suite_digest": "46d457ab7118051ef565afbfdc6aab1f7b2fa0351500c2799480f639bd93501f",
+  "dataset_digest": "d265194df45d65133d7cf577c78ee2723808a86a084a003642dc7eb03d7808e4",
   "case_ids": [
     "budget-exhaustion",
     "contradiction",
@@ -32,6 +32,12 @@
     "model-routing",
     "model-tenant-isolation",
     "model-timeout-cancel",
+    "observability-causal-coverage",
+    "observability-outage-correctness",
+    "observability-replay-convergence",
+    "observability-retry-counting",
+    "observability-safety-alert-bounded",
+    "observability-secret-absence",
     "orchestration-artifacts",
     "orchestration-duplicate-task",
     "orchestration-projection-rebuild",
@@ -143,7 +149,7 @@
       "hard_safety_invariant": false
     }
   ],
-  "reviewed_by": "Aegis maintainers",
-  "review_reason": "Layer 10 initial deterministic safety baseline reviewed against canonical Layers 1-9 behavior.",
-  "reviewed_at": "2026-08-17T13:45:00Z"
+  "reviewed_by": "layer11-automation",
+  "review_reason": "Layer 11 adds reviewed deterministic observability and ledger replay cases.",
+  "reviewed_at": "2026-08-17T16:54:17.023780Z"
 }

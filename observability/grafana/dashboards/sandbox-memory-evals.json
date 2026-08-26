@@ -1,0 +1,16 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "panels": [
+    {"id": 1, "title": "Sandbox execution and cleanup", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=\"sandbox\"}[5m])) by (operation, status)", "refId": "A"}]},
+    {"id": 2, "title": "Memory retrieval", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=\"memory\"}[5m])) by (operation, status)", "refId": "A"}]},
+    {"id": 3, "title": "Evaluation health", "type": "timeseries", "targets": [{"expr": "sum(rate(aegis_operations_total{component=\"eval\"}[5m])) by (operation, status)", "refId": "A"}]}
+  ],
+  "schemaVersion": 41,
+  "tags": ["aegis", "sandbox", "memory", "evals"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "title": "Aegis Sandbox Memory and Evaluations",
+  "uid": "aegis-sandbox-memory-evals",
+  "version": 1
+}

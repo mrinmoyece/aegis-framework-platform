@@ -1,4 +1,4 @@
-# Layer 10 curriculum
+# Layer 11 curriculum
 
 ## Learning outcomes
 
@@ -76,6 +76,13 @@ After this layer, an engineer should be able to:
 55. compare Framework Layer 10 candidly with custom Aegis Layer 11 by catalog breadth,
     LOC/dependencies/services, removed framework mechanics, retained governance and
     hosted escape.
+56. design stable semantic conventions, units, buckets and low-cardinality dimensions;
+57. propagate and link hostile-boundary-safe trace context without making it authority;
+58. separate logical-operation, retry, replay and redelivery metric counting;
+59. define measurable SLOs and non-budgetable safety alerts;
+60. debug and rebuild application state only from a verified ledger;
+61. compare optional Langfuse with LangSmith and preserve an OTLP/ledger escape;
+62. compare Framework Layer 11 candidly with pinned custom Aegis Layer 12.
 
 ## Suggested sequence
 
@@ -123,6 +130,10 @@ After this layer, an engineer should be able to:
 | Adversarial/recovery packs | `evals/suite.json`, Layer 10 tests | Reverse, shard, inject every fault point | Why are sleeps and random crashes insufficient evidence? |
 | Baseline governance | evaluation runbook | Expire/over-broaden a waiver | Which findings can never be waived? |
 | Framework comparison | Layer 10 metrics | Compare pinned custom Layer 11 | Which evaluator/governance code remains custom? |
+| Semantic/privacy boundary | `telemetry.py`, ADR 016 | Inject IDs, URLs, secrets and malformed context | Which dimensions may leave the process? |
+| SLOs and dashboards | SLO catalog, Prometheus rules, dashboards | Validate fast/slow burn and safety alerts | Why is safety not an error-budget tradeoff? |
+| Replay debugging | `replay.py`, observability runbook | Tamper hash/sequence, compare and rebuild | Why are traces/checkpoints not truth? |
+| Framework comparison | Layer 11 metrics | Compare pinned custom Layer 12 | Which telemetry/replay security remains custom? |
 
 ## Practical exercises
 

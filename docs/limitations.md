@@ -208,3 +208,18 @@
   SLOs, UI, MCP/A2A, deployment, and final load/chaos certification remain deferred.
 
 These are explicit non-production boundaries, not implied capabilities.
+# Layer 11 observability limitations
+
+- Local Collector, Prometheus and Grafana Compose services prove configuration and
+  bounded smoke behavior only; no managed backend, retention, HA, capacity, regional,
+  mTLS, alert delivery, silence/escalation, live SLO or on-call evidence is claimed.
+- The four dashboards cover all implemented component families but are starter
+  operational views, not a UI/BFF or production incident workspace.
+- Langfuse remains optional and manually sanitized. LangSmith is not added. No live
+  trace backend or credential is exercised in tests.
+- Trace references can be missing after sampling/export failure and cannot prove an
+  event or effect. Replay remains ledger-grounded.
+- The projection rebuild API covers the investigation run projection; other layer
+  rebuilders retain their existing capability-specific procedures.
+- UI, MCP/A2A, deployment/IaC, live model/connector/memory qualification, penetration,
+  human labeling, load/chaos and managed telemetry remain deferred.

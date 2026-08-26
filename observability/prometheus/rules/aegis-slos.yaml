@@ -1,0 +1,118 @@
+groups:
+  - name: aegis-slo-recording
+    interval: 30s
+    rules:
+      - record: aegis:sli_errors:ratio_rate5m
+        expr: sum(rate(aegis_operations_total{status="error"}[5m])) by (component, operation) / clamp_min(sum(rate(aegis_operations_total[5m])) by (component, operation), 0.000001)
+      - record: aegis:sli_errors:ratio_rate30m
+        expr: sum(rate(aegis_operations_total{status="error"}[30m])) by (component, operation) / clamp_min(sum(rate(aegis_operations_total[30m])) by (component, operation), 0.000001)
+      - record: aegis:sli_errors:ratio_rate1h
+        expr: sum(rate(aegis_operations_total{status="error"}[1h])) by (component, operation) / clamp_min(sum(rate(aegis_operations_total[1h])) by (component, operation), 0.000001)
+      - record: aegis:sli_errors:ratio_rate6h
+        expr: sum(rate(aegis_operations_total{status="error"}[6h])) by (component, operation) / clamp_min(sum(rate(aegis_operations_total[6h])) by (component, operation), 0.000001)
+
+      # Per-component error-budget denominators from the SLO catalog.
+      # api: 0.1 % (1.0e-3), ledger: 0.01 % (1.0e-4),
+      # eval/sandbox/memory: 1 % (1.0e-2), all others: 0.1 % (1.0e-3).
+      - record: aegis:slo_error_budget
+        expr: |
+          label_replace(
+            label_replace(
+              label_replace(
+                label_replace(
+                  vector(0.001),   # default 0.1 %
+                  "component", "ledger",   "component", ""
+                ),
+                "component", "ledger",   "component", "ledger"
+              ) * on() group_left() (
+                # ledger component budget: 0.01 %
+                label_replace(vector(0.0001), "component", "ledger", "", ".*")
+              ),
+              "component", "api",   "component", "api"
+            ),
+            "component", "api",    "component", "api"
+          )
+      # Simplified per-component burn-rate: ratio / budget
+      # api     — error budget 0.001  (0.1 %)
+      # ledger  — error budget 0.0001 (0.01 %)
+      # eval/sandbox/memory — error budget 0.01 (1 %)
+      - record: aegis:slo_burn_rate:fast
+        expr: |
+          (aegis:sli_errors:ratio_rate5m{component="api"} / 0.001)
+          or
+          (aegis:sli_errors:ratio_rate5m{component="ledger"} / 0.0001)
+          or
+          (aegis:sli_errors:ratio_rate5m{component=~"eval|sandbox|memory"} / 0.01)
+          or
+          (aegis:sli_errors:ratio_rate5m{component!~"api|ledger|eval|sandbox|memory"} / 0.001)
+      - record: aegis:slo_burn_rate:slow
+        expr: |
+          (aegis:sli_errors:ratio_rate30m{component="api"} / 0.001)
+          or
+          (aegis:sli_errors:ratio_rate30m{component="ledger"} / 0.0001)
+          or
+          (aegis:sli_errors:ratio_rate30m{component=~"eval|sandbox|memory"} / 0.01)
+          or
+          (aegis:sli_errors:ratio_rate30m{component!~"api|ledger|eval|sandbox|memory"} / 0.001)
+
+  - name: aegis-slo-alerts
+    rules:
+      - alert: AegisFastErrorBudgetBurn
+        expr: aegis:slo_burn_rate:fast > 14.4 and aegis:slo_burn_rate:fast offset 1h > 14.4
+        for: 2m
+        labels:
+          severity: page
+          slo: component-availability
+        annotations:
+          summary: "{{ $labels.component }} is consuming error budget at a fast rate"
+          description: Inspect the affected bounded component and operation before changing release state.
+          runbook_url: docs/runbooks/api-availability.md
+      - alert: AegisSlowErrorBudgetBurn
+        expr: aegis:slo_burn_rate:slow > 6 and aegis:slo_burn_rate:slow offset 6h > 6
+        for: 15m
+        labels:
+          severity: ticket
+          slo: component-availability
+        annotations:
+          summary: "{{ $labels.component }} is consuming error budget persistently"
+          description: Review the SLO projection and durable causal chain.
+          runbook_url: docs/runbooks/api-availability.md
+      - alert: AegisSafetyViolation
+        expr: increase(aegis_safety_violations_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          budgetable: "false"
+        annotations:
+          summary: A non-budgetable Aegis safety invariant was violated
+          description: Stop affected work and preserve the ledger; do not trade safety for availability.
+          runbook_url: docs/runbooks/safety-violation.md
+      - alert: AegisAmbiguousEffect
+        expr: increase(aegis_ambiguous_outcomes_total{component=~"effect|sandbox"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: page
+          budgetable: "false"
+        annotations:
+          summary: An effect or cleanup outcome requires reconciliation
+          description: Fence new execution and reconcile against durable receipts.
+          runbook_url: docs/runbooks/approval-effect.md
+      - alert: AegisDurableFreshness
+        expr: histogram_quantile(0.99, sum(rate(aegis_queue_age_seconds_bucket[10m])) by (le, component, queue)) > 30
+        for: 10m
+        labels:
+          severity: page
+          slo: durable-freshness
+        annotations:
+          summary: Durable work freshness exceeds the SLO threshold
+          description: Inspect outbox claims, Temporal task queues, and projection cursors.
+          runbook_url: docs/runbooks/durable-freshness.md
+      - alert: AegisTelemetryDrops
+        expr: increase(aegis_export_dropped_total[15m]) > 100
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: Bounded telemetry exporters are dropping records
+          description: Correctness continues; repair exporter capacity without expanding sensitive payloads.
+          runbook_url: docs/observability-runbook.md

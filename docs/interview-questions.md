@@ -337,6 +337,36 @@
     syntax parsing, Temporal mechanics and LangGraph mechanics. Most secure-connector
     controls remain custom; neutral ports preserve escape.
 
+## Layer 11 observability and replay
+
+133. **Why is OTel not application truth?**
+     It transports operational signals that may be sampled, dropped, delayed, forged
+     or unavailable. Authorization, approval, audit and effect receipts remain explicit
+     application facts.
+134. **Why keep Langfuse optional and reject LangSmith here?**
+     Langfuse provides manual sanitized model/graph UX with an OTLP escape. LangSmith
+     adds a proprietary self-hosted control plane and automatic capture pressure without
+     removing semantic, privacy, SLO or replay controls.
+135. **How are retry and replay prevented from double-counting availability?**
+     Logical-operation counters accept a stable digest once; retry/redelivery counters
+     are separate. Replayed projections do not emit new logical success.
+136. **What happens when telemetry export fails?**
+     Bounded queues/retries/drop counts protect memory and correctness continues.
+     Operational readiness is degraded while identity/governance/ledger readiness keeps
+     its own fail-closed semantics.
+137. **What validates a replay?**
+     Tenant cursor, aggregate sequence, schema version, aggregate and tenant previous
+     hashes, record hash, duplicate IDs and deterministic reducer output.
+138. **Can replay execute a model or effect?**
+     No. It is read-only over strict application events and has no external-operation
+     ports.
+139. **Why are safety violations excluded from error budget?**
+     Availability budget cannot authorize tenant leakage, unsafe execution, missing
+     approval/fence, integrity failure or unreconciled cleanup.
+140. **What is the Layer 11 escape strategy?**
+     Replace exporters/backends behind W3C/OTLP/OpenMetrics and provisioned JSON, while
+     preserving application semantic policy and canonical ledger replay.
+
 ## Layer 6 governed specialist orchestration
 
 67. **Why add four specialists without adding CrewAI or AutoGen?**

@@ -41,7 +41,7 @@ def test_otel_exports_only_redacted_low_cardinality_attributes() -> None:
     assert attributes["aegis.scenario"] == "success"
     assert attributes["aegis.status"] == "complete"
     assert attributes["aegis.evidence_count"] == 3
-    assert len(str(attributes["aegis.tenant.bucket"])) == 2
+    assert attributes["aegis.semantic.version"] == "1.0.0"
     rendered = repr(attributes)
     assert "tenant-sensitive-name" not in rendered
     assert "high-cardinality" not in rendered

@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from hashlib import sha256
 from threading import Lock
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import (
     AwareDatetime,
@@ -37,6 +37,10 @@ from aegis_framework.errors import (
     PayloadRejected,
 )
 from aegis_framework.ports import Action, ClockPort, PolicyPort
+from aegis_framework.telemetry import durable_trace_reference
+
+if TYPE_CHECKING:
+    from aegis_framework.replay import SupportReport
 
 _ZERO_HASH = "0" * 64
 _MAX_EVENT_BYTES = 32_768
@@ -222,6 +226,28 @@ class DurabilityPort(Protocol):
     ) -> RunView: ...
 
     def get_run(self, *, tenant_id: str, run_id: str) -> RunView | None: ...
+
+    def events(
+        self,
+        *,
+        tenant_id: str,
+        aggregate_type: str | None = None,
+        aggregate_id: str | None = None,
+        after_cursor: int = 0,
+        limit: int = 100,
+    ) -> tuple[ApplicationEvent, ...]: ...
+
+    def verify_integrity(self, *, tenant_id: str) -> bool: ...
+
+    def verify_run_integrity(
+        self,
+        *,
+        tenant_id: str,
+        run_id: str,
+        maximum_events: int = 10_000,
+    ) -> bool: ...
+
+    def rebuild_run(self, *, tenant_id: str, run_id: str) -> RunView: ...
 
     def timeline(
         self,
@@ -543,6 +569,7 @@ class InMemoryDurability:
             workflow_id = stable_id(
                 "workflow", tenant_ref, run_id, request_ref, length=40
             )
+            trace_ref = durable_trace_reference(identity.trace_id).traceparent
             now = self._clock.now()
             event_id = stable_id("event", run_id, "requested", length=32)
             outbox_id = stable_id("outbox", run_id, "temporal-start", length=32)
@@ -558,6 +585,7 @@ class InMemoryDurability:
                     "request_ref": request_ref,
                     "run_id": run_id,
                     "tenant_ref": tenant_ref,
+                    "trace_ref": trace_ref,
                     "wait_for_signal": wait_for_signal,
                     "workflow_id": workflow_id,
                 },
@@ -572,6 +600,7 @@ class InMemoryDurability:
                     "request_ref": request_ref,
                     "run_id": run_id,
                     "tenant_ref": tenant_ref,
+                    "trace_ref": trace_ref,
                     "wait_for_signal": wait_for_signal,
                     "workflow_id": workflow_id,
                 },
@@ -1000,6 +1029,80 @@ class InMemoryDurability:
             tenant_head = _TenantHead(event.tenant_cursor, event.record_hash)
         return True
 
+    def verify_run_integrity(
+        self,
+        *,
+        tenant_id: str,
+        run_id: str,
+        maximum_events: int = 10_000,
+    ) -> bool:
+        if maximum_events < 1 or maximum_events > 10_000:
+            raise ValueError("run integrity event bound is invalid")
+        with self._lock:
+            tenant_events = tuple(self._events.get(tenant_id, ()))
+        selected = tuple(
+            event
+            for event in tenant_events
+            if event.aggregate_type == "investigation" and event.aggregate_id == run_id
+        )
+        if not selected or len(selected) > maximum_events:
+            return False
+        aggregate_sequence = 0
+        aggregate_hash = _ZERO_HASH
+        aggregate_head = self._aggregate_heads.get((tenant_id, "investigation", run_id))
+        for event in selected:
+            if event.tenant_cursor < 1 or event.tenant_cursor > len(tenant_events):
+                return False
+            previous_tenant_hash = (
+                _ZERO_HASH
+                if event.tenant_cursor == 1
+                else tenant_events[event.tenant_cursor - 2].record_hash
+            )
+            draft = EventDraft(
+                event_id=event.event_id,
+                event_type=event.event_type,
+                occurred_at=event.occurred_at,
+                actor_ref=event.actor_ref,
+                correlation_ref=event.correlation_ref,
+                causation_ref=event.causation_ref,
+                schema_version=event.schema_version,
+                payload=event.payload,
+            )
+            expected = sha256(
+                event_material(
+                    tenant_id=event.tenant_id,
+                    aggregate_type=event.aggregate_type,
+                    aggregate_id=event.aggregate_id,
+                    aggregate_sequence=event.aggregate_sequence,
+                    tenant_cursor=event.tenant_cursor,
+                    draft=draft,
+                    aggregate_previous_hash=aggregate_hash,
+                    tenant_previous_hash=previous_tenant_hash,
+                ).encode()
+            ).hexdigest()
+            if (
+                event.aggregate_sequence != aggregate_sequence + 1
+                or event.aggregate_previous_hash != aggregate_hash
+                or event.tenant_previous_hash != previous_tenant_hash
+                or event.record_hash != expected
+            ):
+                return False
+            if event.tenant_cursor < len(tenant_events):
+                successor = tenant_events[event.tenant_cursor]
+                if successor.tenant_previous_hash != event.record_hash:
+                    return False
+            elif self._tenant_heads.get(tenant_id, _TenantHead()).record_hash != (
+                event.record_hash
+            ):
+                return False
+            aggregate_sequence = event.aggregate_sequence
+            aggregate_hash = event.record_hash
+        return (
+            aggregate_head is not None
+            and aggregate_head.sequence == aggregate_sequence
+            and aggregate_head.record_hash == aggregate_hash
+        )
+
     def rebuild_run_projections(self, *, tenant_id: str) -> ProjectionCheckpoint:
         with self._lock:
             self._runs = {
@@ -1019,6 +1122,31 @@ class InMemoryDurability:
             )
             self._projection_checkpoints[key] = checkpoint
             return checkpoint
+
+    def rebuild_run(self, *, tenant_id: str, run_id: str) -> RunView:
+        if not self.verify_integrity(tenant_id=tenant_id):
+            raise IntegrityFailure("ledger integrity verification failed")
+        with self._lock:
+            events = tuple(
+                event
+                for event in self._events.get(tenant_id, ())
+                if event.aggregate_type == "investigation"
+                and event.aggregate_id == run_id
+            )
+            if not events:
+                raise ValueError("run does not exist")
+            projection: RunView | None = None
+            for event in events:
+                if event.schema_version != 1:
+                    raise IntegrityFailure(
+                        f"event {event.event_id!r} has unsupported "
+                        f"schema_version {event.schema_version!r}; expected 1"
+                    )
+                projection = reduce_run(projection, event)
+            if projection is None:
+                raise IntegrityFailure("run projection could not be rebuilt")
+            self._runs[(tenant_id, run_id)] = projection
+            return projection
 
     def replay_legacy(
         self,
@@ -1135,6 +1263,82 @@ class DurableInvestigationService:
     ) -> RunView:
         self._authorize(identity, Action.INVESTIGATION_RUN)
         return self._store.accept_signal(identity=identity, command=command)
+
+    def replay_report(
+        self,
+        identity: IdentityContext,
+        *,
+        run_id: str,
+        maximum_events: int = 200,
+    ) -> SupportReport | None:
+        self._authorize(identity, Action.REPLAY_READ)
+        from aegis_framework.replay import ReplayDebugger
+
+        live = self._store.get_run(tenant_id=identity.tenant_id, run_id=run_id)
+        if live is None:
+            return None
+        seed = self._store.events(
+            tenant_id=identity.tenant_id,
+            aggregate_type="investigation",
+            aggregate_id=run_id,
+            limit=1,
+        )
+        if not seed:
+            from aegis_framework.errors import IntegrityFailure
+
+            raise IntegrityFailure("run events are unavailable")
+        first_cursor = seed[0].tenant_cursor
+        events: list[ApplicationEvent] = []
+        after_cursor = first_cursor - 1
+        ledger_limit = 10_000
+        while len(events) < ledger_limit and after_cursor < live.last_cursor:
+            page = self._store.events(
+                tenant_id=identity.tenant_id,
+                after_cursor=after_cursor,
+                limit=min(500, ledger_limit - len(events)),
+            )
+            events.extend(
+                event for event in page if event.tenant_cursor <= live.last_cursor
+            )
+            if not page or page[-1].tenant_cursor >= live.last_cursor:
+                break
+            after_cursor = page[-1].tenant_cursor
+        if not events or events[-1].tenant_cursor < live.last_cursor:
+            from aegis_framework.errors import PayloadRejected
+
+            raise PayloadRejected("run replay window exceeds the event bound")
+        return ReplayDebugger(
+            events,
+            tenant_anchor_cursor=first_cursor - 1,
+            tenant_anchor_hash=events[0].tenant_previous_hash,
+            aggregate_anchors={
+                (event.aggregate_type, event.aggregate_id): (
+                    event.aggregate_sequence - 1,
+                    event.aggregate_previous_hash,
+                )
+                for event in reversed(events)
+            },
+        ).support_report(
+            aggregate_id=run_id,
+            live=live,
+            maximum_events=maximum_events,
+        )
+
+    def rebuild_projection(self, identity: IdentityContext, *, run_id: str) -> RunView:
+        self._authorize(identity, Action.PROJECTION_REBUILD)
+        if self._store.get_run(tenant_id=identity.tenant_id, run_id=run_id) is None:
+            raise ValueError("run does not exist")
+        if not self._store.verify_run_integrity(
+            tenant_id=identity.tenant_id,
+            run_id=run_id,
+        ):
+            from aegis_framework.errors import IntegrityFailure
+
+            raise IntegrityFailure("ledger integrity verification failed")
+        return self._store.rebuild_run(
+            tenant_id=identity.tenant_id,
+            run_id=run_id,
+        )
 
     def _authorize(self, identity: IdentityContext, action: Action) -> None:
         decision = self._policy.authorize(
