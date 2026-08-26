@@ -170,7 +170,7 @@ class ModelRequest(StrictModel):
     allowed_tool_names: tuple[Identifier, ...] = Field(
         default=(), max_length=_MAX_TOOLS
     )
-    structured_output: StructuredOutputDefinition
+    structured_output: StructuredOutputDefinition | None = None
 
     @field_validator("allowed_tool_names")
     @classmethod
@@ -1292,7 +1292,9 @@ def _conservative_tokens(request: ModelRequest) -> int:
                 message.model_dump(mode="json") for message in request.messages
             ],
             "tools": [tool.model_dump(mode="json") for tool in request.tools],
-            "structured_output": request.structured_output.model_dump(mode="json"),
+            "structured_output": request.structured_output.model_dump(mode="json")
+            if request.structured_output is not None
+            else None,
         }
     )
     return max(1, (len(encoded) + 2) // 3)

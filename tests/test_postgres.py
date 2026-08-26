@@ -496,13 +496,27 @@ def _seed_model_control(
             INSERT INTO aegis.model_policies
                 (tenant_id, policy_id, revision, document, active)
             VALUES (%s, %s, %s, %s::jsonb, true)
-            ON CONFLICT (tenant_id) DO UPDATE
+            ON CONFLICT (tenant_id) WHERE active DO UPDATE
                 SET policy_id = EXCLUDED.policy_id,
                     revision = EXCLUDED.revision,
                     document = EXCLUDED.document,
                     active = true
             """,
             (tenant_id, policy.policy_id, policy.revision, policy.model_dump_json()),
+        )
+        admin.execute(
+            """
+            INSERT INTO aegis.model_budgets
+                (tenant_id, limit_microunits, reserved_microunits,
+                 reconciled_microunits, version)
+            VALUES (%s, 100000, 0, 0, 1)
+            ON CONFLICT (tenant_id) DO UPDATE
+                SET limit_microunits = EXCLUDED.limit_microunits,
+                    reserved_microunits = 0,
+                    reconciled_microunits = 0,
+                    version = aegis.model_budgets.version + 1
+            """,
+            (tenant_id,),
         )
     return policy, entry
 

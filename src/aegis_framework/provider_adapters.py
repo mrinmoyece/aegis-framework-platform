@@ -147,6 +147,12 @@ class OpenAIProviderAdapter(ModelProviderAdapter):
     ) -> ProviderResult:
         try:
             client = self._client_for(credential_reference)
+            if request.structured_output is None:
+                raise ProviderInvocationError(
+                    ModelErrorCode.BAD_REQUEST,
+                    retryable=False,
+                    billing=BillingDisposition.NOT_BILLED,
+                )
             response = client.responses.create(
                 model=entry.model,
                 input=_openai_messages(request.messages),
@@ -269,6 +275,12 @@ class AnthropicProviderAdapter(ModelProviderAdapter):
         try:
             client = self._client_for(credential_reference)
             system, messages = _anthropic_messages(request.messages)
+            if request.structured_output is None:
+                raise ProviderInvocationError(
+                    ModelErrorCode.BAD_REQUEST,
+                    retryable=False,
+                    billing=BillingDisposition.NOT_BILLED,
+                )
             response = client.messages.create(
                 model=entry.model,
                 system=system,
