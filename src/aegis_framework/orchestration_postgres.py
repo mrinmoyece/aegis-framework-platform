@@ -261,7 +261,7 @@ class PostgresOrchestrationLedger:
                     fact_id=stable_id(
                         "fact", run_id, task_id, "dispatch", str(attempt), length=40
                     ),
-                    fact_type="task.fence_rotated",
+                    fact_type="task.dispatch",
                     document={
                         "attempt": attempt,
                         "fence_token": fence,
@@ -650,7 +650,6 @@ class PostgresOrchestrationLedger:
                     FROM aegis.orchestration_artifacts
                     WHERE tenant_id = %s AND run_id = %s
                     ORDER BY ordinal, artifact_id
-                    FOR SHARE
                     """,
                     (tenant_id, run_id),
                 ).fetchall()
