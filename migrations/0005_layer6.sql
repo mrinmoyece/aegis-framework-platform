@@ -32,9 +32,8 @@ CREATE TABLE IF NOT EXISTS aegis.orchestration_facts (
     task_id text,
     fact_type text NOT NULL CHECK (
         fact_type IN (
-            'run.intent', 'task.dispatch', 'task.fence_rotated', 'task.result',
-            'artifact.recorded', 'decision.recorded', 'run.cancelled',
-            'projection.rebuilt'
+            'run.intent', 'task.dispatch', 'task.result', 'artifact.recorded',
+            'decision.recorded', 'run.cancelled', 'projection.rebuilt'
         )
     ),
     schema_version integer NOT NULL CHECK (schema_version BETWEEN 1 AND 1000),
