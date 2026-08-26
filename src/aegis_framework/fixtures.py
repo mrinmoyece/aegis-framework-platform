@@ -88,6 +88,9 @@ def demo_identity(
             "quota:read",
             "remediation:propose",
             "remediation:read",
+            "sandbox:artifact:read",
+            "sandbox:execute",
+            "sandbox:read",
             "tenant:read",
         ),
         "incident-viewer": (
@@ -101,6 +104,8 @@ def demo_identity(
             "policy:read",
             "quota:read",
             "remediation:read",
+            "sandbox:read",
+            "sandbox:artifact:read",
             "tenant:read",
         ),
         "tenant-admin": (
@@ -118,6 +123,8 @@ def demo_identity(
             "quota:read",
             "quota:write",
             "remediation:read",
+            "sandbox:read",
+            "sandbox:artifact:read",
             "tenant:read",
         ),
         "incident-commander": (
@@ -234,6 +241,9 @@ def build_demo_bundle(
                 "quota:write",
                 "remediation:propose",
                 "remediation:read",
+                "sandbox:artifact:read",
+                "sandbox:execute",
+                "sandbox:read",
                 "tenant:read",
             ),
             allowed_purposes=("incident-response",),

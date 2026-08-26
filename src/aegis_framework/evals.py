@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import json
+import stat
+import tempfile
+import zipfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
 
 from aegis_framework.domain import (
     CriticDecision,
@@ -17,7 +21,11 @@ from aegis_framework.domain import (
     InvestigationStatus,
     StrictModel,
 )
-from aegis_framework.errors import OrchestrationFailure, PolicyDenied
+from aegis_framework.errors import (
+    AegisFrameworkError,
+    OrchestrationFailure,
+    PolicyDenied,
+)
 from aegis_framework.fixtures import (
     DemoScenario,
     build_demo_bundle,
@@ -29,6 +37,13 @@ from aegis_framework.remediation_demo import (
     RemediationDemoScenario,
     run_remediation_demo,
 )
+from aegis_framework.sandbox import (
+    EnvironmentVariable,
+    SandboxSecurityContext,
+    parse_exact_destination,
+    validate_relative_path,
+)
+from aegis_framework.sandbox_adapters import safe_extract_zip
 
 
 class EvalCase(StrictModel):
@@ -67,6 +82,9 @@ class EvalCase(StrictModel):
         "remediation-ambiguity",
         "remediation-verification-failure",
         "remediation-rollback",
+        "sandbox-input-security",
+        "sandbox-archive-security",
+        "sandbox-egress-security",
     ] = "investigation"
     scenario: DemoScenario = DemoScenario.SUCCESS
     expected_status: InvestigationStatus | None = None
@@ -112,6 +130,8 @@ def run_eval_suite(cases: tuple[EvalCase, ...]) -> EvalReport:
 
 
 def _run_case(case: EvalCase) -> EvalOutcome:
+    if case.kind.startswith("sandbox-"):
+        return _run_sandbox_case(case)
     if case.kind.startswith("remediation-"):
         return _run_remediation_case(case)
     if case.kind.startswith("orchestration-"):
@@ -193,6 +213,86 @@ def _run_case(case: EvalCase) -> EvalOutcome:
         case_id=case.case_id,
         passed=not details,
         details=tuple(details),
+    )
+
+
+def _run_sandbox_case(case: EvalCase) -> EvalOutcome:
+    details: list[str] = []
+    try:
+        if case.kind == "sandbox-input-security":
+            for path in (
+                "../escape",
+                "/absolute",
+                r"host\path",
+                "con",
+                "safe/\u202etxt.exe",
+            ):
+                try:
+                    validate_relative_path(path)
+                except ValueError:
+                    continue
+                details.append(f"accepted_path={path!r}")
+            try:
+                EnvironmentVariable(
+                    name="API_TOKEN",
+                    value="token=abcdefghijk",
+                )
+            except ValidationError:
+                pass
+            else:
+                details.append("accepted_secret_literal")
+            try:
+                SandboxSecurityContext(
+                    run_as_user=10001,
+                    run_as_group=10001,
+                    fs_group=10001,
+                    apparmor_profile="aegis-sandbox-v1",
+                    privileged=True,
+                )
+            except ValidationError:
+                pass
+            else:
+                details.append("accepted_privileged_context")
+        elif case.kind == "sandbox-egress-security":
+            for origin in (
+                "http://packages.example.com",
+                "https://169.254.169.254",
+                "https://10.0.0.1",
+                "https://*.example.com",
+                "https://service.internal",
+            ):
+                try:
+                    parse_exact_destination(origin)
+                except ValueError:
+                    continue
+                details.append(f"accepted_origin={origin}")
+        elif case.kind == "sandbox-archive-security":
+            payload = io.BytesIO()
+            with zipfile.ZipFile(payload, "w") as archive:
+                entry = zipfile.ZipInfo("link")
+                entry.external_attr = (stat.S_IFLNK | 0o777) << 16
+                archive.writestr(entry, "../escape")
+            with tempfile.TemporaryDirectory() as directory:
+                try:
+                    safe_extract_zip(
+                        payload.getvalue(),
+                        Path(directory) / "workspace",
+                        maximum_members=4,
+                        maximum_uncompressed_bytes=1_024,
+                        maximum_member_bytes=512,
+                    )
+                except (ValueError, AegisFrameworkError):
+                    pass
+                else:
+                    details.append("accepted_malicious_archive")
+        else:
+            details.append("unknown_sandbox_case")
+    except Exception as exc:
+        details.append(f"unexpected={type(exc).__name__}")
+    return EvalOutcome(
+        case_id=case.case_id,
+        passed=not details,
+        details=tuple(details) or (case.expected_reason,),
     )
 
 

@@ -1,4 +1,4 @@
-# Layer 7 limitations
+# Layer 8 limitations
 
 - The optional Temporal Compose service is a single local `auto-setup:1.29.1` process
   backed by the local PostgreSQL service. It proves SDK 1.31.0 compatibility for the
@@ -134,7 +134,35 @@
   witnessing, retention/erasure and multi-region claim order remain unproven.
 - Approval/effect API is deliberately narrow and redacted. A reviewer UI, secure browser
   session, CSRF controls, notification delivery and accessibility are deferred.
-- General sandbox execution, memory/RAG, UI/BFF, MCP/A2A, deployment/IaC and live
-  qualification remain explicitly deferred.
+- Kubernetes Job adapter tests prove manifest and reconciliation logic with SDK doubles,
+  not host-kernel, gVisor, Kata, CNI, admission, CSI, workload-identity, node, or cluster
+  isolation. No live cluster or tenant code is used in tests.
+- Kubernetes namespaces and ordinary containers are not claimed as hostile-code
+  isolation. Production activation requires a separately qualified RuntimeClass; Kata is
+  recommended for mutually distrustful tenants and gVisor needs its own compatibility and
+  escape review.
+- Standard Kubernetes NetworkPolicy cannot enforce FQDN destinations. Network-none is the
+  complete adapter path. Exact destinations require a separately operated enforcing proxy
+  and policy-registration adapter; neither is implemented, so execution fails closed.
+- PID limits are policy contracts and must be enforced by the selected runtime/admission/
+  node configuration; the Kubernetes Job API has no portable per-Pod PID field.
+- Content-addressed input/output CSI drivers, malware/DLP scanners, object encryption,
+  legal hold, retention deletion, and quarantine reviewer operations are contracts and
+  interfaces, not deployed services in this repository.
+- AppArmor annotations and RuntimeDefault seccomp depend on node/runtime/admission support.
+  Readiness declarations must be backed by operator probes; application unit tests cannot
+  prove enforcement.
+- Kubernetes Jobs are at-least-once and can start duplicate Pods in rare controller/node
+  failures. Application idempotency and fencing protect acceptance but cannot undo code
+  already executed in an isolated runtime.
+- E2B and Modal are credible managed alternatives but remain optional/documented pending
+  tenant, region, retention, private-network, idempotency, attestation, DPA, SLA, and
+  incident-response review. Daytona requires renewed vendor review after its public core
+  moved private. No managed adapter is shipped.
+- Docker socket/SDK, local subprocess, RestrictedPython, and raw Firecracker wrappers are
+  deliberately absent: they do not provide the selected durable hostile-tenant boundary
+  without substantial additional platform controls.
+- Memory/RAG, full UI/BFF, MCP/A2A, deployment/IaC and live runtime qualification remain
+  explicitly deferred.
 
 These are explicit non-production boundaries, not implied capabilities.

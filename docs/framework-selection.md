@@ -327,3 +327,88 @@ consume opaque commands through another scheduler implementing
 `RemediationActivityOperations`, keep `ActionPort`, and pass the wait/timer/signal/
 retry/heartbeat/cancellation/crash/replay equivalence suite. Framework history is
 discardable; application decisions and receipts are not.
+# Layer 8 sandbox framework decision
+
+The selected production-shaped adapter is the official Kubernetes Python client creating
+one-shot Jobs behind neutral `SandboxBackend`. `RuntimeClass` permits a separately
+qualified Kata VM boundary (recommended for mutually distrustful tenants) or gVisor
+userspace-kernel profile without placing vendor types in contracts. Kubernetes supplies
+Job lifecycle, scheduling, deadlines, resources, RBAC integration, and official API
+mechanics; Temporal supplies durable Activity retry/heartbeat/cancellation/replay.
+
+This does not claim that Kubernetes namespaces or ordinary containers isolate hostile
+tenants. Kubernetes documents the weaker shared-kernel boundary and recommends sandboxing
+or VMs for untrusted workloads. NetworkPolicy is CNI-dependent L3/L4 and is not an FQDN
+firewall. The adapter therefore implements network none and rejects exact-destination
+execution; an external proxy plus policy-registration adapter remains future work.
+
+| Option | Useful mechanics | Decision |
+|---|---|---|
+| Kubernetes Jobs + RuntimeClass | Official client, immutable digests, Job deadlines/state, quotas/RBAC, injectable SDK doubles | Selected; disabled until live runtime/admission/CNI/CSI/identity qualification |
+| Kata Containers | VM-isolated container runtime through RuntimeClass | Recommended production profile; not qualified by repository tests |
+| gVisor | Userspace-kernel interception with lower overhead | Optional separately qualified profile; not equivalent to a VM |
+| E2B | Managed Firecracker sandbox, lifecycle and egress controls | Credible optional future adapter; vendor/tenant/region/retention/idempotency review required |
+| Modal | Managed gVisor sandbox, mature Python lifecycle/network APIs | Credible optional future adapter; outbound/image/UID/beta domain-policy tradeoffs |
+| Daytona | Managed container/VM classes, snapshots and network controls | Deferred; renewed review required after public core moved private |
+| Docker SDK/socket | Mature image/container APIs | Rejected for hostile tenancy; daemon access is host-privileged |
+| Raw Firecracker wrappers | Strong KVM primitive | Deferred; would recreate scheduling, networking, jailer, image and lifecycle platform |
+| RestrictedPython | Python language restriction | Rejected; maintainers explicitly state it is not a sandbox |
+| Local subprocess | Standard process lifecycle | Rejected; no independent kernel/filesystem/network/tenant boundary |
+
+Primary references: [Kubernetes multi-tenancy](https://kubernetes.io/docs/concepts/security/multi-tenancy/#sandboxing-containers),
+[RuntimeClass](https://kubernetes.io/docs/concepts/containers/runtime-class/),
+[Kubernetes Jobs](https://kubernetes.io/docs/concepts/workloads/controllers/job/),
+[Kubernetes images](https://kubernetes.io/docs/concepts/containers/images/#image-names),
+[NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/),
+[Kata](https://katacontainers.io/), [gVisor security](https://gvisor.dev/docs/architecture_guide/security/),
+[E2B sandbox lifecycle](https://docs.e2b.dev/sandbox),
+[Modal sandboxes](https://modal.com/docs/guide/sandboxes),
+[Daytona sandboxes](https://www.daytona.io/docs/en/sandboxes/),
+[Docker daemon security](https://docs.docker.com/engine/security/#docker-daemon-attack-surface),
+[Firecracker production setup](https://github.com/firecracker-microvm/firecracker/blob/main/docs/prod-host-setup.md),
+and [RestrictedPython](https://restrictedpython.readthedocs.io/en/latest/).
+
+## Framework Layer 8 versus custom Aegis Layer 9
+
+The pinned custom comparison is
+`mrinmoyece/aegis-agent-platform@ed16fb8bb62ca6d18bc53ec8ee4e0191ed6caa63`
+on `mrinmoyece-aegis-layer-9-sandbox`. Custom Layer 9 has 35,980 production LOC,
+18,558 test LOC and 54,538 total LOC, with 12 runtime, seven optional and no declared
+development dependencies. Its one-commit sandbox increment from custom Layer 8 is 14,283
+additions and 95 deletions across 53 files.
+
+Framework Layer 8 currently measures 27,964 production LOC, 12,603 test LOC and 40,567
+total LOC, with 12 runtime, seven optional, eight development and 131 locked packages. Its
+working Layer 8 increment from the Layer 6 comparison anchor is recorded transparently in
+`comparison/layer8-metrics.json`; that Git proxy includes accumulated later-layer changes
+and must not be read as isolated sandbox authoring effort.
+
+Temporal removes a custom durable sandbox scheduler, wait loop, retry/backoff, heartbeat
+timeout, signal history, cancellation delivery, crash recovery and replay implementation.
+The official Kubernetes client and Job controller remove custom Kubernetes wire/object
+mechanics, Job scheduling/state/deadline handling and basic resource placement. They do
+not remove exact contracts, current approval/policy, tenant RLS, quotas, idempotency,
+claims/fencing, observe-before-create, ambiguous reconciliation, safe workspace/archive
+handling, output scanning/redaction/quarantine, attestation, cleanup ownership, privacy,
+or operational readiness controls. Those remain application code in both implementations.
+
+The equivalent 200-run deterministic fake lifecycle measured Framework Layer 8 at
+0.219 ms median/0.249 ms p95 and custom Layer 9 at 4.055 ms median/4.552 ms p95 on the
+same machine. This is not a throughput, isolation or distributed-system result: the custom
+path includes its async event repository/orchestrator while the framework path includes
+strict Pydantic contracts, three application facts and a fake backend. Neither includes
+PostgreSQL, Temporal, Redis, Kubernetes, CSI, CNI, runtime isolation, serialization,
+network, node scheduling or process startup.
+
+Framework lock-in is real: Temporal histories/task queues/versioning and Kubernetes Job,
+RuntimeClass, admission, CNI, CSI and operational semantics become dependencies. Escape is
+explicit: preserve neutral `SandboxBackend`, opaque workflow messages, immutable
+PostgreSQL facts and pure replay; replace Temporal/Kubernetes only after the new scheduler
+or managed service passes equivalent waits/retry/heartbeat/cancel/crash/replay, exact
+identity/idempotency, policy, egress, artifact, attestation, cleanup and privacy tests.
+
+E2B and Modal can remove much of the cluster/runtime operations burden but add remote
+availability, vendor image/build identity, network-policy semantics, region/retention/DPA,
+attestation, SLA and incident-response dependencies. Daytona needs renewed diligence
+after its public core moved private. None is represented as a drop-in production security
+claim, and no live managed-service benchmark is presented.

@@ -108,6 +108,18 @@ class LangfuseObservability:
             name="aegis.graph.model",
         )
 
+    def sandbox(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        return self._run(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "sandbox_activity"},
+            name="aegis.sandbox.activity",
+        )
+
     @contextmanager
     def _run(
         self,

@@ -1,6 +1,6 @@
 # Roadmap across the 16 Aegis capabilities
 
-| Layer | Capability | Layer 7 status | Framework-first direction |
+| Layer | Capability | Layer 8 status | Framework-first direction |
 |---:|---|---|---|
 | 1 | Platform foundation | **Delivered** | Strict Python, contracts, deterministic slice, CI/container/docs |
 | 2 | Tenant identity and authorization | **Delivered** | OIDC/JWT current grants, purpose/risk policy, forced RLS, quota, secret refs, audit |
@@ -10,7 +10,7 @@
 | 6 | Durable evidence connectors and correlation | **Delivered offline/adapter boundary** | Durable page intent/cursor, secure disabled adapters, ingestion/provenance/quarantine and deterministic correlation; live qualification deferred |
 | 7 | Governed durable specialist orchestration | **Delivered offline/adapter boundary** | Fixed eight roles, typed artifacts, critic/planner/verification gates, application ledger and bounded LangGraph inside one Temporal Activity |
 | 8 | Approval-gated remediation actions | **Delivered offline/adapter boundary** | Exact approvals, Temporal waits, fixed action, fencing/idempotency/reconciliation, verification and compensation |
-| 9 | Hardened sandbox execution | Planned | Egress/syscall/resource/artifact/credential isolation |
+| 9 | Hardened sandbox execution | **Delivered offline/adapter boundary** | Approval-bound immutable contracts, Temporal lifecycle, forced-RLS ledger, safe artifacts, hardened Kubernetes Job/RuntimeClass adapter; live isolation qualification deferred |
 | 10 | Event-grounded memory and pgvector RAG | Planned | Tenant/provenance/relevance policy and evals |
 | 11 | Deterministic enterprise evaluation gates | Partial | Twenty-one hermetic evals plus PostgreSQL/Temporal integration; live/load datasets pending |
 | 12 | Observability and replay | Partial | Redacted OTel/Langfuse, ledger rebuild, workflow replay; SLOs pending |
@@ -21,18 +21,19 @@
 
 ## Next layer boundary
 
-The next framework layer may add a hardened general sandbox only after the narrow action
-adapter and production credential/egress operations are qualified. Dynamic agents/peer
-chat, memory/RAG, UI, MCP/A2A and deployment remain explicitly deferred. Do not add
-CrewAI, AutoGen or another overlapping orchestration/workflow framework.
+The next framework layer is event-grounded memory/RAG. Dynamic agents/peer chat, full UI,
+MCP/A2A and deployment remain explicitly deferred. Do not add CrewAI, AutoGen or another
+overlapping orchestration/workflow framework.
 
 Live connector/provider qualification remains blocked on credential brokering, regional
 data policy, private network/CA/egress operations, source scopes, parser isolation,
 retention execution, model/version approval, tokenizer/pricing validation, and capacity
 tests.
 
-Layer 7 provides application-owned SoD/quorum decisions, immutable digests, fencing,
+Layer 8 provides application-owned SoD/quorum decisions, immutable digests, fencing,
 idempotency, verification, reconciliation and durable facts with deterministic/offline
 adapters. Live cluster credentials, workload identity, Kubernetes RBAC, production
 Temporal/PostgreSQL, chaos/load, external witnessing and operational sign-off remain
-qualification gaps. No graph edge or Temporal signal may shortcut the controls.
+qualification gaps. Sandbox live Kata/gVisor, admission, CNI, CSI, egress-proxy and
+workload-identity qualification is also pending. No graph edge or Temporal signal may
+shortcut the controls.

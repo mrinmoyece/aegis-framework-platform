@@ -24,6 +24,7 @@ REQUIRED_DOCS = (
     "docs/runbook.md",
     "docs/connector-runbook.md",
     "docs/approval-effect-runbook.md",
+    "docs/sandbox-runbook.md",
     "docs/interview-questions.md",
     "docs/curriculum.md",
     "docs/glossary.md",
@@ -40,6 +41,7 @@ REQUIRED_DOCS = (
     "docs/adr/010-secure-evidence-connectors.md",
     "docs/adr/011-governed-specialist-orchestration.md",
     "docs/adr/012-temporal-approval-and-effects.md",
+    "docs/adr/013-kubernetes-job-sandbox.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -125,13 +127,13 @@ def _workflow_pin_errors() -> list[str]:
 
 
 def _measurement_errors() -> list[str]:
-    path = ROOT / "comparison/layer7-metrics.json"
+    path = ROOT / "comparison/layer8-metrics.json"
     if not path.is_file():
-        return ["missing comparison/layer7-metrics.json"]
+        return ["missing comparison/layer8-metrics.json"]
     payload = json.loads(path.read_text(encoding="utf-8"))
     errors = []
-    if payload.get("schema_version") != 7 or payload.get("layer") != 7:
-        errors.append("Layer 7 metrics schema/layer is invalid")
+    if payload.get("schema_version") != 8 or payload.get("layer") != 8:
+        errors.append("Layer 8 metrics schema/layer is invalid")
     basis = payload.get("comparison_basis", {})
     custom_layer3 = basis.get("custom_layer3", {}) if isinstance(basis, dict) else {}
     custom_layer4 = basis.get("custom_layer4", {}) if isinstance(basis, dict) else {}
@@ -139,6 +141,7 @@ def _measurement_errors() -> list[str]:
     custom_layer6 = basis.get("custom_layer6", {}) if isinstance(basis, dict) else {}
     custom_layer7 = basis.get("custom_layer7", {}) if isinstance(basis, dict) else {}
     custom_layer8 = basis.get("custom_layer8", {}) if isinstance(basis, dict) else {}
+    custom_layer9 = basis.get("custom_layer9", {}) if isinstance(basis, dict) else {}
     if custom_layer3.get("sha") != ("87cefe58adbf62e6a419d38e57e0928581b7003c"):
         errors.append("Layer 3 custom comparison SHA is not pinned")
     if custom_layer5.get("sha") != ("7c22d380a66f57aad943fe926ffff3ca8fc06ed6"):
@@ -151,15 +154,17 @@ def _measurement_errors() -> list[str]:
         errors.append("Layer 7 custom comparison SHA is not pinned")
     if custom_layer8.get("sha") != ("0ce9368d60f3b2fce7b805d7d7699d585f13cef2"):
         errors.append("Layer 8 custom comparison SHA is not pinned")
+    if custom_layer9.get("sha") != ("ed16fb8bb62ca6d18bc53ec8ee4e0191ed6caa63"):
+        errors.append("Layer 9 custom comparison SHA is not pinned")
     if not payload.get("remaining_custom_controls"):
-        errors.append("Layer 7 metrics must list remaining custom controls")
+        errors.append("Layer 8 metrics must list remaining custom controls")
     if not payload.get("lock_in_and_escape"):
-        errors.append("Layer 7 metrics must list lock-in and escape hatches")
+        errors.append("Layer 8 metrics must list lock-in and escape hatches")
     if payload.get("required_stateful_services") != [
         "PostgreSQL",
         "Temporal Server",
     ]:
-        errors.append("Layer 7 metrics must list exact stateful services")
+        errors.append("Layer 8 metrics must list exact stateful services")
     if not payload.get("equivalent_gateway_benchmark"):
         errors.append("Layer 6 metrics must include the equivalent gateway benchmark")
     if not payload.get("equivalent_evidence_benchmark"):
@@ -168,6 +173,8 @@ def _measurement_errors() -> list[str]:
         errors.append("Layer 7 metrics must include the orchestration benchmark")
     if not payload.get("equivalent_remediation_benchmark"):
         errors.append("Layer 7 metrics must include the remediation benchmark")
+    if not payload.get("equivalent_sandbox_benchmark"):
+        errors.append("Layer 8 metrics must include the sandbox benchmark")
     return errors
 
 

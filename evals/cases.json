@@ -198,5 +198,20 @@
     "case_id": "remediation-rollback",
     "kind": "remediation-rollback",
     "expected_reason": "compensation_is_separate_fact"
+  },
+  {
+    "case_id": "sandbox-input-security",
+    "kind": "sandbox-input-security",
+    "expected_reason": "sandbox_contracts_fail_closed"
+  },
+  {
+    "case_id": "sandbox-archive-security",
+    "kind": "sandbox-archive-security",
+    "expected_reason": "sandbox_archive_quarantined"
+  },
+  {
+    "case_id": "sandbox-egress-security",
+    "kind": "sandbox-egress-security",
+    "expected_reason": "sandbox_egress_default_deny"
   }
 ]

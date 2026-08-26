@@ -2,8 +2,8 @@
   "schema_version": 1,
   "comparison_target": "mrinmoyece/aegis-agent-platform",
   "scenario": "checkout-failure-incident-response",
-  "layer": 7,
-  "generated_on": "2026-08-16",
+  "layer": 8,
+  "generated_on": "2026-08-17",
   "status_definitions": {
     "delivered": "Runnable and tested in this layer",
     "partial": "A boundary or deterministic subset exists; enterprise completion is explicit",
@@ -78,10 +78,10 @@
     {
       "id": "09-sandbox-execution",
       "name": "Hardened sandbox execution",
-      "status": "planned",
-      "evidence": ["docs/roadmap.md"],
-      "framework_owned": [],
-      "enterprise_owned": ["isolation", "egress", "credentials", "resource limits"]
+      "status": "delivered",
+      "evidence": ["src/aegis_framework/sandbox.py", "src/aegis_framework/sandbox_adapters.py", "src/aegis_framework/sandbox_temporal.py", "src/aegis_framework/sandbox_postgres.py", "migrations/0007_layer8.sql", "tests/test_sandbox_layer8.py", "tests/test_temporal_integration.py", "docs/sandbox-runbook.md"],
+      "framework_owned": ["Temporal Activity scheduling/retry/heartbeat/cancellation/replay", "official Kubernetes Job and NetworkPolicy API mechanics", "Kubernetes Job scheduling/deadline/resource object mechanics"],
+      "enterprise_owned": ["exact approval/spec/policy contracts", "tenant policy/quota/idempotency/claims/fencing", "runtime/admission/network/workload-identity readiness", "path/archive/output security", "artifact scanning/redaction/quarantine/provenance", "ambiguous create/delete reconciliation and cleanup ownership"]
     },
     {
       "id": "10-memory-pgvector-rag",
@@ -95,7 +95,7 @@
       "id": "11-enterprise-evaluation-gates",
       "name": "Deterministic enterprise evaluation gates",
       "status": "partial",
-      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py", "tests/test_temporal_integration.py"],
+      "evidence": ["evals/cases.json", "src/aegis_framework/evals.py", "tests/test_model_gateway.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py", "tests/test_sandbox_layer8.py", "tests/test_temporal_integration.py"],
       "framework_owned": ["Temporal replay", "optional Langfuse evaluator observation"],
       "enterprise_owned": ["hermetic safety and approval/effect attack cases", "equivalence", "release thresholds", "load/chaos qualification"]
     },
@@ -103,7 +103,7 @@
       "id": "12-observability-replay",
       "name": "Observability and replay",
       "status": "partial",
-      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/remediation_temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py", "src/aegis_framework/orchestration_postgres.py", "src/aegis_framework/remediation_postgres.py"],
+      "evidence": ["src/aegis_framework/observability.py", "src/aegis_framework/temporal.py", "src/aegis_framework/remediation_temporal.py", "src/aegis_framework/sandbox_temporal.py", "src/aegis_framework/durability.py", "src/aegis_framework/model_postgres.py", "src/aegis_framework/evidence_postgres.py", "src/aegis_framework/orchestration_postgres.py", "src/aegis_framework/remediation_postgres.py", "src/aegis_framework/sandbox_postgres.py"],
       "framework_owned": ["OTel spans", "Temporal replay", "LangGraph checkpoints"],
       "enterprise_owned": ["redaction", "cardinality", "event/model/evidence/artifact/remediation replay", "graph/workflow-version compatibility", "projection rebuild", "retention"]
     },
@@ -111,7 +111,7 @@
       "id": "13-operator-workspace-bff",
       "name": "Secure operator workspace and BFF",
       "status": "partial",
-      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py"],
+      "evidence": ["src/aegis_framework/api.py", "tests/test_durability.py", "tests/test_api_and_cli.py", "tests/test_evidence_layer5.py", "tests/test_orchestration_layer6.py", "tests/test_remediation_layer7.py", "tests/test_sandbox_layer8.py"],
       "framework_owned": ["FastAPI delivery"],
       "enterprise_owned": ["authorized redacted status/timeline/model/evidence/artifact/approval operations", "anti-enumeration", "opaque/encrypted cursor", "session security", "review UX"]
     },
