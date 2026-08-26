@@ -127,6 +127,36 @@ describe("typed BFF client", () => {
     await expect(operatorApi.logout(fixtureSession.csrf_token)).resolves.toBeUndefined();
   });
 
+  it("mutateProtocolTrust posts to the correct endpoint", async () => {
+    const peer = fixtureSnapshot.protocol_peers[0];
+    if (peer === undefined) throw new Error("fixture missing protocol peer");
+    server.use(
+      http.post(`*/operator/api/protocol-peers/${encodeURIComponent(peer.peer_id)}/trust`, async (req) => {
+        expect(req.request.headers.get("idempotency-key")).toBe("trust-command-1");
+        return HttpResponse.json({
+          command_id: "trust-command-1",
+          outcome: "accepted",
+          message: "Protocol peer trust changed.",
+          server_time: fixtureSession.server_time
+        });
+      })
+    );
+    const mutation = {
+      command_id: "trust-command-1",
+      action: "revoke" as const,
+      expected_revision: peer.revision,
+      expected_card_digest: peer.card_digest,
+      expected_schema_digest: peer.schema_digest,
+      expected_certificate_digest: peer.certificate_digest,
+      expected_key_digest: peer.key_digest,
+      rationale: "Verified schema drift requires revocation.",
+      typed_confirmation: `REVOKE ${peer.peer_id}`
+    };
+    await expect(
+      operatorApi.mutateProtocolTrust(peer, mutation, fixtureSession.csrf_token)
+    ).resolves.toMatchObject({ outcome: "accepted" });
+  });
+
   it("rejects invalid JSON responses", async () => {
     server.use(
       http.get("*/operator/session", () => new HttpResponse("not-json", { status: 200 }))
