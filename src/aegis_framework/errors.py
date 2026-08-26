@@ -139,3 +139,7 @@ class SandboxAmbiguous(AegisFrameworkError):
 
 class ArtifactQuarantined(AegisFrameworkError):
     pass
+
+
+class AmbiguousTransportError(AegisFrameworkError):
+    """Network delivery may have reached the external peer."""

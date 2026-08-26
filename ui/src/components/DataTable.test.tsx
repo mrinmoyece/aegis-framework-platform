@@ -1,40 +1,40 @@
 import { render, screen } from "@testing-library/react";
 import type { ColumnDef } from "@tanstack/react-table";
-
 import { DataTable } from "./DataTable";
 
 interface Row {
   id: string;
-  value: string;
+  label: string;
 }
 const columns: ColumnDef<Row>[] = [
   { accessorKey: "id", header: "ID" },
-  { accessorKey: "value", header: "Value" }
+  { accessorKey: "label", header: "Label" }
 ];
 
-describe("DataTable", () => {
-  it("renders rows when data is provided", () => {
-    render(
-      <DataTable
-        caption="Test table"
-        columns={columns}
-        data={[{ id: "row-1", value: "hello" }]}
-        emptyMessage="Nothing here."
-      />
-    );
-    expect(screen.getByText("hello")).toBeInTheDocument();
-    expect(screen.queryByText("Nothing here.")).toBeNull();
-  });
+it("renders rows when data is provided", () => {
+  render(
+    <DataTable
+      caption="Test table"
+      columns={columns}
+      data={[{ id: "r1", label: "Row one" }]}
+    />
+  );
+  expect(screen.getByText("Row one")).toBeInTheDocument();
+});
 
-  it("renders emptyMessage when data is empty", () => {
-    render(
-      <DataTable
-        caption="Test table"
-        columns={columns}
-        data={[]}
-        emptyMessage="Nothing here."
-      />
-    );
-    expect(screen.getByText("Nothing here.")).toBeInTheDocument();
-  });
+it("shows the default empty message when data is empty", () => {
+  render(<DataTable caption="Empty table" columns={columns} data={[]} />);
+  expect(screen.getByText("No authorized records are available.")).toBeInTheDocument();
+});
+
+it("shows a custom empty message when provided", () => {
+  render(
+    <DataTable
+      caption="Empty table"
+      columns={columns}
+      data={[]}
+      emptyMessage="Nothing to display"
+    />
+  );
+  expect(screen.getByText("Nothing to display")).toBeInTheDocument();
 });

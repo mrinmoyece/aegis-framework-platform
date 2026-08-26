@@ -8,6 +8,13 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
+**Layer 13 adds secure MCP and A2A interoperability through the current official
+`mcp==2.0.0` and `a2a-sdk==1.1.2` adapters. A tenant trust registry, workload identity,
+capability/schema/card/certificate pins, SSRF and content bounds, quotas, digest-only
+intent-before-network facts, Temporal reconciliation, forced-RLS projections, and exact
+operator trust transitions surround every peer. External content remains untrusted;
+destructive requests become Layer 7 proposals only and can never approve or execute.**
+
 **Layer 12 adds a secure accessible React/TypeScript operator workspace and same-origin
 FastAPI BFF over those authorities: runtime-validated bounded views, deterministic
 checkout demo, fail-closed OIDC/session readiness, tenant cache teardown, safe approval
@@ -207,7 +214,7 @@ runtime authority or production certification.**
   sequence, schema, compare, causal-chain and bounded support-report validation;
 - nine measurable SLOs and non-budgetable safety alerts. Langfuse remains optional
   trace/evaluation UX; OTel and the application ledger preserve portability and truth.
-  live OIDC/session persistence/browser qualification, MCP/A2A, deployment, and live
+  live OIDC/session persistence/browser qualification, deployment, and live
   managed telemetry/SLO/on-call evidence remain deferred.
 
 ## Ownership

@@ -131,6 +131,17 @@
     it is LangGraph state, never an instruction, approval, or effect trigger.
 27. Block `tombstone_and_erase` on current legal hold before purging the derived index and
     invoking the injected erase-blob callback.
+28. Establish protocol workload identity and tenant purpose before parsing peer content.
+29. Load the current reviewed peer trust revision and exact capability/schema/card/cert/
+    key/classification/risk/egress policy; peer claims cannot widen it.
+30. Reserve request/cost/byte quota and append digest-only intent before MCP/A2A network
+    I/O; Temporal carries only opaque references and digests.
+31. Validate response schema, size, Unicode, MIME, provenance, citations and current
+    trust/fence before accepting artifacts or proposals.
+32. Convert destructive protocol requests only to a Layer 7 proposal. Never open
+    approval, satisfy quorum, call `ActionPort`, or claim production verification.
+33. On timeout/crash/cancel, preserve ambiguity and observe/reconcile the same operation;
+    no SDK or Activity retry may create a second untracked external task.
 
 A Temporal signal, workflow query, history event, LangGraph checkpoint, model output, or
 trace cannot change this order or grant authority.

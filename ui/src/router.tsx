@@ -18,6 +18,7 @@ import {
   MemoryPage,
   ModelsPage,
   OverviewPage,
+  ProtocolPeersPage,
   ReplayPage,
   SandboxesPage
 } from "./pages";
@@ -33,7 +34,8 @@ const navigation = [
   ["/memory", "Memory"],
   ["/evaluations", "Evaluations"],
   ["/audit", "Audit"],
-  ["/replay", "Replay"]
+  ["/replay", "Replay"],
+  ["/protocol-peers", "Protocol peers"]
 ] as const;
 
 function RootLayout() {
@@ -154,6 +156,11 @@ const replayRoute = createRoute({
   path: "/replay",
   component: ReplayPage
 });
+const protocolPeersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/protocol-peers",
+  component: ProtocolPeersPage
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -165,7 +172,8 @@ const routeTree = rootRoute.addChildren([
   memoryRoute,
   evaluationsRoute,
   auditRoute,
-  replayRoute
+  replayRoute,
+  protocolPeersRoute
 ]);
 
 export const router = createRouter({

@@ -8,7 +8,8 @@ import {
   type ApprovalItem,
   type MutationReceipt,
   type OperatorSession,
-  type OperatorSnapshot
+  type OperatorSnapshot,
+  type ProtocolPeerItem
 } from "../contracts/schemas";
 
 const MAX_RESPONSE_BYTES = 1_048_576;
@@ -48,6 +49,18 @@ interface ApprovalDecision {
   expected_status: "pending";
   plan_digest: string;
   approval_digest: string;
+  typed_confirmation: string;
+}
+
+interface ProtocolTrustMutation {
+  command_id: string;
+  action: "review" | "quarantine" | "revoke" | "emergency-disable";
+  expected_revision: number;
+  expected_card_digest: string | null;
+  expected_schema_digest: string;
+  expected_certificate_digest: string | null;
+  expected_key_digest: string | null;
+  rationale: string;
   typed_confirmation: string;
 }
 
@@ -200,7 +213,7 @@ export const operatorApi = {
     return request("/operator/session/callback", sessionSchema, {
       method: "POST",
       ...signalOption(signal),
-      body: JSON.stringify({ code, state, code_verifier: start.code_verifier })
+      body: JSON.stringify({ code, state })
     });
   },
 
@@ -238,6 +251,27 @@ export const operatorApi = {
           "X-CSRF-Token": csrfToken
         },
         body: JSON.stringify(decision)
+      }
+    );
+  },
+
+  mutateProtocolTrust(
+    peer: ProtocolPeerItem,
+    mutation: ProtocolTrustMutation,
+    csrfToken: string,
+    signal?: AbortSignal
+  ): Promise<MutationReceipt> {
+    return request(
+      `/operator/api/protocol-peers/${encodeURIComponent(peer.peer_id)}/trust`,
+      mutationReceiptSchema,
+      {
+        method: "POST",
+        ...signalOption(signal),
+        headers: {
+          "Idempotency-Key": mutation.command_id,
+          "X-CSRF-Token": csrfToken
+        },
+        body: JSON.stringify(mutation)
       }
     );
   },

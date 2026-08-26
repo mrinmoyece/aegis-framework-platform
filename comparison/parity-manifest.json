@@ -386,15 +386,32 @@
     {
       "id": "14-mcp-a2a-interoperability",
       "name": "Secure MCP and A2A interoperability",
-      "status": "planned",
+      "status": "delivered",
       "evidence": [
-        "docs/roadmap.md"
+        "src/aegis_framework/interoperability.py",
+        "src/aegis_framework/mcp_interop.py",
+        "src/aegis_framework/a2a_interop.py",
+        "src/aegis_framework/protocol_adapters.py",
+        "src/aegis_framework/interoperability_temporal.py",
+        "src/aegis_framework/interoperability_postgres.py",
+        "migrations/0009_layer13.sql",
+        "tests/test_interoperability_layer13.py",
+        "docs/adr/018-official-mcp-a2a-interoperability.md",
+        "docs/protocol-runbook.md",
+        "comparison/layer13-metrics.json"
       ],
-      "framework_owned": [],
+      "framework_owned": [
+        "official MCP wire types, modern/legacy negotiation, stdio and Streamable HTTP mechanics",
+        "official A2A protobuf/ProtoJSON, card signing helpers, route factories, JSON-RPC, HTTP+JSON and gRPC mechanics",
+        "Temporal protocol Activity scheduling, retry, cancellation and replay"
+      ],
       "enterprise_owned": [
-        "capability grants",
-        "tool identity",
-        "effect policy"
+        "workload identity and current tenant/purpose/RBAC",
+        "peer trust registry, capability/schema/card/certificate/key pins",
+        "SSRF, DNS, redirect, MIME, Unicode, schema and byte bounds",
+        "quota, idempotency, intent/result facts, ambiguity, fencing and reconciliation",
+        "artifact provenance, citations, quarantine, operator review and audit",
+        "proposal-only remediation and separate approval/effect policy"
       ]
     },
     {

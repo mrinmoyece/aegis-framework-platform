@@ -5,7 +5,11 @@ import { useId, useRef, useState } from "react";
 import { operatorApi } from "./api/client";
 import { DataTable } from "./components/DataTable";
 import { Status, Timestamp } from "./components/Status";
-import type { ApprovalItem, OperatorSnapshot } from "./contracts/schemas";
+import type {
+  ApprovalItem,
+  OperatorSnapshot,
+  ProtocolPeerItem
+} from "./contracts/schemas";
 import { useOperator } from "./operator-context";
 import { redactError } from "./safety";
 
@@ -21,6 +25,8 @@ type Memory = OperatorSnapshot["memories"][number];
 type Evaluation = OperatorSnapshot["evaluations"][number];
 type Audit = OperatorSnapshot["audit"][number];
 type Replay = OperatorSnapshot["replay"][number];
+
+type ProtocolTrustAction = "review" | "quarantine" | "revoke" | "emergency-disable";
 
 export function OverviewPage() {
   const { snapshot } = useOperator();
@@ -184,6 +190,164 @@ export function ApprovalsPage() {
         <ApprovalCard key={approval.approval_id} approval={approval} />
       ))}
     </Page>
+  );
+}
+
+export function ProtocolPeersPage() {
+  const { snapshot } = useOperator();
+  return (
+    <Page
+      title="Protocol peer trust"
+      description="Application-owned MCP and A2A registry status. Peer claims never grant roles, approval, or effect authority."
+    >
+      {snapshot.protocol_peers.map((peer) => (
+        <ProtocolPeerCard key={peer.peer_id} peer={peer} />
+      ))}
+    </Page>
+  );
+}
+
+function ProtocolPeerCard({ peer }: { peer: ProtocolPeerItem }) {
+  const { session } = useOperator();
+  const queryClient = useQueryClient();
+  const [action, setAction] = useState<ProtocolTrustAction>("quarantine");
+  const [confirmation, setConfirmation] = useState("");
+  const [rationale, setRationale] = useState("");
+  const [reviewed, setReviewed] = useState(false);
+  const actionId = useId();
+  const confirmationId = useId();
+  const rationaleId = useId();
+  const confirmationPrefix = {
+    review: "TRUST",
+    quarantine: "QUARANTINE",
+    revoke: "REVOKE",
+    "emergency-disable": "DISABLE"
+  }[action];
+  const exactConfirmation = `${confirmationPrefix} ${peer.peer_id}`;
+  const mutation = useMutation({
+    mutationFn: () =>
+      operatorApi.mutateProtocolTrust(
+        peer,
+        {
+          command_id: crypto.randomUUID(),
+          action,
+          expected_revision: peer.revision,
+          expected_card_digest: peer.card_digest,
+          expected_schema_digest: peer.schema_digest,
+          expected_certificate_digest: peer.certificate_digest,
+          expected_key_digest: peer.key_digest,
+          rationale,
+          typed_confirmation: confirmation
+        },
+        session.csrf_token
+      ),
+    onSettled: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["operator", session.tenant_id]
+      });
+    }
+  });
+  const terminal = peer.status === "revoked" || peer.status === "emergency-disabled";
+  const canSubmit =
+    reviewed &&
+    peer.can_administer &&
+    !terminal &&
+    rationale.trim().length >= 12 &&
+    confirmation === exactConfirmation &&
+    !mutation.isPending;
+  return (
+    <article className="panel">
+      <h2>{peer.peer_id}</h2>
+      <p>
+        <Status value={peer.status} urgent={peer.status === "quarantined"} /> ·{" "}
+        {peer.protocol.toUpperCase()} · {peer.environment} · {peer.trust_tier}
+      </p>
+      <p>
+        Owner {peer.owner_ref}; registry revision {peer.revision}; production ready{" "}
+        {peer.production_ready ? "yes" : "no (fail closed)"}.
+      </p>
+      <p>
+        Capabilities: {peer.capabilities.join(", ")}. Transports:{" "}
+        {peer.transports.join(", ")}. Classification: {peer.classifications.join(", ")}.
+        Risk: {peer.risks.join(", ")}.
+      </p>
+      <dl className="digests">
+        <dt>Card digest</dt>
+        <dd>
+          <code>{peer.card_digest ?? "not applicable"}</code>
+        </dd>
+        <dt>Schema digest</dt>
+        <dd>
+          <code>{peer.schema_digest}</code>
+        </dd>
+        <dt>Certificate digest</dt>
+        <dd>
+          <code>{peer.certificate_digest ?? "not configured"}</code>
+        </dd>
+        <dt>Key digest</dt>
+        <dd>
+          <code>{peer.key_digest ?? "not configured"}</code>
+        </dd>
+      </dl>
+      <p>
+        Review by <Timestamp value={peer.review_after} />; expires{" "}
+        <Timestamp value={peer.expires_at} />.
+      </p>
+      <label htmlFor={actionId}>Trust action</label>
+      <select
+        id={actionId}
+        value={action}
+        disabled={terminal}
+        onChange={(event) => {
+          setAction(event.target.value as ProtocolTrustAction);
+          setConfirmation("");
+        }}
+      >
+        <option value="review" disabled={peer.status !== "pending-review"}>
+          Trust reviewed pins
+        </option>
+        <option value="quarantine">Quarantine</option>
+        <option value="revoke">Revoke</option>
+        <option value="emergency-disable">Emergency disable</option>
+      </select>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={reviewed}
+          disabled={terminal}
+          onChange={(event) => setReviewed(event.target.checked)}
+        />
+        I reviewed owner, environment, capabilities, card/schema/cert/key pins,
+        classification, risk, expiry, and in-flight reconciliation impact.
+      </label>
+      <label htmlFor={rationaleId}>Independent rationale</label>
+      <textarea
+        id={rationaleId}
+        value={rationale}
+        maxLength={2000}
+        disabled={terminal}
+        onChange={(event) => setRationale(event.target.value)}
+      />
+      <label htmlFor={confirmationId}>
+        Type <code>{exactConfirmation}</code>
+      </label>
+      <input
+        id={confirmationId}
+        value={confirmation}
+        autoComplete="off"
+        disabled={terminal}
+        onChange={(event) => setConfirmation(event.target.value)}
+      />
+      <button type="button" disabled={!canSubmit} onClick={() => mutation.mutate()}>
+        {mutation.isPending ? "Applying once…" : "Apply exact trust transition"}
+      </button>
+      <div aria-live="assertive" role="status">
+        {mutation.data === undefined
+          ? null
+          : `${mutation.data.outcome}: ${mutation.data.message}`}
+        {mutation.error instanceof Error ? mutation.error.message : null}
+      </div>
+    </article>
   );
 }
 

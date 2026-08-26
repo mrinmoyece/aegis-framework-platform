@@ -2,8 +2,8 @@
   "baseline_id": "aegis-layer10-checkout-baseline",
   "schema_version": 1,
   "version": 1,
-  "suite_digest": "46d457ab7118051ef565afbfdc6aab1f7b2fa0351500c2799480f639bd93501f",
-  "dataset_digest": "d265194df45d65133d7cf577c78ee2723808a86a084a003642dc7eb03d7808e4",
+  "suite_digest": "cb7770227dd0a5f10eb8f257cf9432ba8faedab5a3f6be39a9ba8c0e0c80dd97",
+  "dataset_digest": "91cf9d2e03ad804781d51442d6f2d7ce11e278d3ca3c522a74fbc679caf98472",
   "case_ids": [
     "budget-exhaustion",
     "contradiction",
@@ -44,6 +44,14 @@
     "orchestration-replay",
     "orchestration-role-denial",
     "prompt-injection",
+    "protocol-ambiguity",
+    "protocol-confused-deputy",
+    "protocol-denial-wallet",
+    "protocol-poisoning",
+    "protocol-proposal-only",
+    "protocol-schema-bomb",
+    "protocol-ssrf",
+    "protocol-trust-revocation",
     "remediation-ambiguity",
     "remediation-denial",
     "remediation-expiry",
@@ -149,7 +157,7 @@
       "hard_safety_invariant": false
     }
   ],
-  "reviewed_by": "layer11-automation",
-  "review_reason": "Layer 11 adds reviewed deterministic observability and ledger replay cases.",
-  "reviewed_at": "2026-08-17T16:54:17.023780Z"
+  "reviewed_by": "layer13-implementation-review",
+  "review_reason": "Add reviewed deterministic MCP and A2A safety cases",
+  "reviewed_at": "2026-08-17T19:39:20.756879Z"
 }

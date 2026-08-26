@@ -213,6 +213,35 @@ The five evidence evals exercise two-page continuation, injection quarantine,
 source-policy revocation, deterministic non-causal correlation, and private-address
 rejection without credentials or network.
 
+## Layer 13: inspect protocol trust without granting peer authority
+
+Open `/protocol-peers` in the operator workspace. Review owner, environment, trust tier,
+revision, capabilities, transports, classifications, risks, expiry, and exact card/
+schema/certificate/key digests. Quarantine requires typing
+`QUARANTINE partner-investigator`; revocation and emergency disable use equally exact
+confirmation. Browser state is not authority: the BFF validates current tenant,
+revision and every digest before appending a transition.
+
+Run the deterministic protocol gates:
+
+```bash
+python3 -m uv run pytest tests/test_interoperability_layer13.py --no-cov
+python3 -m uv run aegis-framework eval run \
+  --filter secure-protocol-interoperability
+```
+
+Trace an outbound operation as:
+
+```text
+identity + purpose -> trust/policy/quota -> digest-only intent -> network
+  -> bounded untrusted result -> accept, quarantine, or ambiguity
+  -> observe/reconcile before any retry
+```
+
+MCP uses modern `server/discover`/per-request negotiation with registered legacy
+`initialize` compatibility. A2A requires protocol `1.0` and a signed/pinned Agent Card.
+Raw protocol content never enters Temporal history or the application fact ledger.
+
 ## 12. Add a source safely
 
 Implement `EvidenceConnector` and return `ConnectorPage`. Keep vendor imports in an

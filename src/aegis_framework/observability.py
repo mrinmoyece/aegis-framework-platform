@@ -117,6 +117,20 @@ class OpenTelemetryObservability:
             span_name="aegis.memory.activity",
         )
 
+    def interoperability(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        protocol = attributes.get("protocol_kind")
+        span_name = "aegis.a2a.task" if protocol == "a2a" else "aegis.mcp.call"
+        return self._span(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "protocol_operation"},
+            span_name=span_name,
+        )
+
     @contextmanager
     def _span(
         self,
@@ -195,6 +209,15 @@ class NoopObservability:
         return self._observation()
 
     def memory(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        del tenant_id, attributes
+        return self._observation()
+
+    def interoperability(
         self,
         *,
         tenant_id: str,

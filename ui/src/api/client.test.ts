@@ -79,16 +79,11 @@ describe("typed BFF client", () => {
           nonce: "n".repeat(43),
           code_challenge: "p".repeat(43),
           code_challenge_method: "S256",
-          code_verifier: "v".repeat(43),
           expires_at: fixtureSession.expires_at
         })
       ),
       http.post("*/operator/session/callback", async ({ request }) => {
-        await expect(request.json()).resolves.toEqual({
-          code: "demo",
-          state,
-          code_verifier: "v".repeat(43)
-        });
+        await expect(request.json()).resolves.toEqual({ code: "demo", state });
         return HttpResponse.json(fixtureSession);
       }),
       http.post("*/operator/session/tenant", async ({ request }) => {
@@ -130,6 +125,39 @@ describe("typed BFF client", () => {
       )
     ).resolves.toMatchObject({ outcome: "denied" });
     await expect(operatorApi.logout(fixtureSession.csrf_token)).resolves.toBeUndefined();
+  });
+
+  it("mutateProtocolTrust posts to the correct endpoint", async () => {
+    const peer = fixtureSnapshot.protocol_peers[0];
+    if (peer === undefined) throw new Error("fixture missing protocol peer");
+    server.use(
+      http.post(
+        `*/operator/api/protocol-peers/${encodeURIComponent(peer.peer_id)}/trust`,
+        (req) => {
+          expect(req.request.headers.get("idempotency-key")).toBe("trust-command-1");
+          return HttpResponse.json({
+            command_id: "trust-command-1",
+            outcome: "accepted",
+            message: "Protocol peer trust changed.",
+            server_time: fixtureSession.server_time
+          });
+        }
+      )
+    );
+    const mutation = {
+      command_id: "trust-command-1",
+      action: "revoke" as const,
+      expected_revision: peer.revision,
+      expected_card_digest: peer.card_digest,
+      expected_schema_digest: peer.schema_digest,
+      expected_certificate_digest: peer.certificate_digest,
+      expected_key_digest: peer.key_digest,
+      rationale: "Verified schema drift requires revocation.",
+      typed_confirmation: `REVOKE ${peer.peer_id}`
+    };
+    await expect(
+      operatorApi.mutateProtocolTrust(peer, mutation, fixtureSession.csrf_token)
+    ).resolves.toMatchObject({ outcome: "accepted" });
   });
 
   it("rejects invalid JSON responses", async () => {

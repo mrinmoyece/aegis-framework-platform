@@ -37,6 +37,8 @@ SPAN_NAMES: Final = frozenset(
         "aegis.sandbox.execute",
         "aegis.memory.retrieve",
         "aegis.eval.case",
+        "aegis.mcp.call",
+        "aegis.a2a.task",
     }
 )
 
@@ -75,6 +77,9 @@ _SAFE_ATTRIBUTE_KEYS: Final = frozenset(
         "aegis.sandbox.runtime",
         "aegis.memory.tier",
         "aegis.eval.suite",
+        "aegis.protocol.kind",
+        "aegis.protocol.transport",
+        "aegis.protocol.trust_status",
         "aegis.count",
         "aegis.size.bytes",
         "aegis.duration.ms",
@@ -136,6 +141,9 @@ _ENUM_VALUES: Final[dict[str, frozenset[str]]] = {
             "sandbox",
             "memory",
             "eval",
+            "mcp",
+            "a2a",
+            "interop",
         }
     ),
     "aegis.status": frozenset(
@@ -188,6 +196,10 @@ _METRIC_LABEL_VALUES: Final[dict[str, frozenset[str]]] = {
             "retrieve",
             "case",
             "projection",
+            "negotiate",
+            "discover",
+            "reconcile",
+            "cancel",
         }
     ),
     "reason": _ENUM_VALUES["aegis.error.type"],
@@ -218,7 +230,9 @@ _METRIC_LABEL_VALUES: Final[dict[str, frozenset[str]]] = {
             "telemetry-export",
         }
     ),
-    "queue": frozenset({"outbox", "temporal", "sandbox", "memory", "eval"}),
+    "queue": frozenset(
+        {"outbox", "temporal", "sandbox", "memory", "eval", "mcp", "a2a"}
+    ),
 }
 _MAX_ATTRIBUTE_TEXT = 64
 _MAX_LOG_BYTES = 4096

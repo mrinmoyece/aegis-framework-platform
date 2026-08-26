@@ -130,6 +130,13 @@ export const fixtureSnapshot: OperatorSnapshot = {
       artifact_count: 1,
       quarantined_count: 1,
       cleanup_complete: true
+    },
+    {
+      execution_id: "sandbox-2",
+      status: "failed",
+      artifact_count: 0,
+      quarantined_count: 0,
+      cleanup_complete: false
     }
   ],
   memories: [
@@ -140,6 +147,14 @@ export const fixtureSnapshot: OperatorSnapshot = {
       status: "held",
       retention_expires_at: later,
       legal_hold: true
+    },
+    {
+      memory_id: "memory-2",
+      tier: "episodic",
+      provenance: "observed",
+      status: "indexed",
+      retention_expires_at: later,
+      legal_hold: false
     }
   ],
   evaluations: [
@@ -147,6 +162,13 @@ export const fixtureSnapshot: OperatorSnapshot = {
       suite_id: "suite-1",
       passed: true,
       regressions: 0,
+      cases: 50,
+      baseline_digest: digest
+    },
+    {
+      suite_id: "suite-2",
+      passed: false,
+      regressions: 2,
       cases: 50,
       baseline_digest: digest
     }
@@ -167,6 +189,36 @@ export const fixtureSnapshot: OperatorSnapshot = {
       projection_matches: true,
       truncated: false,
       report_digest: digest
+    },
+    {
+      report_id: "replay-2",
+      integrity: "failed",
+      projection_matches: false,
+      truncated: true,
+      report_digest: digest
+    }
+  ],
+  protocol_peers: [
+    {
+      peer_id: "partner-investigator",
+      protocol: "a2a",
+      owner_ref: "team-response",
+      environment: "staging",
+      trust_tier: "partner",
+      status: "active",
+      revision: 3,
+      card_digest: digest,
+      schema_digest: digest,
+      certificate_digest: digest,
+      key_digest: digest,
+      capabilities: ["investigate-incident"],
+      transports: ["json-rpc-http"],
+      classifications: ["internal"],
+      risks: ["low", "medium"],
+      review_after: later,
+      expires_at: later,
+      production_ready: false,
+      can_administer: true
     }
   ]
 };

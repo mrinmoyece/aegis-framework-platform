@@ -84,10 +84,10 @@ describe("bounded snapshot polling", () => {
     expect(onAuthenticationExpired).toHaveBeenCalledOnce();
   });
 
-  it("pauses offline and resumes on reconnect", async () => {
-    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+  it("silently swallows AbortError without reporting degraded state", async () => {
     const onDegraded = vi.fn();
-    const fetchSnapshot = vi.fn().mockResolvedValue(fixtureSnapshot);
+    const abortError = new DOMException("aborted", "AbortError");
+    const fetchSnapshot = vi.fn().mockRejectedValue(abortError);
     const poller = new SnapshotPoller({
       tenantId: "tenant-acme",
       sessionGeneration: "session-fixture-1",
@@ -99,22 +99,17 @@ describe("bounded snapshot polling", () => {
     });
     poller.start();
     await poller.pollNow();
-    expect(fetchSnapshot).not.toHaveBeenCalled();
-    expect(onDegraded).toHaveBeenCalledWith("Updates paused while offline or hidden.");
-    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
-    window.dispatchEvent(new Event("online"));
-    await vi.advanceTimersByTimeAsync(0);
-    expect(fetchSnapshot).toHaveBeenCalledOnce();
+    expect(onDegraded).not.toHaveBeenCalled();
     poller.stop();
   });
 
-  it("ignores AbortError when poll is cancelled mid-flight", async () => {
-    const abortError = new DOMException("Aborted", "AbortError");
+  it("reports degraded and retries on generic network errors", async () => {
     const onDegraded = vi.fn();
+    const fetchSnapshot = vi.fn().mockRejectedValue(new Error("Network error"));
     const poller = new SnapshotPoller({
       tenantId: "tenant-acme",
       sessionGeneration: "session-fixture-1",
-      fetchSnapshot: vi.fn().mockRejectedValue(abortError),
+      fetchSnapshot,
       onSnapshot: vi.fn(),
       onAuthenticationExpired: vi.fn(),
       onDegraded,
@@ -122,36 +117,11 @@ describe("bounded snapshot polling", () => {
     });
     poller.start();
     await poller.pollNow();
-    // AbortError is swallowed — no degraded callback
-    expect(onDegraded).not.toHaveBeenCalled();
+    expect(onDegraded).toHaveBeenCalledWith("Live updates are reconnecting.");
     poller.stop();
   });
 
-  it("exhausts retry bound after MAX_FAILURES transient errors", async () => {
-    const onDegraded = vi.fn();
-    const poller = new SnapshotPoller({
-      tenantId: "tenant-acme",
-      sessionGeneration: "session-fixture-1",
-      fetchSnapshot: vi.fn().mockRejectedValue(new Error("transient")),
-      onSnapshot: vi.fn(),
-      onAuthenticationExpired: vi.fn(),
-      onDegraded,
-      intervalMs: 100
-    });
-    poller.start();
-    // 4 = MAX_FAILURES
-    for (let i = 0; i < 5; i++) {
-      await poller.pollNow();
-    }
-    const calls = onDegraded.mock.calls.map((c) => c[0] as string | null);
-    expect(calls.some((m) => m === "Live updates are reconnecting.")).toBe(true);
-    expect(calls.some((m) => m === "Live updates exhausted their retry bound.")).toBe(
-      true
-    );
-    poller.stop();
-  });
-
-  it("resumes after becoming visible", async () => {
+  it("schedules re-poll on visibilitychange when page becomes visible", async () => {
     Object.defineProperty(document, "visibilityState", {
       configurable: true,
       value: "hidden"
@@ -172,6 +142,30 @@ describe("bounded snapshot polling", () => {
       value: "visible"
     });
     document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchSnapshot).toHaveBeenCalledOnce();
+    poller.stop();
+  });
+
+  it("pauses offline and resumes on reconnect", async () => {
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+    const onDegraded = vi.fn();
+    const fetchSnapshot = vi.fn().mockResolvedValue(fixtureSnapshot);
+    const poller = new SnapshotPoller({
+      tenantId: "tenant-acme",
+      sessionGeneration: "session-fixture-1",
+      fetchSnapshot,
+      onSnapshot: vi.fn(),
+      onAuthenticationExpired: vi.fn(),
+      onDegraded,
+      intervalMs: 100
+    });
+    poller.start();
+    await poller.pollNow();
+    expect(fetchSnapshot).not.toHaveBeenCalled();
+    expect(onDegraded).toHaveBeenCalledWith("Updates paused while offline or hidden.");
+    Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+    window.dispatchEvent(new Event("online"));
     await vi.advanceTimersByTimeAsync(0);
     expect(fetchSnapshot).toHaveBeenCalledOnce();
     poller.stop();

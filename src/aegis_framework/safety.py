@@ -111,6 +111,12 @@ _SAFE_OBSERVABILITY_KEYS = frozenset(
         "cache_hit",
         "context_token_bucket",
         "purged_count",
+        "protocol_kind",
+        "transport_kind",
+        "trust_status",
+        "task_state",
+        "risk",
+        "version_family",
     }
 )
 _SAFE_AUDIT_KEYS = frozenset(

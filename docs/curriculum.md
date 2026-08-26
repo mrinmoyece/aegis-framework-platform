@@ -1,4 +1,4 @@
-# Layer 12 curriculum
+# Layer 13 curriculum
 
 ## Learning outcomes
 
@@ -93,6 +93,13 @@ After this layer, an engineer should be able to:
 69. enforce central XSS, URL, download, CSV, clipboard, redaction, CSP and no-analytics
     policy;
 70. compare Framework Layer 12 candidly with pinned custom Aegis Layer 13.
+71. distinguish official MCP/A2A transport mechanics from application authority;
+72. design a versioned trust registry with card/schema/certificate/key drift invalidation;
+73. bind workload identity audience/scope/tenant/purpose/proof/replay to current RBAC;
+74. persist protocol intent before network and reconcile at-least-once ambiguity;
+75. reject protocol poisoning, confused-deputy escalation, SSRF, forged artifacts,
+    schema bombs, Unicode attacks, URL exfiltration and denial-of-wallet;
+76. compare official SDK code removal with the custom security controls that remain.
 
 ## Suggested sequence
 
@@ -146,6 +153,11 @@ After this layer, an engineer should be able to:
 | SLOs and dashboards | SLO catalog, Prometheus rules, dashboards | Validate fast/slow burn and safety alerts | Why is safety not an error-budget tradeoff? |
 | Replay debugging | `replay.py`, observability runbook | Tamper hash/sequence, compare and rebuild | Why are traces/checkpoints not truth? |
 | Framework comparison | Layer 11 metrics | Compare pinned custom Layer 12 | Which telemetry/replay security remains custom? |
+| Protocol contracts | ADR 018, `interoperability.py` | Forge authority fields and raw ledger content | Why can a peer message never grant authority? |
+| MCP adapter | `mcp_interop.py`, `protocol_adapters.py` | Negotiate modern/legacy versions; poison tools and cursors | Which mechanics does MCP 2.0 remove? |
+| A2A adapter | `a2a_interop.py`, compatibility guide | Forge card/artifact/task provenance | What does card JWS not prove? |
+| Trust operations | migration 0009, protocol runbook, operator UI | Review, drift, quarantine, revoke, disable | Why must in-flight work reauthorize? |
+| Protocol recovery | `interoperability_temporal.py` | Crash after intent and reconcile | What can fencing not undo? |
 
 ## Practical exercises
 

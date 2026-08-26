@@ -11,7 +11,7 @@ timeline projections.
 It can now open an exact-scope approval and coordinate one fixed controlled action,
 reconciliation, independent verification and compensation. Production-shaped adapters
 remain disabled by default and unqualified against live credentials/clusters. General
-sandboxing, memory/RAG, UI/BFF, MCP/A2A, deployment and live qualification remain
+sandboxing, memory/RAG, deployment and live qualification remain
 deferred.
 
 ## Layer 7 remediation lifecycle
@@ -649,3 +649,32 @@ Tenant changes cancel requests, delete cached data, rotate session/CSRF state, a
 start from an empty tenant key. Bounded polling uses a generation watermark for
 deduplication/order, caps reconnect, stops on auth expiry, and tears down with tenant
 context. See [ADR 017](adr/017-secure-operator-bff.md).
+
+# Layer 13 secure MCP and A2A interoperability
+
+```text
+verified workload identity + tenant purpose
+  -> current application RBAC
+  -> reviewed tenant trust registry revision
+  -> capability/schema/card/cert/key/risk/classification/egress/quota checks
+  -> immutable digest-only intent + fence
+  -> Temporal Activity
+  -> official MCP 2.0 or A2A 1.1 SDK adapter
+  -> untrusted bounded response
+  -> provenance/citation/schema/MIME/Unicode/size validation
+  -> immutable result, ambiguity, quarantine, or reconciliation fact
+  -> authorized redacted projection/operator view
+```
+
+MCP and A2A are external delivery protocols only. `interoperability.py`,
+`mcp_interop.py`, and `a2a_interop.py` define neutral contracts and application
+authority. `protocol_adapters.py` is the only module importing protocol SDK types.
+LangGraph and internal roles do not cross this boundary. Temporal workflows carry
+opaque references and digests only; PostgreSQL migration `0009_layer13.sql` owns
+forced-RLS trust, invocation, task, cursor, quota, artifact, fact, and rebuild state.
+
+The MCP surface is seven curated tools for redacted incident/evidence/memory/runbook/
+status reads and safe investigation/proposal submission. The A2A Agent Card exposes
+four bounded skills. A proposal remains a Layer 7 candidate; no protocol path opens
+approval or invokes an effect. See [ADR 018](adr/018-official-mcp-a2a-interoperability.md),
+[compatibility](protocol-compatibility.md), and the [protocol runbook](protocol-runbook.md).

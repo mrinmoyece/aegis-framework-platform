@@ -68,7 +68,8 @@ describe("RootLayout navigation and shell", () => {
       "Memory",
       "Evaluations",
       "Audit",
-      "Replay"
+      "Replay",
+      "Protocol peers"
     ]) {
       expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
     }

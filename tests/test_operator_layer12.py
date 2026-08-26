@@ -20,7 +20,6 @@ def _login(client: TestClient) -> dict[str, object]:
         json={
             "code": "deterministic-demo-code",
             "state": body["state"],
-            "code_verifier": body["code_verifier"],
         },
     )
     assert callback.status_code == 200
@@ -52,7 +51,6 @@ def test_operator_oidc_emulator_rotates_session_and_rejects_replay() -> None:
         json={
             "code": "deterministic-demo-code",
             "state": start["state"],
-            "code_verifier": start["code_verifier"],
         },
     )
     assert first.status_code == 200
@@ -63,13 +61,12 @@ def test_operator_oidc_emulator_rotates_session_and_rejects_replay() -> None:
         json={
             "code": "deterministic-demo-code",
             "state": start["state"],
-            "code_verifier": start["code_verifier"],
         },
     )
     assert replay.status_code == 401
     invalid = client.post(
         "/operator/session/callback",
-        json={"code": "wrong-code", "state": "x" * 43, "code_verifier": "v" * 43},
+        json={"code": "wrong-code", "state": "x" * 43},
     )
     assert invalid.status_code == 401
 
@@ -191,6 +188,94 @@ def test_operator_injection_is_returned_only_as_bounded_data() -> None:
     )
     assert hostile["disposition"] == "accepted"
     assert len(hostile["summary"]) <= 300
+
+
+def test_operator_protocol_trust_requires_exact_pins_and_confirmation() -> None:
+    client = TestClient(create_app(mode=AppMode.DEMO), base_url="https://testserver")
+    session = _login(client)
+    peer = client.get("/operator/api/snapshot").json()["protocol_peers"][0]
+    stale = client.post(
+        f"/operator/api/protocol-peers/{peer['peer_id']}/trust",
+        headers={
+            "Origin": "https://testserver",
+            "X-CSRF-Token": session["csrf_token"],
+            "Idempotency-Key": "trust-stale",
+        },
+        json={
+            "command_id": "trust-stale",
+            "action": "quarantine",
+            "expected_revision": peer["revision"] + 1,
+            "expected_card_digest": peer["card_digest"],
+            "expected_schema_digest": peer["schema_digest"],
+            "expected_certificate_digest": peer["certificate_digest"],
+            "expected_key_digest": peer["key_digest"],
+            "rationale": "Peer behavior requires immediate containment review.",
+            "typed_confirmation": f"QUARANTINE {peer['peer_id']}",
+        },
+    )
+    assert stale.status_code == 409
+    wrong = client.post(
+        f"/operator/api/protocol-peers/{peer['peer_id']}/trust",
+        headers={
+            "Origin": "https://testserver",
+            "X-CSRF-Token": session["csrf_token"],
+        },
+        json={
+            "command_id": "trust-wrong",
+            "action": "quarantine",
+            "expected_revision": peer["revision"],
+            "expected_card_digest": peer["card_digest"],
+            "expected_schema_digest": peer["schema_digest"],
+            "expected_certificate_digest": peer["certificate_digest"],
+            "expected_key_digest": peer["key_digest"],
+            "rationale": "Peer behavior requires immediate containment review.",
+            "typed_confirmation": "QUARANTINE wrong-peer",
+        },
+    )
+    assert wrong.status_code == 422
+    accepted = client.post(
+        f"/operator/api/protocol-peers/{peer['peer_id']}/trust",
+        headers={
+            "Origin": "https://testserver",
+            "X-CSRF-Token": session["csrf_token"],
+            "Idempotency-Key": "trust-accepted",
+        },
+        json={
+            "command_id": "trust-accepted",
+            "action": "quarantine",
+            "expected_revision": peer["revision"],
+            "expected_card_digest": peer["card_digest"],
+            "expected_schema_digest": peer["schema_digest"],
+            "expected_certificate_digest": peer["certificate_digest"],
+            "expected_key_digest": peer["key_digest"],
+            "rationale": "Peer behavior requires immediate containment review.",
+            "typed_confirmation": f"QUARANTINE {peer['peer_id']}",
+        },
+    )
+    assert accepted.status_code == 200
+    assert accepted.json()["outcome"] == "accepted"
+    refreshed = client.get("/operator/api/snapshot").json()["protocol_peers"][0]
+    assert refreshed["status"] == "quarantined"
+    assert refreshed["revision"] == peer["revision"] + 1
+    cannot_reactivate = client.post(
+        f"/operator/api/protocol-peers/{peer['peer_id']}/trust",
+        headers={
+            "Origin": "https://testserver",
+            "X-CSRF-Token": session["csrf_token"],
+        },
+        json={
+            "command_id": "trust-reactivate",
+            "action": "review",
+            "expected_revision": refreshed["revision"],
+            "expected_card_digest": refreshed["card_digest"],
+            "expected_schema_digest": refreshed["schema_digest"],
+            "expected_certificate_digest": refreshed["certificate_digest"],
+            "expected_key_digest": refreshed["key_digest"],
+            "rationale": "Quarantined peers require a new pending registry revision.",
+            "typed_confirmation": f"TRUST {peer['peer_id']}",
+        },
+    )
+    assert cannot_reactivate.status_code == 409
 
 
 def test_operator_static_delivery_is_bounded_and_cache_aware(tmp_path) -> None:

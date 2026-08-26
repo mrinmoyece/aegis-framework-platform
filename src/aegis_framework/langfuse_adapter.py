@@ -138,6 +138,20 @@ class LangfuseObservability:
             name="aegis.memory.activity",
         )
 
+    def interoperability(
+        self,
+        *,
+        tenant_id: str,
+        attributes: Mapping[str, str | int | bool],
+    ) -> AbstractContextManager[Observation]:
+        protocol = attributes.get("protocol_kind")
+        name = "aegis.a2a.task" if protocol == "a2a" else "aegis.mcp.call"
+        return self._run(
+            tenant_id=tenant_id,
+            attributes={**attributes, "operation": "protocol_operation"},
+            name=name,
+        )
+
     @contextmanager
     def _run(
         self,

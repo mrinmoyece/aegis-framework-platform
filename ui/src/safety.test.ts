@@ -19,13 +19,18 @@ describe("central browser safety controls", () => {
     expect(csvCell('=HYPERLINK("https://evil.invalid")')).toBe(
       '"\'=HYPERLINK(""https://evil.invalid"")"'
     );
+    expect(csvCell("normal value")).toBe('"normal value"');
     expect(safeFilename("../../secret?.csv")).toBe("..-..-secret-.csv");
     expect(safeFilename("***")).toBe("---");
+    expect(safeFilename("")).toBe("aegis-download");
   });
 
   it("does not expose unknown error details", () => {
     expect(redactError(new Error("secret tenant payload"))).not.toContain("secret");
     expect(redactError("raw failure")).toContain("failed safely");
+    const apiErr = new Error("Operator denied this request.");
+    apiErr.name = "ApiError";
+    expect(redactError(apiErr)).toBe("Operator denied this request.");
   });
 
   it("bounds downloads and clipboard writes", async () => {

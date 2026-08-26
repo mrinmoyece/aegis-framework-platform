@@ -60,17 +60,12 @@ class AuthorizationStart(StrictModel):
     nonce: str = Field(min_length=32, max_length=128)
     code_challenge: str = Field(min_length=43, max_length=128)
     code_challenge_method: Literal["S256"] = "S256"
-    # Demo-only: the server-generated verifier is returned so the client can
-    # complete the PKCE exchange without a separate out-of-band flow.
-    code_verifier: str = Field(min_length=43, max_length=128)
     expires_at: AwareDatetime
 
 
 class AuthorizationCallback(StrictModel):
     code: str = Field(min_length=1, max_length=256)
     state: str = Field(min_length=32, max_length=128)
-    # PKCE code_verifier (RFC 7636 §4.1): 43-128 unreserved chars from the client.
-    code_verifier: str = Field(min_length=43, max_length=128)
 
 
 class TenantSwitchRequest(StrictModel):
@@ -209,6 +204,37 @@ class ReplayItem(StrictModel):
     report_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class ProtocolPeerItem(StrictModel):
+    peer_id: Identifier
+    protocol: Literal["mcp", "a2a"]
+    owner_ref: Identifier
+    environment: Literal["development", "test", "staging", "production"]
+    trust_tier: Literal["internal", "partner", "restricted"]
+    status: Literal[
+        "pending-review",
+        "active",
+        "quarantined",
+        "revoked",
+        "expired",
+        "emergency-disabled",
+    ]
+    revision: int = Field(ge=1)
+    card_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    schema_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    certificate_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    key_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    capabilities: tuple[Identifier, ...] = Field(max_length=32)
+    transports: tuple[Identifier, ...] = Field(max_length=4)
+    classifications: tuple[
+        Literal["public", "internal", "confidential", "restricted"], ...
+    ] = Field(max_length=4)
+    risks: tuple[Literal["low", "medium", "high"], ...] = Field(max_length=3)
+    review_after: AwareDatetime
+    expires_at: AwareDatetime
+    production_ready: bool
+    can_administer: bool
+
+
 class OperatorSnapshot(StrictModel):
     schema_version: Literal[1] = 1
     tenant_id: Identifier
@@ -230,6 +256,7 @@ class OperatorSnapshot(StrictModel):
     evaluations: tuple[EvaluationItem, ...] = Field(max_length=100)
     audit: tuple[AuditItem, ...] = Field(max_length=200)
     replay: tuple[ReplayItem, ...] = Field(max_length=100)
+    protocol_peers: tuple[ProtocolPeerItem, ...] = Field(max_length=100)
 
 
 class ApprovalDecisionRequest(StrictModel):
@@ -249,10 +276,22 @@ class MutationReceipt(StrictModel):
     server_time: AwareDatetime
 
 
+class ProtocolTrustMutationRequest(StrictModel):
+    command_id: Identifier
+    action: Literal["review", "quarantine", "revoke", "emergency-disable"]
+    expected_revision: int = Field(ge=1)
+    expected_card_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    expected_schema_digest: str = Field(pattern=r"^[a-f0-9]{64}$")
+    expected_certificate_digest: str | None = Field(
+        default=None, pattern=r"^[a-f0-9]{64}$"
+    )
+    expected_key_digest: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    rationale: str = Field(min_length=12, max_length=2_000)
+    typed_confirmation: str = Field(min_length=1, max_length=160)
+
+
 @dataclass(frozen=True)
 class _Handshake:
-    verifier_digest: str
-    code_challenge: str  # S256 challenge to validate the PKCE code_verifier on exchange
     nonce: str
     origin_digest: str
     expires_at: datetime
@@ -287,8 +326,6 @@ class InMemoryOperatorSessions:
             if len(self._handshakes) >= _MAX_HANDSHAKES:
                 raise ValueError("handshake capacity exceeded; try again shortly")
             self._handshakes[_digest(state)] = _Handshake(
-                verifier_digest=_digest(verifier),
-                code_challenge=challenge,
                 nonce=nonce,
                 origin_digest=_digest(origin),
                 expires_at=now + _HANDSHAKE_LIFETIME,
@@ -301,12 +338,11 @@ class InMemoryOperatorSessions:
             state=state,
             nonce=nonce,
             code_challenge=challenge,
-            code_verifier=verifier,
             expires_at=now + _HANDSHAKE_LIFETIME,
         )
 
     def exchange(
-        self, *, state: str, code: str, code_verifier: str, origin: str, now: datetime
+        self, *, state: str, code: str, origin: str, now: datetime
     ) -> tuple[str, _Session]:
         with self._lock:
             self._prune(now)
@@ -316,10 +352,6 @@ class InMemoryOperatorSessions:
                 or handshake.expires_at <= now
                 or not hmac.compare_digest(_digest(origin), handshake.origin_digest)
                 or not hmac.compare_digest(code, "deterministic-demo-code")
-                # PKCE S256: SHA-256(code_verifier) base64url-encoded == challenge.
-                or not hmac.compare_digest(
-                    _b64_digest(code_verifier), handshake.code_challenge
-                )
             ):
                 raise ValueError("authorization response is invalid")
             token = secrets.token_urlsafe(48)
@@ -457,6 +489,11 @@ def install_operator_routes(app: FastAPI, *, production: bool) -> None:
     """Install the BFF; production stays unavailable without live adapters."""
 
     sessions = InMemoryOperatorSessions()
+    peer_states: dict[str, tuple[str, int]] = {
+        "partner-investigator": ("active", 3),
+        "quarantined-mcp": ("quarantined", 7),
+    }
+    peer_lock = Lock()
     router = APIRouter(
         prefix="/operator",
         tags=["operator-bff"],
@@ -539,7 +576,6 @@ def install_operator_routes(app: FastAPI, *, production: bool) -> None:
             token, record = sessions.exchange(
                 state=payload.state,
                 code=payload.code,
-                code_verifier=payload.code_verifier,
                 origin=request_origin(request),
                 now=now,
             )
@@ -623,6 +659,7 @@ def install_operator_routes(app: FastAPI, *, production: bool) -> None:
             record.tenant_id,
             session_generation=record.generation,
             now=_now(),
+            peer_states=peer_states,
         )
 
     @router.post(
@@ -668,6 +705,72 @@ def install_operator_routes(app: FastAPI, *, production: bool) -> None:
             server_time=_now(),
         )
 
+    @router.post(
+        "/api/protocol-peers/{peer_id}/trust",
+        response_model=MutationReceipt,
+    )
+    def mutate_protocol_trust(
+        peer_id: Annotated[str, Field(min_length=1, max_length=128)],
+        payload: ProtocolTrustMutationRequest,
+        request: Request,
+        x_csrf_token: Annotated[str | None, Header(alias="X-CSRF-Token")] = None,
+        token: str | None = Cookie(default=None, alias=_SESSION_COOKIE),
+    ) -> MutationReceipt:
+        record = current_session(token)
+        require_mutation(request, record, x_csrf_token)
+        if record.tenant_id != "tenant-acme":
+            raise HTTPException(status_code=404, detail="protocol peer is unavailable")
+        peers = {
+            item.peer_id: item
+            for item in _demo_protocol_peers(now=_now(), peer_states=peer_states)
+        }
+        peer = peers.get(peer_id)
+        if peer is None:
+            raise HTTPException(status_code=404, detail="protocol peer is unavailable")
+        if (
+            payload.expected_revision != peer.revision
+            or payload.expected_card_digest != peer.card_digest
+            or payload.expected_schema_digest != peer.schema_digest
+            or payload.expected_certificate_digest != peer.certificate_digest
+            or payload.expected_key_digest != peer.key_digest
+        ):
+            raise HTTPException(status_code=409, detail="protocol trust is stale")
+        confirmations = {
+            "review": f"TRUST {peer_id}",
+            "quarantine": f"QUARANTINE {peer_id}",
+            "revoke": f"REVOKE {peer_id}",
+            "emergency-disable": f"DISABLE {peer_id}",
+        }
+        if payload.typed_confirmation != confirmations[payload.action]:
+            raise HTTPException(status_code=422, detail="typed confirmation is invalid")
+        target = {
+            "review": "active",
+            "quarantine": "quarantined",
+            "revoke": "revoked",
+            "emergency-disable": "emergency-disabled",
+        }[payload.action]
+        if peer.status in {"revoked", "emergency-disabled"}:
+            raise HTTPException(status_code=409, detail="protocol trust is terminal")
+        if payload.action == "review" and peer.status != "pending-review":
+            raise HTTPException(
+                status_code=409,
+                detail="only pending protocol trust can be activated",
+            )
+        with peer_lock:
+            current = peer_states.get(peer_id)
+            if current != (peer.status, peer.revision):
+                raise HTTPException(status_code=409, detail="protocol trust changed")
+            peer_states[peer_id] = (target, peer.revision + 1)
+        return MutationReceipt(
+            command_id=payload.command_id,
+            outcome="accepted",
+            message=(
+                f"Protocol peer trust changed to {target}; in-flight work must "
+                "reauthorize and reconcile under the new registry revision."
+            ),
+            server_time=_now(),
+        )
+
     app.include_router(router)
 
 
@@ -693,6 +796,7 @@ def install_operator_ui(app: FastAPI, *, directory: Path | None = None) -> None:
         "models",
         "replay",
         "sandboxes",
+        "protocol-peers",
     }
 
     @app.get("/{workspace_path:path}", include_in_schema=False)
@@ -726,6 +830,8 @@ def _session_view(record: _Session, *, now: datetime) -> OperatorSessionView:
             permissions=(
                 "audit:read",
                 "investigation:read",
+                "interoperability:read",
+                "interoperability:trust:admin",
                 "model:usage:read",
                 "operations:read",
                 "orchestration:artifact:read",
@@ -744,7 +850,11 @@ def _session_view(record: _Session, *, now: datetime) -> OperatorSessionView:
 
 
 def _snapshot(
-    tenant_id: str, *, session_generation: str, now: datetime
+    tenant_id: str,
+    *,
+    session_generation: str,
+    now: datetime,
+    peer_states: Mapping[str, tuple[str, int]] | None = None,
 ) -> OperatorSnapshot:
     stale_after = now + timedelta(seconds=30)
     if tenant_id != "tenant-acme":
@@ -768,6 +878,7 @@ def _snapshot(
             evaluations=(),
             audit=(),
             replay=(),
+            protocol_peers=(),
         )
     return OperatorSnapshot(
         tenant_id=tenant_id,
@@ -946,6 +1057,69 @@ def _snapshot(
                 truncated=False,
                 report_digest="e" * 64,
             ),
+        ),
+        protocol_peers=_demo_protocol_peers(
+            now=now,
+            peer_states=peer_states or {},
+        ),
+    )
+
+
+def _demo_protocol_peers(
+    *,
+    now: datetime,
+    peer_states: Mapping[str, tuple[str, int]],
+) -> tuple[ProtocolPeerItem, ...]:
+    partner_status, partner_revision = peer_states.get(
+        "partner-investigator", ("active", 3)
+    )
+    mcp_status, mcp_revision = peer_states.get("quarantined-mcp", ("quarantined", 7))
+    return (
+        ProtocolPeerItem(
+            peer_id="partner-investigator",
+            protocol="a2a",
+            owner_ref="team-incident-response",
+            environment="staging",
+            trust_tier="partner",
+            status=partner_status,
+            revision=partner_revision,
+            card_digest="f" * 64,
+            schema_digest="1" * 64,
+            certificate_digest="2" * 64,
+            key_digest="3" * 64,
+            capabilities=(
+                "investigate-incident",
+                "read-investigation-artifact",
+                "read-investigation-status",
+                "submit-remediation-proposal",
+            ),
+            transports=("json-rpc-http", "grpc"),
+            classifications=("internal",),
+            risks=("low", "medium", "high"),
+            review_after=now + timedelta(days=7),
+            expires_at=now + timedelta(days=30),
+            production_ready=False,
+            can_administer=True,
+        ),
+        ProtocolPeerItem(
+            peer_id="quarantined-mcp",
+            protocol="mcp",
+            owner_ref="team-platform",
+            environment="test",
+            trust_tier="restricted",
+            status=mcp_status,
+            revision=mcp_revision,
+            schema_digest="4" * 64,
+            certificate_digest="5" * 64,
+            key_digest="6" * 64,
+            capabilities=("mcp-aegis-status-read",),
+            transports=("streamable-http",),
+            classifications=("public", "internal"),
+            risks=("low",),
+            review_after=now + timedelta(days=1),
+            expires_at=now + timedelta(days=14),
+            production_ready=False,
+            can_administer=True,
         ),
     )
 

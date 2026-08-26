@@ -263,5 +263,45 @@
     "case_id": "observability-safety-alert-bounded",
     "kind": "observability-safety-alert-bounded",
     "expected_reason": "non_budgetable_safety_alert"
+  },
+  {
+    "case_id": "protocol-poisoning",
+    "kind": "protocol-poisoning",
+    "expected_reason": "untrusted_protocol_content_rejected"
+  },
+  {
+    "case_id": "protocol-confused-deputy",
+    "kind": "protocol-confused-deputy",
+    "expected_reason": "application_authority_not_peer_claims"
+  },
+  {
+    "case_id": "protocol-schema-bomb",
+    "kind": "protocol-schema-bomb",
+    "expected_reason": "canonical_protocol_bounds"
+  },
+  {
+    "case_id": "protocol-ssrf",
+    "kind": "protocol-ssrf",
+    "expected_reason": "private_protocol_destination_rejected"
+  },
+  {
+    "case_id": "protocol-proposal-only",
+    "kind": "protocol-proposal-only",
+    "expected_reason": "proposal_never_direct_effect"
+  },
+  {
+    "case_id": "protocol-trust-revocation",
+    "kind": "protocol-trust-revocation",
+    "expected_reason": "current_trust_registry_authoritative"
+  },
+  {
+    "case_id": "protocol-ambiguity",
+    "kind": "protocol-ambiguity",
+    "expected_reason": "digest_only_ambiguity_reconciliation"
+  },
+  {
+    "case_id": "protocol-denial-wallet",
+    "kind": "protocol-denial-wallet",
+    "expected_reason": "reserve_before_protocol_network"
   }
 ]

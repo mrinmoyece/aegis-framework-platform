@@ -168,3 +168,24 @@ blind re-embedding under a stale version.
 - Never switch silently to memory persistence.
 - Treat hash failure, cross-tenant access, stale results, and framework defects as
   platform/security incidents.
+
+## Layer 13 protocol failures
+
+| Failure | Fail-closed behavior | Durable owner |
+|---|---|---|
+| Unknown/expired/review-due peer | Deny before quota or network | Tenant trust registry |
+| Card/schema/cert/key drift | New pending revision or quarantine; stale work rejected | Registry + application facts |
+| Workload token replay/audience/scope mismatch | Authentication denial; no protocol dispatch | Identity boundary |
+| MCP version/capability mismatch | Deny negotiation; no legacy fallback unless registered | MCP adapter + registry |
+| A2A missing `1.0`/invalid signature | Reject card before client creation | A2A adapter + registry |
+| Tool/capability/schema poisoning | Reject advertisement/result against exact allowlist/digests | Application policy |
+| Timeout after request | Append ambiguity; block resend; reconcile same operation | Application ledger + Temporal |
+| Stream disconnect/cancel race | Persist cancellation; peer cancel; reject stale result by fence | Application ledger |
+| Forged/URL/raw artifact | Quarantine metadata only; no artifact publication | Artifact projection |
+| Cursor loop/substitution | Reject loop, expiry, tenant/peer/query mismatch | Cursor registry |
+| Quota/circuit exhaustion | Deny before network; no success-shaped fallback | PostgreSQL quota/circuit |
+| PostgreSQL/audit unavailable | Operation cannot become durable success | Application database |
+
+MCP/A2A SDK retries do not own application retry. Temporal retries whole Activities with
+the same operation, idempotency and fence. An ambiguous peer outcome is observed before
+any new network attempt.
