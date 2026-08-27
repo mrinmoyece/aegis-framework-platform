@@ -1,5 +1,5 @@
 ARG PYTHON_IMAGE=python:3.14.7-slim-trixie@sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9885476e7df5a4
-ARG PYTHON_RUNTIME_IMAGE=cgr.dev/chainguard/python@sha256:6d71f8dbd199350964ce8b10d50fb9d4d8e2bd50316f3a1821dbdc6eef5252fb
+ARG PYTHON_RUNTIME_IMAGE=cgr.dev/chainguard/python@sha256:ee37f5e4fb445732409626797dccb6f2a6337872def2bab48729ee61b335fa77
 ARG NODE_IMAGE=node:24.15.0-bookworm-slim@sha256:4e6b70dd6cbfc88c8157ba19aa3d9f9cce6ba4703576d55459e45efcbc9c5f5d
 
 FROM ${NODE_IMAGE} AS ui-builder
