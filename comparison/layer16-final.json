@@ -165,11 +165,11 @@
         "GitHub PR 18 metadata retrieved 2026-08-18"
       ],
       "framework": {
-        "additions": 4287,
-        "base_sha": "536979cc0b0bff028134db644f27bbb9d8c1791a",
+        "additions": 395,
+        "base_sha": "da0021fa4a156ac0d237b0eaa738170bf93c9dc2",
         "commits": 1,
-        "deletions": 5423,
-        "files_changed": 150
+        "deletions": 439,
+        "files_changed": 8
       }
     },
     "learning_curve": {
@@ -290,7 +290,7 @@
       "state_observed": "open-unmerged"
     },
     "framework": {
-      "base_sha": "536979cc0b0bff028134db644f27bbb9d8c1791a",
+      "base_sha": "da0021fa4a156ac0d237b0eaa738170bf93c9dc2",
       "comparison_scope": "Layer 16 working tree measured against the exact Layer 15 base",
       "repository": "mrinmoyece/aegis-framework-platform"
     }

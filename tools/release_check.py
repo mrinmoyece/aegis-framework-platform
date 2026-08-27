@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_SHA = "536979cc0b0bff028134db644f27bbb9d8c1791a"
+BASE_SHA = "da0021fa4a156ac0d237b0eaa738170bf93c9dc2"
 CUSTOM_SHA = "1cccd9363fec83f7f4b2748b0e913be3a123d5ce"
 STATUSES = {
     "Locally Qualified",
