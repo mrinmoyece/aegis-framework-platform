@@ -165,10 +165,10 @@
         "GitHub PR 18 metadata retrieved 2026-08-18"
       ],
       "framework": {
-        "additions": 4253,
+        "additions": 4309,
         "base_sha": "536979cc0b0bff028134db644f27bbb9d8c1791a",
         "commits": 1,
-        "deletions": 5345,
+        "deletions": 5404,
         "files_changed": 150
       }
     },
