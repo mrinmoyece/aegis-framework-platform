@@ -1,0 +1,26 @@
+name: Change proposal
+description: Propose a capability, framework, or governance change
+title: "[Proposal] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: State the operator or engineering problem, not only a tool choice.
+    validations:
+      required: true
+  - type: textarea
+    id: authority
+    attributes:
+      label: Authority impact
+      description: Explain what remains application-owned and how bypass is prevented.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and exit path
+      description: List tests, evals, operations cost, migration risk, and replacement path.
+    validations:
+      required: true

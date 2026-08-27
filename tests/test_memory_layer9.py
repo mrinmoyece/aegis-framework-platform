@@ -168,7 +168,6 @@ def _acceptance(
         decision_id=f"acceptance:{record.memory_id}:{disposition}",
         tenant_id=record.tenant_id,
         memory_id=record.memory_id,
-        record_digest=record.canonical_digest,
         disposition=disposition,
         reviewer_ref="actor:reviewer",
         reviewer_kind="human",
@@ -1115,6 +1114,25 @@ def test_cache_expiry_invalidation_and_lifecycle_rejection_paths() -> None:
             replaced_memory_ids=(record.memory_id,),
             actor_ref="actor:reviewer",
         )
+
+
+def test_index_write_invalidates_tenant_cache() -> None:
+    demo = run_memory_demo()
+    query = _query("deployment rollback")
+
+    assert demo.control.retrieve(query).hits
+    assert demo.control.retrieve(query).cache_hit
+
+    indexed = next(iter(demo.control._index._items.values()))
+    demo.control._index.index(
+        indexed.model_copy(
+            update={"indexed_at": DEMO_MEMORY_TIME + timedelta(seconds=1)}
+        )
+    )
+
+    refreshed = demo.control.retrieve(query)
+    assert refreshed.hits
+    assert not refreshed.cache_hit
 
 
 def test_compaction_constructor_empty_fallback_and_text_bounds() -> None:

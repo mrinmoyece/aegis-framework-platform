@@ -14,9 +14,14 @@ on:
     branches: [master]
   schedule:
     - cron: "41 4 * * 2"
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: restore-drill-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   restore:
@@ -36,7 +41,7 @@ jobs:
       - run: uv run pytest tests/test_production_layer14.py tests/test_temporal.py --no-cov
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: layer14-restore-drill
+          name: layer16-restore-drill
           path: |
             build/restore-drill.json
             build/restore-drill-db.json

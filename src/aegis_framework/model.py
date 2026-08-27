@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 from collections.abc import Mapping
 from enum import StrEnum
 
@@ -143,8 +142,6 @@ class GatewayStructuredModel:
             or isinstance(value, bool)
             or not isinstance(threshold, (int, float))
             or isinstance(threshold, bool)
-            or not math.isfinite(value)
-            or not math.isfinite(threshold)
         ):
             return _abstention(task, "telemetry_signal_malformed")
         if value <= threshold:
@@ -155,7 +152,7 @@ class GatewayStructuredModel:
             None,
         )
         cause_code = (
-            "post_deploy_error_spike"
+            "post_deploy_regression"
             if change is not None and change.facts.get("status") == "deployed"
             else "traffic_or_dependency_anomaly"
         )
@@ -221,14 +218,14 @@ class GatewayStructuredModel:
                 "finding",
                 task.incident_id,
                 task.specialist.value,
-                "post_deploy_error_spike",
+                "post_deploy_regression",
             ),
             specialist=task.specialist,
             statement=(
                 f"Deployment {change.facts.get('version', 'unknown')} preceded the "
                 f"alert by {minutes} minutes."
             ),
-            cause_code="post_deploy_error_spike",
+            cause_code="post_deploy_regression",
             confidence=0.89,
             citations=tuple(citations),
         )

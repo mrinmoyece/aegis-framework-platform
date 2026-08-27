@@ -181,6 +181,7 @@ CREATE TABLE IF NOT EXISTS aegis.effect_attempts (
     updated_at timestamptz NOT NULL,
     PRIMARY KEY (tenant_id, plan_id, action_id, attempt),
     UNIQUE (tenant_id, idempotency_key),
+    UNIQUE (tenant_id, operation_id),
     FOREIGN KEY (tenant_id, plan_id)
         REFERENCES aegis.remediation_plans (tenant_id, plan_id),
     CHECK (

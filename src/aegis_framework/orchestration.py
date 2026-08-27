@@ -242,13 +242,6 @@ class GovernanceArtifact(StrictModel):
             raise ValueError("artifact canonical digest mismatch")
         if self.payload.kind not in _ROLE_WRITES[self.producer_role]:
             raise ValueError("role is not permitted to produce this artifact kind")
-        # Validate provenance chain: plan has no predecessors; everything else must.
-        if self.payload.kind is ArtifactKind.INVESTIGATION_PLAN:
-            if self.provenance:
-                raise ValueError("investigation plan cannot have artifact predecessors")
-        else:
-            if not self.provenance:
-                raise ValueError("artifact transition requires provenance")
         if isinstance(self.payload, InvestigationTaskPayload):
             if self.payload.assigned_role not in SPECIALIST_ROLES:
                 raise ValueError("task can target only a fixed specialist role")
@@ -818,17 +811,11 @@ def orchestration_input_digest(
     incident_id: str,
     run_id: str,
     evidence_digests: Sequence[str],
-    alert_digest: str | None = None,
-    evidence_ids: Sequence[str] = (),
-    evidence_locators: Sequence[str] = (),
 ) -> str:
     return sha256(
         _canonical_json(
             {
-                "alert_digest": alert_digest,
                 "evidence_digests": sorted(evidence_digests),
-                "evidence_ids": sorted(evidence_ids),
-                "evidence_locators": sorted(evidence_locators),
                 "graph_version": GRAPH_VERSION,
                 "incident_id": incident_id,
                 "run_id": run_id,

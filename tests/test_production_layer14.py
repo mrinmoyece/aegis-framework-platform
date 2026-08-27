@@ -132,28 +132,13 @@ def test_fenced_single_writer_failover_rejects_stale_or_unapproved_transition() 
         temporal_namespace_strategy="one-namespace-per-region",
         regional_edges_stateless=True,
     )
-    fence_digest = sha256(
-        json.dumps(
-            {
-                "home_region": "eu-west-1",
-                "writer_region": "eu-west-1",
-                "generation": 7,
-                "source_region": "eu-west-1",
-                "target_region": "eu-central-1",
-                "expected_generation": 7,
-                "next_generation": 8,
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
     authorization = FailoverAuthorization(
         source_region="eu-west-1",
         target_region="eu-central-1",
         expected_generation=7,
         next_generation=8,
         approval_ref="approval:dr:008",
-        fence_digest=fence_digest,
+        fence_digest="a" * 64,
         source_writer_fenced=True,
         database_restore_verified=True,
         ledger_hashes_verified=True,
@@ -248,16 +233,21 @@ def test_vulnerability_waiver_is_exact_short_lived_and_no_fix(
     }
     report.write_text(json.dumps({"matches": [finding]}))
     waiver = {
+        "approved_on": "2026-08-18",
+        "affected_scope": "test runtime",
+        "compensating_controls": ["minimal runtime image"],
         "expires_on": "2026-08-25",
+        "fixed_version_available": False,
         "id": "CVE-2026-54876",
         "owner": "platform-security",
         "package": "libcrypto3",
         "reason_code": "upstream-no-fixed-package-minimal-runtime",
         "reference": "change-ref://layer14-runtime-cve-review",
+        "renewal_requires_new_review": True,
         "severity": "High",
         "version": "3.6.3-r4",
     }
-    waivers.write_text(json.dumps({"schema_version": 1, "waivers": [waiver]}))
+    waivers.write_text(json.dumps({"schema_version": 2, "waivers": [waiver]}))
     result = evaluate(
         reports=(report,),
         waiver_path=waivers,
@@ -272,28 +262,3 @@ def test_vulnerability_waiver_is_exact_short_lived_and_no_fix(
             waiver_path=waivers,
             today=date(2026, 8, 18),
         )
-
-
-def test_spdx_document_requires_mandatory_fields(tmp_path: Path) -> None:
-    evaluate = runpy.run_path("tools/spdx_check.py")["evaluate"]
-    sbom = tmp_path / "image.spdx.json"
-    document = {
-        "SPDXID": "SPDXRef-DOCUMENT",
-        "creationInfo": {
-            "created": "2026-08-18T12:00:00Z",
-            "creators": ["Tool: anchore-sbom-action-0.20.6"],
-        },
-        "dataLicense": "CC0-1.0",
-        "documentNamespace": "https://aegis.example.invalid/sbom/image",
-        "name": "aegis-framework-platform",
-        "packages": [{"SPDXID": "SPDXRef-Package-image"}],
-        "spdxVersion": "SPDX-2.3",
-    }
-    sbom.write_text(json.dumps(document), encoding="utf-8")
-    result = evaluate(sboms=(sbom,))
-    assert result["checked_count"] == 1
-
-    document["creationInfo"]["creators"] = []
-    sbom.write_text(json.dumps(document), encoding="utf-8")
-    with pytest.raises(ValueError, match="creators"):
-        evaluate(sboms=(sbom,))

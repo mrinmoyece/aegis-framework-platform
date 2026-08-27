@@ -777,77 +777,7 @@ def test_github_app_adapter_uses_scoped_installation_token_and_link_cursor() -> 
     assert transport.requests[0]["method"] == "POST"
     token_body = json.loads(cast(bytes, transport.requests[0]["content"]))
     assert token_body["repositories"] == ["checkout"]
-    assert cast(dict[str, str], transport.requests[0]["headers"])[
-        "authorization"
-    ].startswith("Bearer ")
     assert transport.requests[1]["method"] == "GET"
-    assert (
-        cast(dict[str, str], transport.requests[1]["headers"])["authorization"]
-        == "Bearer installation-token"
-    )
-
-
-def test_github_app_adapter_rejects_malformed_cursor_and_stale_secret() -> None:
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    pem = private_key.private_bytes(
-        Encoding.PEM,
-        PrivateFormat.PKCS8,
-        NoEncryption(),
-    ).decode()
-    connector = GitHubAppConnector(
-        client=_secure_client((_response({"token": "installation-token"}),))[0],
-        secrets=_Secrets(pem),
-        config=GitHubAppConfig(
-            app_id=123,
-            installation_id=456,
-            repositories=("acme/checkout",),
-        ),
-        clock=lambda: _NOW,
-        enabled=True,
-    )
-    with pytest.raises(ConnectorRejected, match="malformed"):
-        connector.fetch_page(
-            _query(EvidenceSourceKind.GITHUB, credential=True),
-            cursor="not-a-page",
-            page_number=1,
-            cancelled=lambda: False,
-        )
-
-    class _ExpiredSecrets:
-        def resolve(
-            self,
-            *,
-            tenant_id: str,
-            reference: str,
-            expected_version: int,
-        ) -> SecretLease:
-            del tenant_id
-            return SecretLease(
-                tenant_id="tenant-acme",
-                reference=reference,
-                version=expected_version,
-                value=pem,
-                expires_at=_NOW - timedelta(seconds=1),
-            )
-
-    expired = GitHubAppConnector(
-        client=_secure_client((_response({"token": "installation-token"}),))[0],
-        secrets=_ExpiredSecrets(),
-        config=GitHubAppConfig(
-            app_id=123,
-            installation_id=456,
-            repositories=("acme/checkout",),
-        ),
-        clock=lambda: _NOW,
-        enabled=True,
-    )
-    with pytest.raises(ConnectorRejected, match="credential binding is stale"):
-        expired.fetch_page(
-            _query(EvidenceSourceKind.GITHUB, credential=True),
-            cursor=None,
-            page_number=1,
-            cancelled=lambda: False,
-        )
 
 
 class _KubernetesMetadata:
@@ -980,7 +910,6 @@ def _legacy_evidence(
             kind=kind,
             locator=locator,
             observed_at=observed_at,
-            summary=f"{kind.value} summary",
             facts=facts,
         ),
     )

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "methodology": "Fixed synthetic checkout inputs, fixed clocks and deterministic fakes; wall-clock samples are local CI guardrails only. Percentiles use nearest-rank over bounded concurrent batches driven via asyncio.gather. They exclude network, process startup, managed services and production extrapolation.",
+  "methodology": "Fixed synthetic checkout inputs, fixed clocks and deterministic fakes; wall-clock samples are local CI guardrails only. Percentiles use nearest-rank over bounded serial runs. They exclude network, process startup, managed services and production extrapolation.",
   "profiles": [
     {
       "component": "Authenticated API checkout",
@@ -8,9 +8,8 @@
       "runs": 20,
       "status": "Locally Verified",
       "p99_budget_ms": 10000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.2
+      "minimum_serial_iterations_per_second": 0.2,
+      "maximum_error_rate": 0
     },
     {
       "component": "Evidence, LangGraph fanout and model limiter",
@@ -18,59 +17,53 @@
       "runs": 20,
       "status": "Locally Verified",
       "p99_budget_ms": 10000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.2
+      "minimum_serial_iterations_per_second": 0.2,
+      "maximum_error_rate": 0
     },
     {
       "component": "Application ledger, replay and outbox intent",
       "driver": "ledger-replay-outbox",
       "runs": 50,
       "status": "Locally Verified",
-      "p99_budget_ms": 2000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 1
+      "p99_budget_ms": 1000,
+      "minimum_serial_iterations_per_second": 1,
+      "maximum_error_rate": 0
     },
     {
       "component": "Two-person approval, effect ambiguity and reconciliation",
       "driver": "approval-effect-reconciliation",
       "runs": 20,
       "status": "Locally Verified",
-      "p99_budget_ms": 8000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.3
+      "p99_budget_ms": 5000,
+      "minimum_serial_iterations_per_second": 0.3,
+      "maximum_error_rate": 0
     },
     {
       "component": "Sandbox policy and archive quarantine",
       "driver": "sandbox-security-pack",
       "runs": 20,
       "status": "Locally Verified",
-      "p99_budget_ms": 8000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.5
+      "p99_budget_ms": 5000,
+      "minimum_serial_iterations_per_second": 0.5,
+      "maximum_error_rate": 0
     },
     {
       "component": "Memory retrieval, index and context",
       "driver": "memory-retrieval-index-context",
       "runs": 20,
       "status": "Locally Verified",
-      "p99_budget_ms": 8000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.5
+      "p99_budget_ms": 5000,
+      "minimum_serial_iterations_per_second": 0.5,
+      "maximum_error_rate": 0
     },
     {
       "component": "MCP and A2A trust boundary",
       "driver": "protocol-mcp-a2a-pack",
       "runs": 20,
       "status": "Locally Verified",
-      "p99_budget_ms": 8000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.3
+      "p99_budget_ms": 5000,
+      "minimum_serial_iterations_per_second": 0.3,
+      "maximum_error_rate": 0
     },
     {
       "component": "Governed evaluation suite",
@@ -78,9 +71,8 @@
       "runs": 20,
       "status": "Locally Verified",
       "p99_budget_ms": 60000,
-      "maximum_error_rate": 0,
-      "concurrency": 4,
-      "minimum_iterations_per_second": 0.016
+      "minimum_serial_iterations_per_second": 0.016,
+      "maximum_error_rate": 0
     },
     {
       "component": "PostgreSQL and pgvector",

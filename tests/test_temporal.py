@@ -5,12 +5,7 @@ import asyncio
 import pytest
 from pydantic import ValidationError
 from temporalio.api.common.v1 import Payload
-from temporalio.common import RetryPolicy
-from temporalio.exceptions import (
-    ActivityError,
-    ApplicationError,
-    WorkflowAlreadyStartedError,
-)
+from temporalio.exceptions import ApplicationError, WorkflowAlreadyStartedError
 from temporalio.testing import ActivityEnvironment
 from temporalio.worker import WorkerDeploymentConfig
 
@@ -23,14 +18,22 @@ from aegis_framework.durability import (
     OutboxDraft,
 )
 from aegis_framework.errors import (
+    EffectAmbiguous,
+    EffectConflict,
     IntegrityFailure,
     PayloadRejected,
     PolicyDenied,
 )
 from aegis_framework.fixtures import DEMO_TIME
+from aegis_framework.remediation_temporal import (
+    RemediationActivityInput,
+    RemediationActivityOutcome,
+    RemediationSignal,
+    RemediationWorkflowInput,
+    TemporalRemediationActivities,
+)
 from aegis_framework.temporal import (
     ActivityOutcome,
-    AegisInvestigationWorkflow,
     BoundedPayloadCodec,
     TemporalActivities,
     TemporalActivityInput,
@@ -107,13 +110,6 @@ def test_production_temporal_connection_requires_paired_mtls(
                 target_host="private.example.invalid:7233",
                 tls_server_name="private.example.invalid",
                 client_certificate=b"certificate",
-            )
-        )
-    with pytest.raises(ValueError, match="verified server name"):
-        asyncio.run(
-            connect_temporal(
-                target_host="private.example.invalid:7233",
-                api_key="injected",
             )
         )
     with pytest.raises(ValueError, match="verified server name"):
@@ -453,93 +449,122 @@ def test_callback_operations_cover_each_workflow_boundary() -> None:
     ]
 
 
-def test_workflow_failure_recording_threads_failure_code_into_fail_activity() -> None:
-    captured: dict[str, object] = {}
+class _RemediationOperations:
+    def __init__(
+        self,
+        outcome: RemediationActivityOutcome | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.outcome = outcome or RemediationActivityOutcome(outcome="recorded")
+        self.error = error
 
-    async def fake_execute_activity(
-        name: str,
-        value: TemporalActivityInput,
-        *,
-        result_type: type[ActivityOutcome],
-        start_to_close_timeout: object,
-        retry_policy: RetryPolicy,
-    ) -> ActivityOutcome:
-        captured["name"] = name
-        captured["value"] = value
-        captured["result_type"] = result_type
-        captured["timeout"] = start_to_close_timeout
-        captured["retry_policy"] = retry_policy
-        return ActivityOutcome(outcome="recorded")
+    async def _call(
+        self,
+        value: RemediationActivityInput,
+    ) -> RemediationActivityOutcome:
+        del value
+        if self.error is not None:
+            raise self.error
+        return self.outcome
 
-    from aegis_framework import temporal as temporal_module
+    request_approval = _call
+    load_approval_decision = _call
+    preflight = _call
+    execute = _call
+    reconcile = _call
+    verify = _call
+    rollback = _call
+    cancel = _call
+    expire = _call
+    escalate = _call
 
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(
-        temporal_module.workflow, "execute_activity", fake_execute_activity
+
+def _remediation_activity_input() -> RemediationActivityInput:
+    return RemediationActivityInput(
+        tenant_ref="tenant:opaque",
+        actor_ref="actor:opaque",
+        request_ref="request:opaque",
+        run_id="run:opaque",
+        plan_ref="plan:opaque",
+        action_ref="action:opaque",
+        operation_id="operation:opaque",
     )
-    try:
-        recorded = asyncio.run(
-            AegisInvestigationWorkflow._record_failure(
-                TemporalWorkflowInput(
-                    tenant_ref="tenant:opaque",
-                    actor_ref="actor:opaque",
-                    request_ref="request:opaque",
-                    run_id="run:opaque",
-                    workflow_id="workflow:opaque",
-                ),
-                failure_code="authorization_denied",
-            )
-        )
-    finally:
-        monkeypatch.undo()
-
-    assert recorded is True
-    assert captured["name"] == "aegis.fail"
-    recorded_input = captured["value"]
-    assert isinstance(recorded_input, TemporalActivityInput)
-    assert recorded_input.failure_code == "authorization_denied"
 
 
-def test_workflow_failure_recording_fails_closed_when_ledger_write_fails() -> None:
-    async def fake_execute_activity(
-        name: str,
-        value: TemporalActivityInput,
-        *,
-        result_type: type[ActivityOutcome],
-        start_to_close_timeout: object,
-        retry_policy: RetryPolicy,
-    ) -> ActivityOutcome:
-        del name, value, result_type, start_to_close_timeout, retry_policy
-        raise ActivityError(
-            "ledger write failed",
-            scheduled_event_id=1,
-            started_event_id=2,
-            identity="worker:test",
-            activity_type="aegis.fail",
-            activity_id="activity:fail",
-            retry_state=None,
-        )
-
-    from aegis_framework import temporal as temporal_module
-
-    monkeypatch = pytest.MonkeyPatch()
-    monkeypatch.setattr(
-        temporal_module.workflow, "execute_activity", fake_execute_activity
+def test_remediation_temporal_contracts_are_strict_bounded_and_opaque() -> None:
+    value = RemediationWorkflowInput(
+        tenant_ref="tenant:opaque",
+        actor_ref="actor:opaque",
+        request_ref="request:opaque",
+        run_id="run:opaque",
+        plan_ref="plan:opaque",
+        action_ref="action:opaque",
+        workflow_id="workflow:opaque",
     )
-    try:
-        recorded = asyncio.run(
-            AegisInvestigationWorkflow._record_failure(
-                TemporalWorkflowInput(
-                    tenant_ref="tenant:opaque",
-                    actor_ref="actor:opaque",
-                    request_ref="request:opaque",
-                    run_id="run:opaque",
-                    workflow_id="workflow:opaque",
-                ),
-                failure_code="activity_failure",
-            )
+    assert "tenant-acme" not in value.model_dump_json()
+    with pytest.raises(ValidationError):
+        RemediationWorkflowInput.model_validate(
+            {**value.model_dump(), "tenant_id": "tenant-acme"}
         )
-    finally:
-        monkeypatch.undo()
+    with pytest.raises(ValidationError):
+        RemediationSignal(command_ref="forged command")
 
-    assert recorded is False
+
+def test_remediation_activity_wrapper_heartbeats_and_registers_all_boundaries() -> None:
+    activities = TemporalRemediationActivities(
+        _RemediationOperations(
+            RemediationActivityOutcome(outcome="preflight_succeeded")
+        )
+    )
+
+    async def execute() -> tuple[RemediationActivityOutcome, list[object]]:
+        environment = ActivityEnvironment()
+        heartbeats: list[object] = []
+        environment.on_heartbeat = lambda *details: heartbeats.extend(details)
+        result = await environment.run(
+            activities.preflight,
+            _remediation_activity_input(),
+        )
+        return result, heartbeats
+
+    result, heartbeats = asyncio.run(execute())
+    assert result.outcome == "preflight_succeeded"
+    assert heartbeats == ["preflight:started", "preflight:completed"]
+    assert len(activities.registered()) == 10
+
+
+@pytest.mark.parametrize(
+    ("error", "error_type", "returns_ambiguous"),
+    [
+        (PolicyDenied("revoked"), "AuthorizationDenied", False),
+        (EffectConflict("target changed"), "EffectConflict", False),
+        (IntegrityFailure("tampered"), "IntegrityFailure", False),
+        (RuntimeError("adapter defect"), "FrameworkDefect", False),
+        (EffectAmbiguous("timeout"), "", True),
+    ],
+)
+def test_remediation_activity_wrapper_contains_adapter_failures(
+    error: Exception,
+    error_type: str,
+    returns_ambiguous: bool,
+) -> None:
+    activities = TemporalRemediationActivities(_RemediationOperations(error=error))
+
+    async def execute() -> None:
+        environment = ActivityEnvironment()
+        if returns_ambiguous:
+            result = await environment.run(
+                activities.execute,
+                _remediation_activity_input(),
+            )
+            assert result.outcome == "effect_ambiguous"
+            return
+        with pytest.raises(ApplicationError) as raised:
+            await environment.run(
+                activities.execute,
+                _remediation_activity_input(),
+            )
+        assert raised.value.type == error_type
+        assert raised.value.non_retryable is True
+
+    asyncio.run(execute())

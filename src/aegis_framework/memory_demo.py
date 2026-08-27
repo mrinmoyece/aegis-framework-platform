@@ -15,7 +15,6 @@ from aegis_framework.evidence import (
     SourceTrust,
 )
 from aegis_framework.memory import (
-    AuditedMemoryRetrievalControl,
     ContextBudget,
     ControlledEmbeddingGateway,
     DeterministicChunker,
@@ -24,20 +23,17 @@ from aegis_framework.memory import (
     InMemoryHybridIndex,
     InMemoryMemoryControl,
     InMemoryMemoryLedger,
-    InMemoryMemoryOperationLedger,
     LangGraphMemoryContextBuilder,
     MemoryAcceptance,
     MemoryACL,
     MemoryContext,
     MemoryLifecycleService,
     MemoryProjection,
-    MemoryRetrievalService,
     MemoryTier,
     RetentionBinding,
     RetrievalPolicy,
     RetrievalQuery,
     RetrievalResult,
-    deterministic_query_vector,
     memory_record_from_evidence,
 )
 
@@ -47,10 +43,10 @@ DEMO_MEMORY_TIME = datetime(2026, 8, 17, 12, 0, tzinfo=UTC)
 @dataclass(frozen=True)
 class MemoryDemo:
     projection: MemoryProjection
+    query: RetrievalQuery
     retrieval: RetrievalResult
     context: MemoryContext
     control: InMemoryMemoryControl
-    retrieval_service: AuditedMemoryRetrievalControl
 
 
 def run_memory_demo() -> MemoryDemo:
@@ -104,7 +100,6 @@ def run_memory_demo() -> MemoryDemo:
             decision_id="memory-acceptance:demo-001",
             tenant_id=record.tenant_id,
             memory_id=record.memory_id,
-            record_digest=record.canonical_digest,
             disposition="accept",
             reviewer_ref="actor:memory-reviewer",
             reviewer_kind="human",
@@ -146,16 +141,6 @@ def run_memory_demo() -> MemoryDemo:
         ),
     )
     control = InMemoryMemoryControl(ledger=ledger, index=index, dimensions=64)
-    operation_ledger = InMemoryMemoryOperationLedger()
-    retrieval_svc = MemoryRetrievalService(
-        index=index,
-        operations=operation_ledger,
-        clock=lambda: DEMO_MEMORY_TIME,
-    )
-    retrieval_control = AuditedMemoryRetrievalControl(
-        service=retrieval_svc,
-        embed=lambda text: deterministic_query_vector(text, 64),
-    )
     retrieval = control.retrieve(query)
     context = LangGraphMemoryContextBuilder().build(
         result=retrieval,
@@ -172,10 +157,10 @@ def run_memory_demo() -> MemoryDemo:
     )
     return MemoryDemo(
         projection=projection,
+        query=query,
         retrieval=retrieval,
         context=context,
         control=control,
-        retrieval_service=retrieval_control,
     )
 
 

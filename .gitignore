@@ -10,6 +10,10 @@ build/
 .terraform/
 *.tfstate
 *.tfstate.*
+deployment/terraform/**/backend.hcl
+deployment/terraform/**/*.tfvars
+!deployment/terraform/**/*.tfvars.example
+.terraform.tfstate.lock.info
 crash.log
 dist/
 htmlcov/

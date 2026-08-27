@@ -327,3 +327,18 @@ These are explicit non-production boundaries, not implied capabilities.
 - Production UI/BFF OIDC/session, ingress proxy behavior, protocol PKI/partners,
   provider/connectors, telemetry backend, SLO/on-call, load/chaos, penetration,
   accessibility, legal/privacy, and compliance effectiveness remain unproven.
+
+# Layer 16 final-audit limitations
+
+- machine validation proves repository consistency, not the truth of external
+  systems or organizational controls;
+- physical LOC, dependency, service and change counts are disclosed but do not
+  measure developer hours, maintainability, security or production efficiency;
+- deterministic latency profiles use different fixtures, interpreters and sample
+  counts across repositories and cannot support a winner;
+- local rebuild checks do not replace a production-scale export/replacement,
+  managed restore, framework-loss or region-failover rehearsal;
+- no live credentials, real provider/connector/partner traffic, hostile sandbox,
+  production users, managed telemetry history or cloud apply is exercised;
+- no penetration, manual accessibility, privacy/legal, control-effectiveness or
+  certification assessment is claimed.

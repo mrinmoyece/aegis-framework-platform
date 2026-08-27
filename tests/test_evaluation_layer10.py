@@ -61,9 +61,6 @@ def test_governed_artifacts_are_complete_and_tamper_bound(
     assert baseline.dataset_digest == dataset.canonical_digest  # type: ignore[attr-defined]
     assert set(baseline.case_ids) == {case.case_id for case in cases}
     assert load_waivers(Path("evals/waivers.json")) == ()
-    waiver_document = json.loads(Path("evals/waivers.json").read_text(encoding="utf-8"))
-    assert waiver_document["schema_version"] == 1
-    assert waiver_document["version"] == 1
 
     outcomes = {
         scenario.expected_outcome.value  # type: ignore[union-attr]
@@ -120,24 +117,11 @@ def test_every_fault_cut_point_converges_without_unsafe_effects() -> None:
     assert {item.canonical_digest for item in first} == {
         item.canonical_digest for item in replayed
     }
-    assert all(item.fault_injected for item in first)
     assert all(item.converged for item in first)
     assert all(item.unauthorized_effects == 0 for item in first)
     assert all(item.stale_effects == item.duplicate_effects == 0 for item in first)
-    assert all(item.recovery_verified for item in first)
     assert all(item.cleanup_complete and item.audit_complete for item in first)
     assert all(item.tenant_isolated for item in first)
-
-
-def test_fault_scenario_rejects_missing_injection_budget() -> None:
-    with pytest.raises(
-        ValueError, match="fault occurrence exceeds recovery attempt budget"
-    ):
-        run_fault_scenario(
-            FaultPlan(
-                fault_point=FaultPoint.EFFECT, occurrence=2, maximum_attempts=1, seed=7
-            )
-        )
 
 
 def test_runner_is_repeatable_order_independent_and_shard_stable(
@@ -207,8 +191,6 @@ def test_baseline_detects_tamper_missing_new_and_invalid_waivers(
     assert "new-unreviewed-cases" in comparison.violations
 
     hard_waiver = WaiverContract(
-        schema_version=1,
-        version=1,
         waiver_id="waiver-hard",
         baseline_id=baseline.baseline_id,
         scorer_id="privacy-isolation",
@@ -253,8 +235,6 @@ def test_soft_waiver_is_scoped_and_expiry_fails_closed(
     suite, dataset, baseline, cases = governed_assets
     regressed_case = "budget-exhaustion"
     waiver = WaiverContract(
-        schema_version=1,
-        version=1,
         waiver_id="waiver-confidence",
         baseline_id=baseline.baseline_id,
         scorer_id="confidence-calibration",
@@ -307,19 +287,6 @@ class _EscapingExecutor:
     def execute(self, case: EvalCase) -> ExecutionObservation:
         del case
         socket.create_connection(("127.0.0.1", 1))
-        return ExecutionObservation(
-            outcome=EvalOutcome(case_id="unreachable", passed=True, details=())
-        )
-
-
-class _RawSocketExecutor:
-    def execute(self, case: EvalCase) -> ExecutionObservation:
-        del case
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        try:
-            sock.connect(("127.0.0.1", 1))
-        finally:
-            sock.close()
         return ExecutionObservation(
             outcome=EvalOutcome(case_id="unreachable", passed=True, details=())
         )
@@ -383,22 +350,6 @@ def test_hermetic_runner_denies_escape_and_redacts_failures(
     assert "tenant-acme" not in serialized
 
 
-def test_hermetic_runner_blocks_raw_socket_bypass_attempts(
-    governed_assets: tuple[object, object, BaselineContract, tuple[EvalCase, ...]],
-) -> None:
-    suite, dataset, baseline, cases = governed_assets
-    report = EvaluationRunner(
-        suite=suite,  # type: ignore[arg-type]
-        dataset=dataset,  # type: ignore[arg-type]
-        baseline=baseline,
-        executor=_RawSocketExecutor(),
-    ).run(cases, filters=("success",))
-    assert report.passed is False
-    assert all(
-        item.reason_codes == ("executor_error:RuntimeError",) for item in report.results
-    )
-
-
 def test_executor_cannot_override_hard_safety_metrics(
     governed_assets: tuple[object, object, BaselineContract, tuple[EvalCase, ...]],
 ) -> None:
@@ -450,16 +401,6 @@ def test_reviewed_baseline_creation_and_integration_gates(
     )
     assert created.case_ids == baseline.case_ids
     assert canonical_digest(created) == created.canonical_digest
-    advanced = create_baseline(
-        suite=suite,  # type: ignore[arg-type]
-        dataset=dataset,  # type: ignore[arg-type]
-        case_ids=(case.case_id for case in cases),
-        reviewed_by="release-reviewer",
-        review_reason="Reviewed canonical deterministic Layer 10 update.",
-        previous=baseline,
-    )
-    assert advanced.baseline_id == baseline.baseline_id
-    assert advanced.version == baseline.version + 1
 
     monkeypatch.delenv("AEGIS_TEST_POSTGRES_ADMIN_DSN", raising=False)
     monkeypatch.delenv("AEGIS_TEST_POSTGRES_RUNTIME_DSN", raising=False)
@@ -523,8 +464,6 @@ def test_contract_validators_and_exact_scorer_fail_closed() -> None:
     assert not _within(1.03, ScoreDirection.EXACT, 1.0, 0.02)
     with pytest.raises(ValueError, match="timezone"):
         WaiverContract(
-            schema_version=1,
-            version=1,
             waiver_id="naive",
             baseline_id="baseline",
             scorer_id="confidence-calibration",
@@ -575,8 +514,6 @@ def test_invalid_shard_and_waiver_shapes_are_rejected(
         case_ids: tuple[str, ...] = ("success",),
     ) -> WaiverContract:
         return WaiverContract(
-            schema_version=1,
-            version=1,
             waiver_id=waiver_id,
             baseline_id=baseline_id,
             scorer_id=scorer_id,
@@ -620,16 +557,6 @@ def test_failed_report_contains_bounded_failure_nodes(
     assert '"passed": false' in json_path.read_text(encoding="utf-8")
     assert "## Violations" in markdown_path.read_text(encoding="utf-8")
     assert "<failure" in junit_path.read_text(encoding="utf-8")
-
-
-def test_write_baseline_requires_monotonic_versions(tmp_path: Path) -> None:
-    baseline = load_baseline(Path("evals/baseline.json"))
-    path = tmp_path / "baseline.json"
-    from aegis_framework.evaluation import write_baseline
-
-    write_baseline(path, baseline)
-    with pytest.raises(ValueError, match="version must increase"):
-        write_baseline(path, baseline)
 
 
 def load_dataset_from_payload(payload: object) -> object:

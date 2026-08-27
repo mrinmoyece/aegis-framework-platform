@@ -93,10 +93,6 @@ class InvestigationInProgress(AegisFrameworkError):
     pass
 
 
-class OptionalDependencyMissing(AegisFrameworkError):
-    pass
-
-
 class ConcurrencyConflict(AegisFrameworkError):
     pass
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Mapping
-from contextlib import suppress
 from dataclasses import dataclass
 from enum import StrEnum
 from threading import Lock
@@ -18,11 +17,10 @@ from fastapi import (
     HTTPException,
     Path,
     Query,
-    Request,
     status,
 )
 from pydantic import Field, TypeAdapter, ValidationError
-from starlette.responses import JSONResponse, PlainTextResponse
+from starlette.responses import PlainTextResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from aegis_framework.access import (
@@ -125,7 +123,6 @@ from aegis_framework.telemetry import (
 )
 
 _IDENTIFIER_ADAPTER = TypeAdapter(Identifier)
-_METRICS_ELIGIBLE_STATE_KEY = "aegis_metrics_eligible"
 
 
 class AppMode(StrEnum):
@@ -135,6 +132,7 @@ class AppMode(StrEnum):
 
 
 class ApiInvestigationRequest(StrictModel):
+    scenario: DemoScenario = DemoScenario.SUCCESS
     incident_id: Identifier
     alert: CheckoutAlert
 
@@ -386,33 +384,26 @@ class TelemetryMiddleware:
         try:
             await self._app(scope, receive, observed_send)
         finally:
-            state = scope.get("state")
-            if (
-                isinstance(state, dict)
-                and state.get(_METRICS_ELIGIBLE_STATE_KEY) is True
-            ):
-                if response_status < 300:
-                    metric_status = "ok"
-                elif response_status < 500:
-                    metric_status = "denied"
-                else:
-                    metric_status = "error"
-                elapsed = max(0.0, monotonic() - started)
-                with suppress(Exception):
-                    self._metrics.record(
-                        "aegis_operations_total",
-                        1,
-                        labels={
-                            "component": "api",
-                            "operation": "request",
-                            "status": metric_status,
-                        },
-                    )
-                    self._metrics.record(
-                        "aegis_operation_duration_seconds",
-                        elapsed,
-                        labels={"component": "api", "operation": "request"},
-                    )
+            metric_status = "ok" if response_status < 500 else "error"
+            elapsed = max(0.0, monotonic() - started)
+            try:
+                self._metrics.record(
+                    "aegis_operations_total",
+                    1,
+                    labels={
+                        "component": "api",
+                        "operation": "request",
+                        "status": metric_status,
+                    },
+                )
+                self._metrics.record(
+                    "aegis_operation_duration_seconds",
+                    elapsed,
+                    labels={"component": "api", "operation": "request"},
+                )
+            except ValueError:
+                # Telemetry faults are contained; delivery correctness remains primary.
+                pass
 
 
 @dataclass(frozen=True)
@@ -493,9 +484,8 @@ def create_app(
 
     app = FastAPI(
         title="Aegis Framework Platform",
-        version="0.15.0",
-        description="Authenticated Layer 15 enterprise qualification API.",
-        default_response_class=JSONResponse,
+        version="0.16.0",
+        description="Authenticated Layer 16 enterprise hardening.",
     )
     app.add_middleware(BodySizeLimitMiddleware, maximum_bytes=maximum_body_bytes)
     app.add_middleware(OperatorSecurityHeadersMiddleware)
@@ -505,7 +495,6 @@ def create_app(
     app.add_middleware(TelemetryMiddleware, metrics=metrics)
 
     def authenticated(
-        request: Request,
         authorization: Annotated[str | None, Header(alias="Authorization")] = None,
         x_request_id: Annotated[str | None, Header(alias="X-Request-ID")] = None,
         x_trace_id: Annotated[str | None, Header(alias="X-Trace-ID")] = None,
@@ -539,13 +528,11 @@ def create_app(
             else x_trace_id or stable_id("trace", x_request_id)
         )
         try:
-            identity = selected_runtime.authenticator.authenticate(
+            return selected_runtime.authenticator.authenticate(
                 bearer_token=token,
                 request_id=x_request_id,
                 trace_id=trace_id,
             )
-            request.state.aegis_metrics_eligible = True
-            return identity
         except AuthenticationFailed as exc:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -553,11 +540,6 @@ def create_app(
                 headers={"WWW-Authenticate": "Bearer"},
             ) from exc
         except IdentityUnavailable as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="identity service is unavailable",
-            ) from exc
-        except RepositoryUnavailable as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="identity service is unavailable",
@@ -584,17 +566,6 @@ def create_app(
     def readiness() -> ReadinessResponse:
         identity_ready = selected_runtime.authenticator.ready()
         governance_ready = selected_runtime.governance.ready()
-        with suppress(Exception):
-            metrics.record(
-                "aegis_dependency_ready",
-                1.0 if identity_ready else 0.0,
-                labels={"dependency": "identity", "criticality": "correctness"},
-            )
-            metrics.record(
-                "aegis_dependency_ready",
-                1.0 if governance_ready else 0.0,
-                labels={"dependency": "governance", "criticality": "correctness"},
-            )
         if not selected_runtime.ready():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -626,7 +597,7 @@ def create_app(
 
     @app.get("/v1/tenants/{tenant_id}", response_model=TenantRecord)
     def tenant(
-        tenant_id: Annotated[Identifier, Path()],
+        tenant_id: Annotated[str, Path(min_length=1, max_length=128)],
         identity: IdentityContext = Depends(authenticated),
     ) -> TenantRecord:
         _authorize_resource(
@@ -1038,26 +1009,10 @@ def create_app(
                 detail="approval decision conflicts with current state",
             ) from exc
         except IntegrityFailure as exc:
-            with suppress(Exception):
-                metrics.record(
-                    "aegis_safety_violations_total",
-                    1,
-                    labels={"control": "integrity", "severity": "ticket"},
-                )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="approval is already terminal",
             ) from exc
-        with suppress(Exception):
-            metrics.record(
-                "aegis_operations_total",
-                1,
-                labels={
-                    "component": "api",
-                    "operation": "approval.decide",
-                    "status": "ok",
-                },
-            )
         return _approval_view(view)
 
     @app.post(
@@ -1104,12 +1059,17 @@ def create_app(
         payload: ApiInvestigationRequest,
         identity: IdentityContext = Depends(authenticated),
     ) -> InvestigationResult:
+        if mode is AppMode.PRODUCTION and payload.scenario is not DemoScenario.SUCCESS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="scenario selection is unavailable",
+            )
         request = InvestigationRequest(
             incident_id=payload.incident_id,
             alert=payload.alert,
         )
         try:
-            return selected_runtime.service_for(DemoScenario.SUCCESS).investigate(
+            return selected_runtime.service_for(payload.scenario).investigate(
                 identity, request
             )
         except PolicyDenied as exc:
@@ -1163,16 +1123,6 @@ def create_app(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="durable investigation failed safely",
             ) from exc
-        with suppress(Exception):
-            metrics.record(
-                "aegis_operations_total",
-                1,
-                labels={
-                    "component": "api",
-                    "operation": "investigation.submit",
-                    "status": "ok",
-                },
-            )
         return _durable_response(result)
 
     @app.get(
@@ -1188,11 +1138,6 @@ def create_app(
             result = durable.get(identity, run_id=run_id)
         except PolicyDenied:
             _not_found()
-        except AegisFrameworkError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="durable investigation failed safely",
-            ) from exc
         if result is None:
             _not_found()
         return _durable_response(result)
@@ -1223,11 +1168,6 @@ def create_app(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="timeline cursor is invalid",
-            ) from exc
-        except AegisFrameworkError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="durable investigation failed safely",
             ) from exc
 
     @app.get("/v1/operations/slos", response_model=SloCatalogResponse)
@@ -1360,29 +1300,21 @@ def create_app(
             Action.PROJECTION_REBUILD,
             resource_tenant_id=identity.tenant_id,
         )
-        # Persist audit intent before mutation (intent-before-side-effect).
-        _audit_operational_access(
-            selected_runtime,
-            identity,
-            operation="projection_rebuild",
-            record_count=1,
-            event_type="operations.rebuild",
-        )
         try:
             result = durable.rebuild_projection(identity, run_id=run_id)
         except (PolicyDenied, ValueError):
             _not_found()
         except IntegrityFailure as exc:
-            with suppress(Exception):
-                metrics.record(
-                    "aegis_safety_violations_total",
-                    1,
-                    labels={"control": "ledger", "severity": "ticket"},
-                )
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="ledger projection integrity failed",
             ) from exc
+        _audit_operational_access(
+            selected_runtime,
+            identity,
+            operation="projection_rebuild",
+            record_count=1,
+        )
         return _durable_response(result)
 
     @app.post(
@@ -1433,31 +1365,6 @@ def create_app(
 def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
     if budget_units < 5:
         raise ValueError("API demo budget must permit at least one investigation")
-
-    class _DemoOperatorAudit:
-        """Bounded in-memory audit log for demo and test environments."""
-
-        _MAX_ENTRIES = 10_000
-
-        def __init__(self) -> None:
-            self._entries: list[tuple[str, str, Mapping[str, str | int | bool]]] = []
-            self._lock = Lock()
-
-        def append(
-            self,
-            *,
-            identity: IdentityContext,
-            event_type: str,
-            attributes: Mapping[str, str | int | bool],
-        ) -> None:
-            with self._lock:
-                if len(self._entries) >= self._MAX_ENTRIES:
-                    self._entries.pop(0)
-                self._entries.append(
-                    (identity.subject_id, event_type, dict(attributes))
-                )
-
-    operator_audit = _DemoOperatorAudit()
     bundles: dict[DemoScenario, DemoBundle] = {}
     bundle_lock = Lock()
 
@@ -1479,7 +1386,6 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
 
     primary = bundle_for(DemoScenario.SUCCESS)
     from aegis_framework.adapters import FixedClock
-    from aegis_framework.durability import CursorCodec, DurableInvestigationService
     from aegis_framework.fixtures import DEMO_TIME
 
     durable_store = InMemoryDurability(clock=FixedClock(DEMO_TIME))
@@ -1503,10 +1409,7 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         authenticator=primary.authenticator,
         governance=primary.governance,
         policy=primary.policy,
-        # Use the primary bundle's service for all API requests so budget
-        # and idempotency state are shared at the app boundary — scenario
-        # selection is server-side configuration, not caller-selectable.
-        service_for=lambda _scenario: primary.service,
+        service_for=lambda scenario: bundle_for(scenario).service,
         durable=DurableInvestigationService(
             policy=primary.policy,
             store=durable_store,
@@ -1520,8 +1423,9 @@ def _build_demo_runtime(*, budget_units: int) -> ApiRuntime:
         ),
         approvals=remediation_demo.approvals,
         memory_status_control=memory_demo.control,
-        memory_retrieval_control=memory_demo.retrieval_service,
-        operator_audit=operator_audit,
+        memory_retrieval_control=memory_demo.control,
+        operator_audit=primary.audit,
+        metrics=MetricRegistry(),
     )
 
 
@@ -1748,22 +1652,6 @@ def _require_sandbox_control(runtime: ApiRuntime) -> SandboxReadPort:
     return runtime.sandbox_control
 
 
-def _memory_view(projection: MemoryProjection) -> MemoryApiView:
-    return MemoryApiView(
-        memory_ref=projection.memory_id,
-        tier=projection.tier.value,
-        status=projection.status.value,
-        version=projection.version,
-        record_digest=projection.record_digest,
-        chunk_count=projection.chunk_count,
-        indexed=projection.indexed,
-        tombstoned=projection.tombstoned,
-        legal_hold_count=projection.legal_hold_count,
-        derived_purged=projection.derived_purged,
-        blob_erased=projection.blob_erased,
-    )
-
-
 def _require_memory_status_control(runtime: ApiRuntime) -> MemoryStatusPort:
     if runtime.memory_status_control is None:
         raise HTTPException(
@@ -1797,35 +1685,51 @@ def _approval_view(value: ApprovalView) -> ApprovalApiView:
     )
 
 
-def _sandbox_view(projection: SandboxProjection) -> SandboxApiView:
+def _sandbox_view(value: SandboxProjection) -> SandboxApiView:
     return SandboxApiView(
-        execution_ref=projection.execution_id,
-        run_ref=projection.run_id,
-        task_ref=projection.task_id,
-        status=projection.status.value,
-        version=projection.version,
-        request_digest=projection.request_digest,
-        spec_digest=projection.spec_digest,
-        policy_digest=projection.policy_digest,
-        approval_digest=projection.approval_digest,
-        result_digest=projection.result_digest,
-        manifest_digest=projection.manifest_digest,
-        attestation_digest=projection.attestation_digest,
-        cleanup_complete=projection.cleanup_complete,
+        execution_ref=value.execution_id,
+        run_ref=value.run_id,
+        task_ref=value.task_id,
+        status=value.status.value,
+        version=value.version,
+        request_digest=value.request_digest,
+        spec_digest=value.spec_digest,
+        policy_digest=value.policy_digest,
+        approval_digest=value.approval_digest,
+        result_digest=value.result_digest,
+        manifest_digest=value.manifest_digest,
+        attestation_digest=value.attestation_digest,
+        cleanup_complete=value.cleanup_complete,
     )
 
 
-def _sandbox_artifact_view(item: ArtifactRecord) -> SandboxArtifactApiView:
+def _sandbox_artifact_view(value: ArtifactRecord) -> SandboxArtifactApiView:
     return SandboxArtifactApiView(
-        artifact_ref=item.artifact_id,
-        logical_path=item.logical_path,
-        media_type=item.media_type,
-        content_hash=item.content_hash,
-        size_bytes=item.size_bytes,
-        disposition=item.disposition.value,
-        redaction_count=item.redaction_count,
-        scanner_codes=item.scanner_codes,
-        retention_expires_at=item.retention_expires_at.isoformat(),
+        artifact_ref=value.artifact_id,
+        logical_path=value.logical_path,
+        media_type=value.media_type,
+        content_hash=value.content_hash,
+        size_bytes=value.size_bytes,
+        disposition=value.disposition.value,
+        redaction_count=value.redaction_count,
+        scanner_codes=value.scanner_codes,
+        retention_expires_at=value.retention_expires_at.isoformat(),
+    )
+
+
+def _memory_view(value: MemoryProjection) -> MemoryApiView:
+    return MemoryApiView(
+        memory_ref=value.memory_id,
+        tier=value.tier.value,
+        status=value.status.value,
+        version=value.version,
+        record_digest=value.record_digest,
+        chunk_count=value.chunk_count,
+        indexed=value.indexed,
+        tombstoned=value.tombstoned,
+        legal_hold_count=value.legal_hold_count,
+        derived_purged=value.derived_purged,
+        blob_erased=value.blob_erased,
     )
 
 
@@ -1844,16 +1748,8 @@ def _authorize_resource(
             purpose="incident-response",
             risk=RiskLevel.LOW,
         )
-    except (IdentityUnavailable, RepositoryUnavailable) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="authorization service is unavailable",
-        ) from exc
-    except AegisFrameworkError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="authorization failed safely",
-        ) from exc
+    except AegisFrameworkError:
+        _not_found()
     if not decision.allowed:
         _not_found()
 
@@ -1864,7 +1760,6 @@ def _audit_operational_access(
     *,
     operation: str,
     record_count: int,
-    event_type: str = "operations.read",
 ) -> None:
     if runtime.operator_audit is None:
         raise HTTPException(
@@ -1874,7 +1769,7 @@ def _audit_operational_access(
     try:
         runtime.operator_audit.append(
             identity=identity,
-            event_type=event_type,
+            event_type="operations.read",
             attributes={
                 "operation": operation,
                 "record_count": record_count,

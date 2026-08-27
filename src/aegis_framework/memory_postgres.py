@@ -387,73 +387,10 @@ class PostgresMemoryStore:
             ) as connection:
                 rows = connection.execute(
                     """
-                    WITH vector_cands AS (
+                    WITH filtered AS (
                         SELECT chunk.memory_id, chunk.chunk_id, chunk.ordinal,
                                chunk.chunk_text, chunk.content_digest,
-                               chunk.citation_document, chunk.embedding
-                        FROM aegis.memory_chunks AS chunk
-                        JOIN aegis.memory_projections AS projection
-                          ON projection.tenant_id = chunk.tenant_id
-                         AND projection.memory_id = chunk.memory_id
-                        WHERE chunk.tenant_id = %s
-                          AND projection.status IN ('accepted', 'active')
-                          AND NOT projection.tombstoned
-                          AND chunk.classification = ANY(%s)
-                          AND chunk.accepted_at <= %s
-                          AND chunk.expires_at > %s
-                          AND (
-                              (
-                                  jsonb_array_length(chunk.acl_document->'roles') = 0
-                                  AND jsonb_array_length(
-                                      chunk.acl_document->'principals'
-                                  ) = 0
-                              )
-                              OR chunk.acl_document->'roles' ?| %s
-                              OR chunk.acl_document->'principals' ? %s
-                          )
-                        ORDER BY chunk.embedding <=> %s::vector
-                        LIMIT %s
-                    ),
-                    lexical_cands AS (
-                        SELECT chunk.memory_id, chunk.chunk_id, chunk.ordinal,
-                               chunk.chunk_text, chunk.content_digest,
-                               chunk.citation_document, chunk.embedding
-                        FROM aegis.memory_chunks AS chunk
-                        JOIN aegis.memory_projections AS projection
-                          ON projection.tenant_id = chunk.tenant_id
-                         AND projection.memory_id = chunk.memory_id
-                        WHERE chunk.tenant_id = %s
-                          AND projection.status IN ('accepted', 'active')
-                          AND NOT projection.tombstoned
-                          AND chunk.classification = ANY(%s)
-                          AND chunk.accepted_at <= %s
-                          AND chunk.expires_at > %s
-                          AND (
-                              (
-                                  jsonb_array_length(chunk.acl_document->'roles') = 0
-                                  AND jsonb_array_length(
-                                      chunk.acl_document->'principals'
-                                  ) = 0
-                              )
-                              OR chunk.acl_document->'roles' ?| %s
-                              OR chunk.acl_document->'principals' ? %s
-                          )
-                          AND chunk.lexical @@ plainto_tsquery('simple', %s)
-                        ORDER BY ts_rank_cd(
-                            chunk.lexical, plainto_tsquery('simple', %s), 32
-                        ) DESC
-                        LIMIT %s
-                    ),
-                    combined AS (
-                        SELECT DISTINCT ON (memory_id, chunk_id) *
-                        FROM (
-                            SELECT * FROM vector_cands
-                            UNION ALL
-                            SELECT * FROM lexical_cands
-                        ) t
-                    ),
-                    scored AS (
-                        SELECT c.*,
+                               chunk.citation_document, chunk.embedding,
                                ts_rank_cd(
                                    chunk.lexical,
                                    plainto_tsquery('simple', %s),
@@ -464,7 +401,7 @@ class PostgresMemoryStore:
                                    least(
                                        1.0,
                                        1.0 - (
-                                           c.embedding <=> %s::vector
+                                           chunk.embedding <=> %s::vector
                                        ) / 2.0
                                    )
                                ) AS vector_score,
@@ -479,13 +416,30 @@ class PostgresMemoryStore:
                                ) AS recency_score,
                                (chunk.quality + chunk.confidence) / 2.0
                                    AS quality_score
-                        FROM combined c
-                        JOIN aegis.memory_chunks AS chunk
-                          ON chunk.tenant_id = %s
-                         AND chunk.memory_id = c.memory_id
-                         AND chunk.chunk_id = c.chunk_id
+                        FROM aegis.memory_chunks AS chunk
+                        JOIN aegis.memory_projections AS projection
+                          ON projection.tenant_id = chunk.tenant_id
+                         AND projection.memory_id = chunk.memory_id
+                        WHERE chunk.tenant_id = %s
+                          AND projection.status IN ('accepted', 'active')
+                          AND NOT projection.tombstoned
+                          AND chunk.classification = ANY(%s)
+                          AND chunk.accepted_at <= %s
+                          AND chunk.expires_at > %s
+                          AND (
+                              (
+                                  jsonb_array_length(
+                                      chunk.acl_document->'roles'
+                                  ) = 0
+                                  AND jsonb_array_length(
+                                      chunk.acl_document->'principals'
+                                  ) = 0
+                              )
+                              OR chunk.acl_document->'roles' ?| %s
+                              OR chunk.acl_document->'principals' ? %s
+                          )
                     ),
-                    reranked AS (
+                    scored AS (
                         SELECT *,
                                least(
                                    1.0,
@@ -497,49 +451,35 @@ class PostgresMemoryStore:
                                        + quality_score * %s
                                    )
                                ) AS combined_score
-                        FROM scored
+                        FROM filtered
                     )
                     SELECT memory_id, chunk_id, ordinal, chunk_text,
                            content_digest, citation_document,
                            embedding::text AS embedding,
                            lexical_score, vector_score, recency_score,
                            quality_score, combined_score
-                    FROM reranked
+                    FROM scored
                     ORDER BY combined_score DESC, memory_id, ordinal, chunk_id
                     LIMIT %s
                     """,
                     (
-                        # vector_cands params
-                        query.tenant_id,
-                        [c.value for c in query.allowed_classifications],
-                        query.as_of,
-                        query.as_of,
-                        list(query.roles),
-                        query.principal_ref,
-                        vector_literal,
-                        query.policy.maximum_candidates,
-                        # lexical_cands params
-                        query.tenant_id,
-                        [c.value for c in query.allowed_classifications],
-                        query.as_of,
-                        query.as_of,
-                        list(query.roles),
-                        query.principal_ref,
-                        query.text,
-                        query.text,
-                        query.policy.maximum_candidates,
-                        # scored params
                         query.text,
                         vector_literal,
                         query.as_of,
                         query.policy.freshness_seconds,
                         query.tenant_id,
-                        # reranked params
+                        [
+                            classification.value
+                            for classification in query.allowed_classifications
+                        ],
+                        query.as_of,
+                        query.as_of,
+                        list(query.roles),
+                        query.principal_ref,
                         query.policy.lexical_weight,
                         query.policy.vector_weight,
                         query.policy.recency_weight,
                         query.policy.quality_weight,
-                        # final limit
                         query.policy.maximum_candidates,
                     ),
                 ).fetchall()
@@ -563,34 +503,6 @@ class PostgresMemoryStore:
                 self._pool,
                 tenant_id=fact.tenant_id,
             ) as connection:
-                # Lock the operation aggregate so concurrent inserts cannot
-                # create sequence gaps.
-                max_row = connection.execute(
-                    """
-                    SELECT COALESCE(MAX(sequence), 0) AS max_seq
-                    FROM aegis.memory_operation_facts
-                    WHERE tenant_id = %s AND operation_id = %s
-                    """,
-                    (fact.tenant_id, fact.operation_id),
-                ).fetchone()
-                current_max = max_row["max_seq"] if max_row else 0
-                if fact.sequence <= current_max:
-                    # Possible replay — verify digest matches.
-                    existing = connection.execute(
-                        """
-                        SELECT fact_digest
-                        FROM aegis.memory_operation_facts
-                        WHERE tenant_id = %s
-                          AND operation_id = %s
-                          AND sequence = %s
-                        """,
-                        (fact.tenant_id, fact.operation_id, fact.sequence),
-                    ).fetchone()
-                    if existing is None or existing["fact_digest"] != fact.fact_digest:
-                        raise IdempotencyConflict("memory operation replay changed")
-                    return
-                if fact.sequence != current_max + 1:
-                    raise ConcurrencyConflict("memory operation sequence changed")
                 connection.execute(
                     """
                     INSERT INTO aegis.memory_operation_facts (
@@ -599,6 +511,7 @@ class PostgresMemoryStore:
                         fact_digest, recorded_at
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (tenant_id, operation_id, sequence) DO NOTHING
                     """,
                     (
                         fact.tenant_id,
@@ -614,7 +527,19 @@ class PostgresMemoryStore:
                         fact.recorded_at,
                     ),
                 )
-        except (IdempotencyConflict, ConcurrencyConflict):
+                row = connection.execute(
+                    """
+                    SELECT fact_digest
+                    FROM aegis.memory_operation_facts
+                    WHERE tenant_id = %s
+                      AND operation_id = %s
+                      AND sequence = %s
+                    """,
+                    (fact.tenant_id, fact.operation_id, fact.sequence),
+                ).fetchone()
+                if row is None or row["fact_digest"] != fact.fact_digest:
+                    raise IdempotencyConflict("memory operation replay changed")
+        except IdempotencyConflict:
             raise
         except Exception as exc:
             raise RepositoryUnavailable("memory operation persistence failed") from exc

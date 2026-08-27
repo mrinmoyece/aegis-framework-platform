@@ -8,7 +8,7 @@ from contextlib import suppress
 from datetime import UTC, datetime, timedelta
 from typing import Literal, Protocol
 
-from pydantic import Field, ValidationError
+from pydantic import ValidationError
 from temporalio import activity, workflow
 from temporalio.api.common.v1 import Payload
 from temporalio.client import Client, PayloadLimitsConfig, TLSConfig
@@ -71,7 +71,7 @@ class TemporalWorkflowInput(StrictModel):
     run_id: Identifier
     workflow_id: Identifier
     wait_for_signal: bool = False
-    wait_timeout_seconds: int = Field(default=3_600, ge=1, le=86_400)
+    wait_timeout_seconds: int = 3_600
 
 
 class TemporalActivityInput(StrictModel):
@@ -81,7 +81,6 @@ class TemporalActivityInput(StrictModel):
     run_id: Identifier
     operation_id: Identifier
     command_ref: Identifier | None = None
-    failure_code: Identifier | None = None
 
 
 class TemporalSignal(StrictModel):
@@ -301,23 +300,19 @@ class AegisInvestigationWorkflow:
                     cancelled = None
                 if cancelled is not None:
                     return cancelled
-            failure_code = _activity_failure_code(exc)
-            if not await self._record_failure(value, failure_code=failure_code):
-                raise
+            await self._record_failure(value)
             return TemporalWorkflowResult(
                 run_id=value.run_id,
                 status=RunStatus.FAILED,
-                failure_code=failure_code,
+                failure_code=_activity_failure_code(exc),
             )
         except ApplicationError as exc:
             self._stage = "failed"
-            failure_code = _application_failure_code(exc)
-            if not await self._record_failure(value, failure_code=failure_code):
-                raise
+            await self._record_failure(value)
             return TemporalWorkflowResult(
                 run_id=value.run_id,
                 status=RunStatus.FAILED,
-                failure_code=failure_code,
+                failure_code=_application_failure_code(exc),
             )
 
     @workflow.signal(name="resume")
@@ -409,7 +404,6 @@ class AegisInvestigationWorkflow:
         operation: str,
         *,
         command_ref: str | None = None,
-        failure_code: str | None = None,
     ) -> TemporalActivityInput:
         return TemporalActivityInput(
             tenant_ref=value.tenant_ref,
@@ -418,30 +412,21 @@ class AegisInvestigationWorkflow:
             run_id=value.run_id,
             operation_id=f"{operation}:{value.run_id}",
             command_ref=command_ref,
-            failure_code=failure_code,
         )
 
     @staticmethod
-    async def _record_failure(
-        value: TemporalWorkflowInput, *, failure_code: str
-    ) -> bool:
+    async def _record_failure(value: TemporalWorkflowInput) -> None:
         try:
-            result = await workflow.execute_activity(
+            await workflow.execute_activity(
                 "aegis.fail",
-                AegisInvestigationWorkflow._input(
-                    value,
-                    "fail",
-                    failure_code=failure_code,
-                ),
+                AegisInvestigationWorkflow._input(value, "fail"),
                 result_type=ActivityOutcome,
                 start_to_close_timeout=timedelta(seconds=30),
                 retry_policy=RetryPolicy(maximum_attempts=1),
             )
-            outcome = ActivityOutcome.model_validate(result)
-            return outcome.outcome in {"recorded", "duplicate"}
         except ActivityError:
             # The application remains non-terminal for explicit operator reconciliation.
-            return False
+            return
 
 
 class TemporalActivities:
@@ -671,41 +656,28 @@ class TemporalOutboxDispatcher:
 
     async def _deliver(self, claim: DeliveryClaim) -> None:
         payload = claim.payload
-
-        def _str(key: str) -> str:
-            val = payload.get(key)
-            if not isinstance(val, str):
-                raise PayloadRejected(f"outbox payload field '{key}' must be a string")
-            return val
-
-        def _bool(key: str) -> bool:
-            val = payload.get(key)
-            if not isinstance(val, bool):
-                raise PayloadRejected(f"outbox payload field '{key}' must be a boolean")
-            return val
-
         if claim.message_type == "investigation.start":
             await self._temporal.start(
                 TemporalWorkflowInput(
-                    tenant_ref=_str("tenant_ref"),
-                    actor_ref=_str("actor_ref"),
-                    request_ref=_str("request_ref"),
-                    run_id=_str("run_id"),
-                    workflow_id=_str("workflow_id"),
-                    wait_for_signal=_bool("wait_for_signal"),
+                    tenant_ref=str(payload["tenant_ref"]),
+                    actor_ref=str(payload["actor_ref"]),
+                    request_ref=str(payload["request_ref"]),
+                    run_id=str(payload["run_id"]),
+                    workflow_id=str(payload["workflow_id"]),
+                    wait_for_signal=bool(payload["wait_for_signal"]),
                 )
             )
             return
         if claim.message_type == "investigation.resume_requested":
             await self._temporal.resume(
-                workflow_id=_str("workflow_id"),
-                command_ref=_str("command_ref"),
+                workflow_id=str(payload["workflow_id"]),
+                command_ref=str(payload["command_ref"]),
             )
             return
         if claim.message_type == "investigation.cancel_requested":
             await self._temporal.request_cancel(
-                workflow_id=_str("workflow_id"),
-                command_ref=_str("command_ref"),
+                workflow_id=str(payload["workflow_id"]),
+                command_ref=str(payload["command_ref"]),
             )
             return
         raise PayloadRejected("outbox message type is not supported")
@@ -777,14 +749,11 @@ async def connect_temporal(
     if (client_certificate is None) != (client_private_key is None):
         raise ValueError("Temporal mTLS certificate and private key must be paired")
     if tls_server_name is None and (
-        api_key is not None
-        or server_root_ca_cert is not None
+        server_root_ca_cert is not None
         or client_certificate is not None
         or client_private_key is not None
     ):
-        raise ValueError(
-            "Temporal authenticated transport requires a verified server name"
-        )
+        raise ValueError("Temporal TLS material requires a verified server name")
     tls = (
         TLSConfig(
             server_root_ca_cert=server_root_ca_cert,
@@ -795,9 +764,6 @@ async def connect_temporal(
         if tls_server_name is not None
         else None
     )
-    # Prevent credentials from travelling over an unencrypted channel.
-    if api_key is not None and tls is None:
-        raise ValueError("Temporal API key requires an authenticated TLS connection")
     interceptors = [TracingInterceptor()] if tracing else []
     return await Client.connect(
         target_host,

@@ -9,7 +9,7 @@ deterministic contracts without cloud credentials or paid resources.
 
 | Workload | Replicas | Temporal queue / purpose | Authority boundary |
 |---|---:|---|---|
-| API | 3-12 | none | Establishes `IdentityContext`; reads application projections |
+| API | 3-12 | none | Establishs `IdentityContext`; reads application projections |
 | Operator BFF/UI | 3-8 | none | Same-origin session/CSRF boundary; production readiness still requires live OIDC exchange and shared sessions |
 | Outbox | 2 | `aegis-production-outbox-v1` | Delivers committed application intent; never creates truth |
 | Reconciler | 2 | `aegis-production-reconciler-v1` | Resolves ambiguous framework/provider state into new application facts |

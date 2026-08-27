@@ -41,7 +41,7 @@ signing = [
 
 [[package]]
 name = "aegis-framework-platform"
-version = "0.15.0"
+version = "0.16.0"
 source = { editable = "." }
 dependencies = [
     { name = "a2a-sdk", extra = ["fastapi", "grpc", "signing"] },

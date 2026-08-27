@@ -220,24 +220,6 @@ class DurableActivityRuntime(ActivityOperations):
             value.request_ref,
             length=32,
         )
-        # Check for cancellation before starting the expensive graph execution.
-        # This propagates cancel intent even if the run_graph activity is
-        # cancelled before returning (e.g., concurrent cancel signal processed).
-        preflight = self._store.get_run(tenant_id=tenant_id, run_id=value.run_id)
-        if preflight is not None and preflight.status in (
-            RunStatus.CANCEL_REQUESTED,
-            RunStatus.CANCELLED,
-        ):
-            self._store.record_transition(
-                tenant_id=tenant_id,
-                run_id=value.run_id,
-                event_type="investigation.graph_cancelled",
-                operation_id=value.operation_id,
-                actor_ref=value.actor_ref,
-                request_ref=value.request_ref,
-                attributes={"reason": "cancel_requested_before_graph"},
-            )
-            return ActivityOutcome(outcome="cancelled")
         result = self._orchestrator.run(
             tenant_id=tenant_id,
             request=request,
@@ -415,7 +397,7 @@ class DurableActivityRuntime(ActivityOperations):
             operation_id=value.operation_id,
             actor_ref="system:temporal-worker",
             request_ref=current.request_ref,
-            failure_code=value.failure_code or "temporal_activity_failure",
+            failure_code="temporal_activity_failure",
         )
         return ActivityOutcome(outcome="recorded")
 

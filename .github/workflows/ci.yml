@@ -61,6 +61,8 @@ jobs:
       UV_PYTHON: ${{ matrix.python }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python }}
@@ -199,7 +201,7 @@ jobs:
       - run: make qualification
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: layer15-enterprise-qualification
+          name: layer16-enterprise-qualification
           path: build/qualification/*.json
           if-no-files-found: error
           retention-days: 30
@@ -209,6 +211,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14.7"
@@ -218,6 +222,8 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --all-extras
       - run: make docs
+      - run: make release-check
+      - run: make observability-config
       - run: make compose-config
 
   security:
@@ -233,8 +239,7 @@ jobs:
           version: ${{ env.UV_VERSION }}
           enable-cache: true
       - run: uv sync --locked --all-extras
-      - run: uv run bandit -q -r src
-      - run: uv run pip-audit --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
+      - run: make backend-security python-licenses
 
   dependency-review:
     if: github.event_name == 'pull_request'

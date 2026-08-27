@@ -183,19 +183,7 @@ class AegisEvidenceQueryWorkflow:
                 status=QueryStatus.COMPLETED,
                 bundle_ref=completed.bundle_ref,
             )
-        except ActivityError as exc:
-            # Non-retryable application errors (AuthorizationDenied, PayloadRejected,
-            # IntegrityFailure, etc.) cannot have an ambiguous external outcome, so
-            # return a deterministic failed result rather than RECONCILIATION_REQUIRED.
-            if (
-                isinstance(exc.__cause__, ApplicationError)
-                and exc.__cause__.non_retryable
-            ):
-                return EvidenceWorkflowResult(
-                    query_ref=value.query_ref,
-                    status=QueryStatus.FAILED,
-                    failure_code=exc.__cause__.type or "non_retryable_activity",
-                )
+        except ActivityError:
             self._stage = "reconciling"
             with suppress(ActivityError):
                 await self._activity(

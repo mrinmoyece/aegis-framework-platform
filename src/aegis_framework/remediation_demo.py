@@ -12,8 +12,6 @@ from pydantic import Field
 from aegis_framework.action_adapters import DeterministicActionAdapter
 from aegis_framework.domain import (
     Citation,
-    Evidence,
-    EvidenceKind,
     GrantBinding,
     IdentityContext,
     PrincipalKind,
@@ -36,7 +34,6 @@ from aegis_framework.remediation import (
     InMemoryActionPolicyStore,
     InMemoryEffectClaims,
     InMemoryEffectQuota,
-    InMemoryPostEffectEvidenceStore,
     InMemoryRemediationControlStore,
     InMemoryRemediationLedger,
     KubernetesTarget,
@@ -123,7 +120,6 @@ class _Demo:
     approvers: tuple[IdentityContext, IdentityContext]
     worker: IdentityContext
     plan: RemediationPlan
-    evidence_store: InMemoryPostEffectEvidenceStore
 
 
 @dataclass(frozen=True)
@@ -249,20 +245,6 @@ def run_remediation_demo(
         )
         reconciled = True
     demo.clock.advance()
-    # Register post-effect evidence so EffectService.verify() can confirm freshness.
-    demo.evidence_store.add(
-        Evidence(
-            evidence_id="checkout-post-effect-demo",
-            tenant_id=demo.plan.tenant_id,
-            kind=EvidenceKind.CHANGE,
-            source="demo-k8s-watch",
-            locator="github:deployments/checkout-v42",
-            observed_at=demo.clock.now(),
-            summary="Checkout deployment restarted successfully.",
-            facts={"available_replicas": 3, "checkout_failure_rate_bps": 42},
-            content_hash="c" * 64,
-        )
-    )
     try:
         verification = demo.effects.verify(
             demo.worker,
@@ -273,7 +255,7 @@ def run_remediation_demo(
             ),
             operation_id=f"demo-{scenario.value}-verify",
             effect_receipt=receipt,
-            fresh_evidence=(),
+            fresh_evidence=demo.plan.evidence,
             attempt=1,
         )
     except VerificationFailed:
@@ -370,7 +352,6 @@ def _build_demo(scenario: RemediationDemoScenario) -> _Demo:
         ),
         verification_facts=verification_facts,
     )
-    evidence_store = InMemoryPostEffectEvidenceStore()
     approvals = ApprovalService(
         policy=application_policy,
         action_policies=policy_store,
@@ -387,7 +368,6 @@ def _build_demo(scenario: RemediationDemoScenario) -> _Demo:
         quotas=InMemoryEffectQuota({"tenant-acme": 1}),
         claims=InMemoryEffectClaims(),
         clock=clock,
-        evidence=evidence_store,
     )
     return _Demo(
         clock=clock,
@@ -409,7 +389,6 @@ def _build_demo(scenario: RemediationDemoScenario) -> _Demo:
                 else DEMO_TIME + timedelta(hours=2)
             ),
         ),
-        evidence_store=evidence_store,
     )
 
 
@@ -521,7 +500,7 @@ def _plan(
             enabled=True,
             action="rollback_revision",
             rollback_revision="checkout-v41",
-            requires_fresh_approval=False,
+            requires_fresh_approval=True,
         ),
     }
     action = ActionDefinition(

@@ -2,7 +2,7 @@
 
 UV ?= uv
 
-.PHONY: help bootstrap format lint type test protocol integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta qualification docs security python-licenses demo serve measure observability-config deployment-check kubernetes-render terraform-check restore-drill restore-drill-db frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
+.PHONY: help bootstrap format lint type test protocol integration temporal-integration eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta qualification docs release-check backend-security security python-licenses demo serve measure observability-config deployment-check kubernetes-render terraform-check restore-drill restore-drill-db frontend-install frontend-lint frontend-type frontend-test frontend-axe frontend-build frontend-e2e frontend-contracts frontend-audit frontend-licenses frontend-bundle frontend-csp frontend-ci container compose-config ci
 
 help:
 	@printf '%s\n' \
@@ -20,8 +20,10 @@ help:
 	  'eval-recovery   Run deterministic recovery/chaos scenarios' \
 	  'eval-baseline   Compare current results with the reviewed baseline' \
 	  'eval-meta       Test evaluator repeatability, sharding, waivers, and redaction' \
-	  'qualification   Run Layer 15 journey, invariants, security, chaos, and capacity' \
+	  'qualification   Run Layer 16 journey, invariants, security, chaos, and capacity' \
 	  'docs            Validate documentation and manifests' \
+	  'release-check   Validate Layer 16 release, comparison, risk, and governance assets' \
+	  'backend-security Run Python static and dependency vulnerability checks' \
 	  'security        Run static and dependency vulnerability checks' \
 	  'python-licenses Enforce reviewed Python dependency licenses' \
 	  'demo            Run the successful checkout investigation' \
@@ -91,9 +93,14 @@ qualification:
 docs:
 	$(UV) run python tools/docs_check.py
 
-security:
+release-check:
+	$(UV) run python tools/release_check.py
+
+backend-security:
 	$(UV) run bandit -q -r src
 	$(UV) run pip-audit --progress-spinner=off --timeout=60 --cache-dir=.cache/pip-audit
+
+security: backend-security frontend-audit
 	npm --prefix ui run audit
 
 python-licenses:
@@ -169,9 +176,9 @@ frontend-csp:
 frontend-ci: frontend-lint frontend-type frontend-contracts frontend-test frontend-axe frontend-build frontend-bundle frontend-csp frontend-licenses frontend-audit
 
 container:
-	docker build --pull --tag aegis-framework-platform:layer15 .
+	docker build --pull --tag aegis-framework-platform:layer16 .
 
 compose-config:
 	docker compose config --quiet
 
-ci: lint type test protocol eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta qualification docs observability-config deployment-check kubernetes-render restore-drill frontend-ci
+ci: lint type test protocol eval eval-safety eval-adversarial eval-recovery eval-baseline eval-meta qualification docs release-check observability-config deployment-check kubernetes-render restore-drill frontend-ci

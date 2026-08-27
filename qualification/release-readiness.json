@@ -1,0 +1,615 @@
+{
+  "schema_version": 1,
+  "layer": 16,
+  "as_of": "2026-08-18",
+  "owner": "release-commander",
+  "approver": "platform-governance",
+  "sign_off_date": "2026-08-18",
+  "slo_gates_passed": false,
+  "security_review_complete": true,
+  "open_risks": [
+    "RR16-001",
+    "RR16-002",
+    "RR16-003",
+    "RR16-004",
+    "RR16-005",
+    "RR16-006",
+    "RR16-007",
+    "RR16-008",
+    "RR16-009",
+    "RR16-010",
+    "RR16-011",
+    "RR16-012",
+    "RR16-013"
+  ],
+  "framework_base_sha": "536979cc0b0bff028134db644f27bbb9d8c1791a",
+  "production_ready": false,
+  "certification_claimed": false,
+  "status_definitions": {
+    "Locally Qualified": "Deterministic repository and bounded local evidence passes without live credentials or production effects.",
+    "Environment-Gated": "A named integration environment and command are required; local unit evidence is not enough.",
+    "Live Evidence Required": "Production-like organizational or managed-service evidence is a hard go-live gate.",
+    "Deferred": "The capability is deliberately outside the current release claim."
+  },
+  "capabilities": [
+    {
+      "id": "01-platform-foundation",
+      "name": "Platform foundation",
+      "owner": "platform-engineering",
+      "status": "Locally Qualified",
+      "hard_go_live_gate": false,
+      "code": [
+        "pyproject.toml",
+        "src/aegis_framework/api.py",
+        "src/aegis_framework/service.py"
+      ],
+      "tests": [
+        "tests/test_api_and_cli.py",
+        "tests/test_domain_and_safety.py"
+      ],
+      "evals": [
+        "success",
+        "prompt-injection"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#lint",
+        ".github/workflows/ci.yml#tests"
+      ],
+      "runbooks": [
+        "docs/runbook.md",
+        "docs/architecture.md"
+      ],
+      "commands": [
+        "make lint",
+        "make type",
+        "make test"
+      ],
+      "release_gate": "Strict types, lint, branch coverage and deterministic checkout must pass."
+    },
+    {
+      "id": "02-tenant-identity-authorization",
+      "name": "Tenant identity and authorization",
+      "owner": "identity-platform",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/identity.py",
+        "src/aegis_framework/authorization.py",
+        "migrations/0001_layer2.sql"
+      ],
+      "tests": [
+        "tests/test_identity_and_authorization.py",
+        "tests/test_keycloak_integration.py"
+      ],
+      "evals": [
+        "forged-identity-headers",
+        "tenant-isolation",
+        "cross-tenant-checkpoint"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#postgres-integration"
+      ],
+      "runbooks": [
+        "docs/authority-boundaries.md",
+        "docs/operator-security.md"
+      ],
+      "commands": [
+        "make test",
+        "make integration"
+      ],
+      "release_gate": "Live OIDC, JWKS rotation, revocation, logout and production role/RLS evidence remain mandatory."
+    },
+    {
+      "id": "03-durable-event-ledger",
+      "name": "Durable PostgreSQL event ledger",
+      "owner": "data-platform",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/durability.py",
+        "src/aegis_framework/durable_postgres.py",
+        "migrations/0002_layer3.sql"
+      ],
+      "tests": [
+        "tests/test_durability.py",
+        "tests/test_postgres.py"
+      ],
+      "evals": [
+        "durable-duplicate-request",
+        "durable-framework-outage",
+        "observability-replay-convergence"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#postgres-integration",
+        ".github/workflows/restore-drill.yml"
+      ],
+      "runbooks": [
+        "docs/database-lifecycle.md",
+        "docs/backup-restore-dr.md"
+      ],
+      "commands": [
+        "make test",
+        "make integration",
+        "make restore-drill",
+        "make restore-drill-db"
+      ],
+      "release_gate": "Managed PITR, restore, hash-chain verification, projection rebuild and measured RPO/RTO must pass."
+    },
+    {
+      "id": "04-distributed-worker-runtime",
+      "name": "Distributed worker runtime",
+      "owner": "workflow-platform",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/temporal.py",
+        "src/aegis_framework/activity_runtime.py",
+        "src/aegis_framework/worker_runtime.py"
+      ],
+      "tests": [
+        "tests/test_temporal.py",
+        "tests/test_temporal_integration.py",
+        "tests/test_worker_runtime_layer14.py"
+      ],
+      "evals": [
+        "durable-worker-recovery",
+        "durable-cancellation-race",
+        "durable-policy-revocation"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#temporal-integration",
+        ".github/workflows/infrastructure.yml"
+      ],
+      "runbooks": [
+        "docs/runbooks/temporal-worker-rollout.md",
+        "docs/failure-modes.md"
+      ],
+      "commands": [
+        "make temporal-integration",
+        "make deployment-check"
+      ],
+      "release_gate": "Temporal Cloud namespace, codec, identity, retention, failover and compatible worker rollout require live evidence."
+    },
+    {
+      "id": "05-provider-neutral-model-gateway",
+      "name": "Provider-neutral model gateway",
+      "owner": "ai-platform",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/model_gateway.py",
+        "src/aegis_framework/provider_adapters.py",
+        "src/aegis_framework/model_postgres.py"
+      ],
+      "tests": [
+        "tests/test_model_gateway.py",
+        "tests/test_postgres.py"
+      ],
+      "evals": [
+        "model-routing",
+        "model-budget",
+        "model-duplicate-ambiguous",
+        "model-policy-revocation"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#evals"
+      ],
+      "runbooks": [
+        "docs/runbooks/model-gateway.md",
+        "docs/limitations.md"
+      ],
+      "commands": [
+        "make test",
+        "make eval",
+        "make integration"
+      ],
+      "release_gate": "Each live provider needs retention, residency, pricing, tokenization, billing, latency and safety qualification."
+    },
+    {
+      "id": "06-evidence-connectors-correlation",
+      "name": "Durable evidence connectors and correlation",
+      "owner": "integrations",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/evidence_runtime.py",
+        "src/aegis_framework/connector_adapters.py",
+        "src/aegis_framework/correlation.py"
+      ],
+      "tests": [
+        "tests/test_evidence_layer5.py",
+        "tests/test_postgres.py"
+      ],
+      "evals": [
+        "evidence-pagination",
+        "evidence-poisoning",
+        "evidence-policy-revocation",
+        "evidence-ssrf"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#evals"
+      ],
+      "runbooks": [
+        "docs/connector-runbook.md",
+        "docs/runbooks/evidence-health.md"
+      ],
+      "commands": [
+        "make test",
+        "make eval-adversarial",
+        "make integration"
+      ],
+      "release_gate": "Every source requires scoped credentials, private egress/TLS, pagination, retention, parser and rotation evidence."
+    },
+    {
+      "id": "07-specialist-orchestration",
+      "name": "Governed specialist orchestration",
+      "owner": "incident-automation",
+      "status": "Locally Qualified",
+      "hard_go_live_gate": false,
+      "code": [
+        "src/aegis_framework/orchestration.py",
+        "src/aegis_framework/graph.py",
+        "src/aegis_framework/orchestration_postgres.py"
+      ],
+      "tests": [
+        "tests/test_orchestration_layer6.py",
+        "tests/test_postgres.py"
+      ],
+      "evals": [
+        "graph-authority-override",
+        "orchestration-role-denial",
+        "orchestration-replay",
+        "orchestration-projection-rebuild"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#enterprise-qualification"
+      ],
+      "runbooks": [
+        "docs/architecture.md",
+        "docs/authority-boundaries.md"
+      ],
+      "commands": [
+        "make test",
+        "make qualification"
+      ],
+      "release_gate": "The bounded graph and application-ledger rebuild pass locally; semantic calibration remains a live adoption gate."
+    },
+    {
+      "id": "08-approval-remediation",
+      "name": "Approval-gated remediation",
+      "owner": "change-management",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/remediation.py",
+        "src/aegis_framework/remediation_temporal.py",
+        "src/aegis_framework/action_adapters.py"
+      ],
+      "tests": [
+        "tests/test_remediation_layer7.py",
+        "tests/test_temporal_integration.py"
+      ],
+      "evals": [
+        "remediation-denial",
+        "remediation-ambiguity",
+        "remediation-verification-failure",
+        "remediation-rollback"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#temporal-integration"
+      ],
+      "runbooks": [
+        "docs/approval-effect-runbook.md",
+        "docs/runbooks/approval-effect.md"
+      ],
+      "commands": [
+        "make test",
+        "make temporal-integration",
+        "make eval-recovery"
+      ],
+      "release_gate": "No production effect is allowed before live credential brokerage, target semantics, SoD/quorum and reconciliation drills."
+    },
+    {
+      "id": "09-sandbox-execution",
+      "name": "Hardened sandbox execution",
+      "owner": "sandbox-platform",
+      "status": "Live Evidence Required",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/sandbox.py",
+        "src/aegis_framework/sandbox_adapters.py",
+        "deployment/kubernetes/base/sandbox-foundation.yaml"
+      ],
+      "tests": [
+        "tests/test_sandbox_layer8.py",
+        "tests/test_temporal_integration.py"
+      ],
+      "evals": [
+        "sandbox-input-security",
+        "sandbox-archive-security",
+        "sandbox-egress-security"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/infrastructure.yml"
+      ],
+      "runbooks": [
+        "docs/sandbox-runbook.md",
+        "docs/runbooks/sandbox-cleanup.md"
+      ],
+      "commands": [
+        "make eval-adversarial",
+        "make kubernetes-render",
+        "make temporal-integration"
+      ],
+      "release_gate": "Keep untrusted execution disabled until RuntimeClass, admission, CNI/egress, CSI, identity, scanner and cleanup controls pass live."
+    },
+    {
+      "id": "10-memory-pgvector-rag",
+      "name": "Event-grounded memory and pgvector RAG",
+      "owner": "ai-platform",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/memory.py",
+        "src/aegis_framework/memory_postgres.py",
+        "migrations/0008_layer9.sql"
+      ],
+      "tests": [
+        "tests/test_memory_layer9.py",
+        "tests/test_postgres.py"
+      ],
+      "evals": [
+        "memory-retrieval",
+        "memory-tenant-cache",
+        "memory-context",
+        "memory-retention"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#postgres-integration"
+      ],
+      "runbooks": [
+        "docs/memory-runbook.md",
+        "docs/runbooks/memory-retrieval.md"
+      ],
+      "commands": [
+        "make test",
+        "make integration",
+        "make qualification"
+      ],
+      "release_gate": "Production serving-path pgvector, embedding, blob/KMS erasure and rebuild evidence remain required."
+    },
+    {
+      "id": "11-enterprise-evaluation",
+      "name": "Governed deterministic evaluation",
+      "owner": "quality-engineering",
+      "status": "Locally Qualified",
+      "hard_go_live_gate": false,
+      "code": [
+        "src/aegis_framework/evaluation.py",
+        "src/aegis_framework/evals.py",
+        "evals/suite.json"
+      ],
+      "tests": [
+        "tests/test_evaluation_layer10.py",
+        "tests/test_evals.py"
+      ],
+      "evals": [
+        "success",
+        "prompt-injection",
+        "durable-framework-outage",
+        "protocol-proposal-only"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#evals",
+        ".github/workflows/ci.yml#eval-gates"
+      ],
+      "runbooks": [
+        "docs/evaluation-runbook.md",
+        "docs/runbooks/evaluation-health.md"
+      ],
+      "commands": [
+        "make eval",
+        "make eval-safety",
+        "make eval-adversarial",
+        "make eval-recovery",
+        "make eval-baseline",
+        "make eval-meta"
+      ],
+      "release_gate": "All deterministic gates pass; live model quality and independent human calibration are not claimed."
+    },
+    {
+      "id": "12-observability-replay",
+      "name": "Observability and replay",
+      "owner": "sre",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/observability.py",
+        "src/aegis_framework/replay.py",
+        "observability/prometheus/rules/aegis-slos.yaml"
+      ],
+      "tests": [
+        "tests/test_observability_layer11.py",
+        "tests/test_langfuse_adapter.py"
+      ],
+      "evals": [
+        "observability-secret-absence",
+        "observability-outage-correctness",
+        "observability-replay-convergence"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/infrastructure.yml"
+      ],
+      "runbooks": [
+        "docs/observability-runbook.md",
+        "docs/runbooks/api-availability.md"
+      ],
+      "commands": [
+        "make observability-config",
+        "make test",
+        "make qualification"
+      ],
+      "release_gate": "Managed exporters, alert delivery, paging, retained SLI windows and on-call response require live evidence."
+    },
+    {
+      "id": "13-operator-workspace-bff",
+      "name": "Secure operator workspace and BFF",
+      "owner": "operator-experience",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/operator_api.py",
+        "ui/src/App.tsx",
+        "ui/src/api/client.ts"
+      ],
+      "tests": [
+        "tests/test_operator_layer12.py",
+        "ui/e2e/operator.spec.ts",
+        "ui/src/safety.test.ts"
+      ],
+      "evals": [
+        "tenant-isolation",
+        "prompt-injection",
+        "protocol-trust-revocation"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#operator-ui"
+      ],
+      "runbooks": [
+        "docs/operator-runbook.md",
+        "docs/operator-accessibility.md",
+        "docs/operator-security.md"
+      ],
+      "commands": [
+        "make frontend-ci",
+        "make frontend-e2e",
+        "make protocol"
+      ],
+      "release_gate": "Live IdP/session store and supported browser, manual accessibility and assistive-technology qualification remain mandatory."
+    },
+    {
+      "id": "14-mcp-a2a-interoperability",
+      "name": "Secure MCP and A2A interoperability",
+      "owner": "protocols",
+      "status": "Environment-Gated",
+      "hard_go_live_gate": true,
+      "code": [
+        "src/aegis_framework/mcp_interop.py",
+        "src/aegis_framework/a2a_interop.py",
+        "src/aegis_framework/interoperability.py"
+      ],
+      "tests": [
+        "tests/test_interoperability_layer13.py",
+        "tests/test_operator_layer12.py"
+      ],
+      "evals": [
+        "protocol-confused-deputy",
+        "protocol-ssrf",
+        "protocol-proposal-only",
+        "protocol-trust-revocation"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#tests",
+        ".github/workflows/ci.yml#operator-ui"
+      ],
+      "runbooks": [
+        "docs/protocol-runbook.md",
+        "docs/protocol-compatibility.md"
+      ],
+      "commands": [
+        "make protocol",
+        "make eval-adversarial",
+        "make temporal-integration"
+      ],
+      "release_gate": "Production PKI, token brokerage, partner identity, conformance, egress, revocation and a pure invocation/artifact projection rebuild are required per peer."
+    },
+    {
+      "id": "15-production-deployment",
+      "name": "Production deployment foundations",
+      "owner": "platform-engineering",
+      "status": "Live Evidence Required",
+      "hard_go_live_gate": true,
+      "code": [
+        "deployment/kubernetes",
+        "deployment/terraform/aws",
+        "src/aegis_framework/production.py"
+      ],
+      "tests": [
+        "tests/test_production_layer14.py",
+        "tests/test_worker_runtime_layer14.py"
+      ],
+      "evals": [
+        "durable-worker-recovery",
+        "durable-framework-outage",
+        "observability-safety-alert-bounded"
+      ],
+      "ci": [
+        ".github/workflows/infrastructure.yml",
+        ".github/workflows/supply-chain.yml",
+        ".github/workflows/promotion.yml"
+      ],
+      "runbooks": [
+        "docs/production-deployment.md",
+        "docs/runbooks/deployment-promotion.md",
+        "docs/runbooks/restore-failover.md"
+      ],
+      "commands": [
+        "make deployment-check",
+        "make kubernetes-render",
+        "make terraform-check",
+        "make container",
+        "make compose-config"
+      ],
+      "release_gate": "Cloud apply, protected promotion, signed admission, load/chaos, restore/failover and rollback evidence are hard blockers."
+    },
+    {
+      "id": "16-final-enterprise-qualification",
+      "name": "Final cross-layer qualification and governance",
+      "owner": "release-commander",
+      "status": "Locally Qualified",
+      "hard_go_live_gate": false,
+      "code": [
+        "tools/qualification.py",
+        "tools/release_check.py",
+        "qualification/release-readiness.json"
+      ],
+      "tests": [
+        "tests/test_qualification_layer15.py",
+        "tests/test_release_layer16.py"
+      ],
+      "evals": [
+        "durable-framework-outage",
+        "orchestration-projection-rebuild",
+        "observability-outage-correctness",
+        "protocol-proposal-only"
+      ],
+      "ci": [
+        ".github/workflows/ci.yml#enterprise-qualification",
+        ".github/workflows/ci.yml#docs"
+      ],
+      "runbooks": [
+        "docs/release-readiness.md",
+        "docs/release-checklist.md",
+        "docs/governance.md"
+      ],
+      "commands": [
+        "make release-check",
+        "make qualification",
+        "make ci",
+        "make security",
+        "make container",
+        "make compose-config"
+      ],
+      "release_gate": "Local qualification is complete only when every repository gate passes; hard live gates remain open and no certification is claimed."
+    }
+  ]
+}

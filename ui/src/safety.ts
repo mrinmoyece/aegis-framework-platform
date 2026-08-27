@@ -1,5 +1,5 @@
 const ALLOWED_DOWNLOAD_TYPES = new Set(["application/json", "text/csv"]);
-const FORMULA_PREFIX = /^[=+\-@\t\r\n]/;
+const FORMULA_PREFIX = /^[=+\-@]/;
 
 export function safeInternalUrl(value: string): string | null {
   try {

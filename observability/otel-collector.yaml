@@ -47,23 +47,6 @@ processors:
         action: delete
       - key: cookie
         action: delete
-  # Broad regex-based redaction for any attribute whose name pattern suggests
-  # PII, credentials, or tenant-identifying material that slips past the above
-  # exact-key list (e.g. vendor-injected attributes or future attribute names).
-  transform/redact_sensitive:
-    error_mode: ignore
-    trace_statements:
-      - context: span
-        statements:
-          - delete_matching_keys(attributes, "(?i).*(token|secret|password|credential|api_key|private_key|auth|bearer|session|cookie|jwt|ssn|dob|email|phone|credit_card|cvv|iban).*")
-          - delete_matching_keys(attributes, "(?i)^http\\.request\\.header\\..*")
-          - delete_matching_keys(attributes, "(?i)^http\\.response\\.header\\..*")
-          - delete_matching_keys(attributes, "(?i).*\\.tenant_id$")
-          - delete_matching_keys(attributes, "(?i).*\\.actor_id$")
-    metric_statements:
-      - context: datapoint
-        statements:
-          - delete_matching_keys(attributes, "(?i).*(token|secret|password|credential|api_key|private_key|auth|bearer|session|cookie|jwt).*")
   filter/allow_aegis:
     error_mode: ignore
     traces:
@@ -83,9 +66,6 @@ exporters:
     endpoint: ${env:AEGIS_OTLP_TRACE_ENDPOINT}
     headers:
       Authorization: ${env:AEGIS_OTLP_TRACE_AUTHORIZATION}
-    tls:
-      insecure: false
-      min_version: "1.2"
     timeout: 5s
     sending_queue:
       enabled: true
@@ -106,9 +86,9 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [memory_limiter, attributes/redact, transform/redact_sensitive, filter/allow_aegis, batch]
+      processors: [memory_limiter, attributes/redact, filter/allow_aegis, batch]
       exporters: [otlphttp/optional_trace_backend]
     metrics:
       receivers: [otlp, prometheus]
-      processors: [memory_limiter, attributes/redact, transform/redact_sensitive, batch]
+      processors: [memory_limiter, attributes/redact, batch]
       exporters: [prometheus]

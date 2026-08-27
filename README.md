@@ -8,6 +8,12 @@ investigation. It uses LangGraph for one bounded cognitive graph, Temporal for
 cross-process workflow/timer/retry/signal recovery, and PostgreSQL for application-owned
 tenant facts, immutable events, delivery records, projections, and audit.
 
+**Layer 16 is the final repository release/governance layer. It adds a
+machine-validated 16-capability readiness manifest, detailed residual-risk register,
+pinned custom-versus-framework comparison, per-framework verdicts, consolidated
+learning path, and release/security/governance package. It is locally qualified,
+not production approved or certified; every live gate remains explicit.**
+
 **Layer 14 adds a renderable Kustomize production reference, direct AWS Terraform,
 Temporal Cloud/private-endpoint and Worker Deployment Versioning boundaries, signed
 multi-arch supply chain, additive deployment/restore/retention schema, HA/capacity,
@@ -50,7 +56,7 @@ deferred.**
 
 **Layer 10 adds governed deterministic enterprise evaluation: immutable neutral
 suite/dataset/scorer/result/baseline/waiver/report contracts, a hermetic runner over
-all 44 real Layers 1-9 cases, adversarial and 17-point fault packs, non-waivable
+all 58 real cross-layer cases, adversarial and 17-point fault packs, non-waivable
 safety baselines, deterministic JSON/Markdown/JUnit, dedicated CI gates, and an
 optional sanitized Langfuse publisher. Evaluation remains release evidence, never
 runtime authority or production certification.**
@@ -200,7 +206,7 @@ runtime authority or production certification.**
 - immutable, strict, schema-versioned neutral evaluation contracts and canonical
   digests for suites, scenarios, cases, datasets, scorers, results, baselines,
   comparisons, waivers, reports, provenance, fingerprints, bounds and trace refs;
-- hermetic deterministic execution of 44 real cross-layer cases, stable filtering/
+- hermetic deterministic execution of 58 real cross-layer cases, stable filtering/
   sharding/replay, hard timeouts, dataset hash and secret/PII validation, and no
   required network, process, credential, production data or model judge;
 - eight outcome classes, broad adversarial taxonomy, 17 named fault cut points,
@@ -360,17 +366,21 @@ never the repository or workflow history.
 
 ## Qualification status
 
-- 415 deterministic tests pass at 90%+ meaningful branch coverage, 44 evals pass — including
-  governed Layer 10 evaluation with JUnit/Markdown/JSON report artefacts, immutable
-  canonical digest chains, baseline/waiver/comparison contracts, hermetic runtime, and all
-  cross-layer scenario coverage — and eleven PostgreSQL plus six Temporal integration tests
-  pass locally;
-- one Keycloak compatibility test remains environment-gated;
-- tests/evals use no live credentials, real models, real embedding providers, or cloud
-  services.
+- **Locally qualified:** deterministic backend/frontend/protocol/eval/qualification,
+  documentation, governance, deployment-render, restore-contract and supply-chain
+  policy gates.
+- **Backend snapshot:** 450 passed, 18 environment-skipped, 90.03% branch coverage;
+  58 governed eval cases, 17 qualification fault points, and 12 capacity profiles.
+- **Environment-gated:** PostgreSQL/pgvector, Temporal, Keycloak, browser, provider,
+  connector and protocol partner environments.
+- **Live evidence required:** identity/key rotation, managed recovery/failover,
+  sandbox isolation, signed promotion/admission, representative load/chaos/SLO/on-call,
+  independent assessments and organizational controls.
 
-See [status](docs/status.md) and [limitations](docs/limitations.md) before interpreting
-these as production evidence.
+Tests/evals use no live credentials, real models, real embedding providers, or cloud
+services. See [final readiness](docs/release-readiness.md),
+[status](docs/status.md), [residual risks](qualification/residual-risks.json), and
+[limitations](docs/limitations.md) before interpreting local results.
 
 ## Framework comparison
 
@@ -397,7 +407,7 @@ parity is not measured by either benchmark.
 | Command | Purpose |
 |---|---|
 | `make lint` / `make type` / `make test` | Strict deterministic gates |
-| `make eval` | Complete governed 44-case deterministic suite |
+| `make eval` | Complete governed 58-case deterministic suite |
 | `make eval-safety` | Non-waivable safety gates |
 | `make eval-adversarial` | Adversarial attack pack |
 | `make eval-recovery` | Recovery and deterministic fault gates |
@@ -406,11 +416,21 @@ parity is not measured by either benchmark.
 | `make integration` | Configured PostgreSQL/Keycloak tests |
 | `make temporal-integration` | Configured Temporal workflow/replay test |
 | `make docs` | Documentation, parity, pin, and measurement checks |
+| `make release-check` | Final readiness, risk, comparison and governance checks |
+| `make qualification` | Bounded cross-layer journey, chaos and capacity evidence |
+| `make protocol` | Deterministic MCP/A2A and operator protocol gates |
+| `make frontend-ci` / `make frontend-e2e` | Locked operator UI and browser gates |
+| `make deployment-check` / `make kubernetes-render` | Deployment policy and rendered resources |
+| `make terraform-check` | Format, validate and mock-test Terraform |
+| `make restore-drill` / `make restore-drill-db` | Restore contract and logical database drill |
 | `make security` | Bandit and dependency audit |
 | `make container` | Digest-pinned non-root image |
-| `make measure` | Refresh Layer 10 comparison metrics |
+| `make compose-config` | Validate the local service topology |
+| `make measure` | Refresh Layer 11 historical comparison metrics |
 
-Start with [architecture](docs/architecture.md),
+Start with the [documentation index](docs/README.md) and
+[learning path](docs/learning-path.md), then
+[architecture](docs/architecture.md),
 [authority boundaries](docs/authority-boundaries.md),
 [ADR 007](docs/adr/007-temporal-durable-workflow.md),
 [ADR 010](docs/adr/010-secure-evidence-connectors.md),
@@ -418,10 +438,13 @@ Start with [architecture](docs/architecture.md),
 [ADR 012](docs/adr/012-temporal-approval-and-effects.md),
 [ADR 013](docs/adr/013-kubernetes-job-sandbox.md),
 [ADR 014](docs/adr/014-pgvector-sql-event-grounded-memory.md),
+[ADR index](docs/adr/README.md),
 [connector runbook](docs/connector-runbook.md), [runbook](docs/runbook.md),
 [approval/effect runbook](docs/approval-effect-runbook.md),
 [sandbox runbook](docs/sandbox-runbook.md),
 [memory runbook](docs/memory-runbook.md),
+[final comparison](docs/framework-comparison-final.md),
+[release checklist](docs/release-checklist.md),
 [threat model](docs/threat-model.md), and
 [limitations](docs/limitations.md).
 

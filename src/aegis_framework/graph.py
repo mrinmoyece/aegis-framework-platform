@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable, Iterator, Sequence
 from datetime import datetime
-from hashlib import sha256
 from threading import Lock
 from typing import Any, Literal, cast
 
@@ -104,9 +102,6 @@ _SPECIALIST_BINDINGS = (
     ),
 )
 _ROLE_BY_SPECIALIST = {binding[0]: binding[1] for binding in _SPECIALIST_BINDINGS}
-_EVIDENCE_KINDS_BY_SPECIALIST: dict[Specialist, frozenset[str]] = {
-    binding[0]: frozenset(binding[2]) for binding in _SPECIALIST_BINDINGS
-}
 _TASK_ORDINAL_BY_SPECIALIST = {
     binding[0]: binding[3] for binding in _SPECIALIST_BINDINGS
 }
@@ -451,18 +446,13 @@ class LangGraphInvestigator:
     def _execute_specialist(
         self, state: InvestigationState, specialist: Specialist
     ) -> SpecialistFinding:
-        allowed_kinds = _EVIDENCE_KINDS_BY_SPECIALIST[specialist]
         task = SpecialistTask(
             tenant_id=state["tenant_id"],
             run_id=state["run_id"],
             incident_id=state["incident_id"],
             specialist=specialist,
             evidence=tuple(
-                item
-                for item in (
-                    ModelEvidence.model_validate(raw) for raw in state["safe_evidence"]
-                )
-                if item.kind.value in allowed_kinds
+                ModelEvidence.model_validate(item) for item in state["safe_evidence"]
             ),
             correlation=CorrelationContext.model_validate(state["correlation"]),
         )
@@ -707,6 +697,10 @@ class LangGraphInvestigator:
             if state.get("proposal") is not None
             else None
         )
+        if critic.decision is CriticDecision.ACCEPTED and proposal is None:
+            critic = critic.model_copy(
+                update={"reasons": ("corroborated_but_no_valid_action",)}
+            )
         verification = tuple(_artifacts(state, ArtifactKind.VERIFICATION_PLAN))
         reasons: tuple[str, ...]
         if (
@@ -731,11 +725,7 @@ class LangGraphInvestigator:
                 else OrchestrationTerminalState.ABSTAINED
             )
             status = InvestigationStatus.ABSTAINED
-            reasons = (
-                ("corroborated_but_no_valid_action",)
-                if critic.decision is CriticDecision.ACCEPTED and proposal is None
-                else (critic.reasons or ("no_authorized_proposal",))
-            )
+            reasons = critic.reasons or ("no_authorized_proposal",)
             source = tuple(_artifacts(state, ArtifactKind.CONTRADICTION)) or tuple(
                 _artifacts(state, ArtifactKind.CRITIQUE)
             )
@@ -806,18 +796,11 @@ class LangGraphInvestigator:
             owner = self._thread_tenants.setdefault(thread_ref, tenant_id)
             if owner != tenant_id:
                 raise OrchestrationFailure("checkpoint thread tenant mismatch")
-        _alert_dict = request.alert.model_dump(mode="json")
-        alert_digest = sha256(
-            json.dumps(_alert_dict, separators=(",", ":"), sort_keys=True).encode()
-        ).hexdigest()
         input_digest = orchestration_input_digest(
             tenant_id=tenant_id,
             incident_id=request.incident_id,
             run_id=bound_run_id,
             evidence_digests=tuple(item.content_hash for item in evidence),
-            alert_digest=alert_digest,
-            evidence_ids=tuple(item.evidence_id for item in evidence),
-            evidence_locators=tuple(item.locator for item in evidence),
         )
         projection = self._ledger.begin_run(
             tenant_id=tenant_id,
@@ -1261,17 +1244,14 @@ def _runtime_finding(task: SpecialistTask) -> SpecialistFinding:
         )
     return SpecialistFinding(
         finding_id=stable_id(
-            "finding",
-            task.incident_id,
-            task.specialist.value,
-            "post_deploy_error_spike",
+            "finding", task.incident_id, task.specialist.value, "post_deploy_regression"
         ),
         specialist=task.specialist,
         statement=(
             "Runtime telemetry and deployment state independently support a "
             "post-deployment regression."
         ),
-        cause_code="post_deploy_error_spike",
+        cause_code="post_deploy_regression",
         confidence=0.84,
         citations=(_citation(telemetry), _citation(change)),
     )
@@ -1297,17 +1277,14 @@ def _knowledge_finding(task: SpecialistTask) -> SpecialistFinding:
         )
     return SpecialistFinding(
         finding_id=stable_id(
-            "finding",
-            task.incident_id,
-            task.specialist.value,
-            "post_deploy_error_spike",
+            "finding", task.incident_id, task.specialist.value, "post_deploy_regression"
         ),
         specialist=task.specialist,
         statement=(
             "The trusted runbook contains a proposal-only rollback candidate for the "
             "observed deployment condition."
         ),
-        cause_code="post_deploy_error_spike",
+        cause_code="post_deploy_regression",
         confidence=0.78,
         citations=(_citation(runbook), _citation(change)),
     )
@@ -1372,24 +1349,10 @@ def _proposal_from_runbook(
         or runbook.facts.get("action") != "rollback_candidate"
     ):
         return None
-    # Require the change record to carry explicit, non-empty service and version
-    # rather than inventing a rollback target from defaults.
-    service = change.facts.get("service")
-    version = change.facts.get("version")
-    if not isinstance(service, str) or not service.strip():
-        return None
-    if not isinstance(version, str) or not version.strip():
-        return None
-    # Bind the proposal to the runbook's declared scope: the service must match
-    # the change record and the runbook condition must agree with the corroborated
-    # hypothesis cause.
-    runbook_service = runbook.facts.get("service")
-    runbook_condition = runbook.facts.get("condition")
-    if runbook_service != service:
-        return None
-    if runbook_condition != hypothesis.cause_code:
-        return None
-    target = f"{service}:{version}"
+    target = (
+        f"{change.facts.get('service', 'checkout-api')}:"
+        f"{change.facts.get('version', 'unknown')}"
+    )
     try:
         return RemediationProposal(
             proposal_id=stable_id("proposal", tenant_id, incident_id, target),

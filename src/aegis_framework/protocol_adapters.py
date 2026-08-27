@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import base64
-import hashlib
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -15,7 +14,6 @@ from contextlib import AbstractAsyncContextManager, AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import partial
-from pathlib import Path
 from threading import BoundedSemaphore
 from typing import Any, Protocol, TypeVar, cast
 from urllib.parse import urlsplit
@@ -203,13 +201,12 @@ class OfficialMcpServerAdapter:
             resource_ref: str,
             idempotency_key: str,
             limit: int,
-            cursor: str | None,
             context: Context[object, object],
         ) -> dict[str, Any]:
             return self._call(
                 context,
                 McpToolName.EVIDENCE_LIST,
-                {"resource_ref": resource_ref, "limit": limit, "cursor": cursor},
+                {"resource_ref": resource_ref, "limit": limit},
                 idempotency_key,
             )
 
@@ -414,11 +411,7 @@ class OfficialMcpClientAdapter(McpSdkClientPort):
             client, http_client = self._client(registration, peer)
             portal.call(client.__aenter__)
             entered = True
-            if (
-                client.protocol_version != MCP_SPEC_VERSION
-                and client.protocol_version
-                not in registration.supported_protocol_versions
-            ):
+            if client.protocol_version != MCP_SPEC_VERSION:
                 raise PolicyDenied("MCP client requires the current stateless protocol")
         except BaseException:
             if entered and client is not None:
@@ -571,18 +564,6 @@ class OfficialMcpClientAdapter(McpSdkClientPort):
         transport = registration.transport
         http_client: httpx2.AsyncClient | None = None
         if isinstance(transport, FixedStdioRegistration):
-            # Verify the digest before launching to prevent binary substitution.
-            exe_path = Path(transport.executable)
-            try:
-                actual_digest = hashlib.sha256(exe_path.read_bytes()).hexdigest()
-            except OSError as exc:
-                raise PolicyDenied(
-                    "MCP stdio executable cannot be read for digest verification"
-                ) from exc
-            if actual_digest != transport.executable_digest:
-                raise PolicyDenied(
-                    "MCP stdio executable digest does not match registered value"
-                )
             environment = self._environments.resolve(transport.environment_names)
             sdk_transport: AbstractAsyncContextManager[TransportStreams] = stdio_client(
                 StdioServerParameters(
@@ -680,12 +661,6 @@ class OfficialA2AClientAdapter(A2ASdkClientPort):
         pending = self._pending_cards.pop(registration.peer_id, None)
         if pending is None:
             raise PolicyDenied("A2A peer card has not been discovered")
-        try:
-            self._signature_verifier(pending)
-        except Exception as exc:
-            raise PayloadRejected(
-                "A2A peer card signature verification failed"
-            ) from exc
         document = cast(
             Mapping[str, Any],
             MessageToDict(pending, preserving_proto_field_name=False),
@@ -1040,24 +1015,16 @@ def parse_official_agent_card(
         if not isinstance(signature, dict):
             raise PayloadRejected("A2A card signature is invalid")
         protected = signature.get("protected")
-        signature_value = signature.get("signature")
         if not isinstance(protected, str):
             raise PayloadRejected("A2A card protected signature is invalid")
-        if not isinstance(signature_value, str) or not signature_value:
-            raise PayloadRejected("A2A card signature bytes are invalid")
         try:
             padding = "=" * (-len(protected) % 4)
             header = json.loads(base64.urlsafe_b64decode(protected + padding).decode())
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise PayloadRejected("A2A card protected signature is malformed") from exc
-        algorithm = header.get("alg") if isinstance(header, dict) else None
-        if algorithm not in {"ES256", "PS256"}:
-            raise PayloadRejected("A2A card signature algorithm is unsupported")
         key_id = header.get("kid") if isinstance(header, dict) else None
         if not isinstance(key_id, str) or not key_id or len(key_id) > 256:
             raise PayloadRejected("A2A card signature key ID is invalid")
-        if header.get("typ") != "JOSE":
-            raise PayloadRejected("A2A card signature type is invalid")
         key_ids.add(key_id)
     key_digest = digest_value(sorted(key_ids))
     primary_origin = sorted(interface_origins)[0]

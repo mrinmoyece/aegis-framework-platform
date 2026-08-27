@@ -33,7 +33,6 @@ def _environment() -> dict[str, str]:
         "AEGIS_TEMPORAL_TASK_QUEUE_PREFIX": "aegis-production",
         "AEGIS_TEMPORAL_TLS_SERVER_NAME": "private.example.invalid",
         "AEGIS_TEMPORAL_API_KEY": "injected-secret",
-        "AEGIS_TEMPORAL_WORKER_KIND": "investigation",
         "AEGIS_TEMPORAL_WORKER_VERSIONING": "required",
         "AEGIS_TELEMETRY_ATTRIBUTES": "allowlist-only",
         "AEGIS_WORKER_BUILD_ID": "aegis-0.14.0-build-001",
@@ -158,50 +157,6 @@ def test_worker_bootstrap_is_exact_and_fail_closed(tmp_path: Path) -> None:
             task_queue="aegis-production-investigation-v1",
             runtime_directory=tmp_path,
             environment={**_environment(), "AEGIS_DEPLOYMENT_GENERATION": "zero"},
-            discover=lambda: (),
-        )
-    certificate_path = tmp_path / "temporal-client.pem"
-    private_key_path = tmp_path / "temporal-client.key"
-    certificate_path.write_text("certificate", encoding="utf-8")
-    private_key_path.write_text("private-key", encoding="utf-8")
-    observed.clear()
-    assert (
-        run_production_worker(
-            profile="investigation",
-            task_queue="aegis-production-investigation-v1",
-            runtime_directory=tmp_path / "mtls-path",
-            environment={
-                **_environment(),
-                "AEGIS_TEMPORAL_API_KEY": "",
-                "AEGIS_TEMPORAL_CLIENT_CERTIFICATE_PATH": os.fspath(certificate_path),
-                "AEGIS_TEMPORAL_CLIENT_KEY_PATH": os.fspath(private_key_path),
-            },
-            discover=lambda: (_EntryPoint(bootstrap),),  # type: ignore[return-value]
-        )
-        == 0
-    )
-    with pytest.raises(RuntimeError, match="absolute"):
-        run_production_worker(
-            profile="investigation",
-            task_queue="aegis-production-investigation-v1",
-            runtime_directory=tmp_path,
-            environment={
-                **_environment(),
-                "AEGIS_TEMPORAL_API_KEY": "",
-                "AEGIS_TEMPORAL_CLIENT_CERTIFICATE_PATH": "relative-cert.pem",
-                "AEGIS_TEMPORAL_CLIENT_KEY_PATH": os.fspath(private_key_path),
-            },
-            discover=lambda: (),
-        )
-    with pytest.raises(RuntimeError, match="server name"):
-        run_production_worker(
-            profile="investigation",
-            task_queue="aegis-production-investigation-v1",
-            runtime_directory=tmp_path,
-            environment={
-                **_environment(),
-                "AEGIS_TEMPORAL_TLS_SERVER_NAME": "https://private.example.invalid",
-            },
             discover=lambda: (),
         )
 

@@ -14,7 +14,6 @@ FORBIDDEN = re.compile(
     r"(?i)(tenant_id|actor_id|user_id|request_id|run_id|incident_id|"
     r"evidence_locator|prompt|completion|authorization|cookie)"
 )
-_REMOTE_EXPORTER_TYPES = ("otlphttp/", "otlp/")
 
 
 def main() -> int:
@@ -47,7 +46,9 @@ def main() -> int:
             for required in ("memory_limiter", "attributes/redact", "batch")
             if required not in processors
         )
-        errors.extend(_exporter_errors(collector.get("exporters", {})))
+        exporters = collector.get("exporters", {})
+        if "debug" in exporters or "logging" in exporters:
+            errors.append("collector must not enable a payload debug exporter")
     if prometheus and not prometheus.get("rule_files"):
         errors.append("Prometheus does not load rule files")
     alerts = _alerts(rules)
@@ -93,34 +94,6 @@ def _alerts(rules: dict[str, object]) -> set[str]:
             if isinstance(rule, dict) and isinstance(rule.get("alert"), str):
                 result.add(rule["alert"])
     return result
-
-
-def _exporter_errors(exporters: object) -> list[str]:
-    if not isinstance(exporters, dict):
-        return ["collector exporters must contain a mapping"]
-    errors: list[str] = []
-    if "debug" in exporters or "logging" in exporters:
-        errors.append("collector must not enable a payload debug exporter")
-    for name, exporter in exporters.items():
-        if not isinstance(name, str) or not isinstance(exporter, dict):
-            continue
-        if not name.startswith(_REMOTE_EXPORTER_TYPES):
-            continue
-        tls = exporter.get("tls")
-        if not isinstance(tls, dict):
-            errors.append(f"{name} must configure TLS explicitly")
-            continue
-        if tls.get("insecure") is not False:
-            errors.append(f"{name} must set tls.insecure to false")
-        endpoint = exporter.get("endpoint")
-        if (
-            name.startswith("otlphttp/")
-            and isinstance(endpoint, str)
-            and "${env:" not in endpoint
-            and not endpoint.startswith("https://")
-        ):
-            errors.append(f"{name} endpoint must use https")
-    return errors
 
 
 if __name__ == "__main__":

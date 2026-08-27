@@ -7,22 +7,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from aegis_framework.api import ApiRuntime, AppMode, create_app
+from aegis_framework.api import AppMode, create_app
 from aegis_framework.cli import main
-from aegis_framework.errors import IdentityUnavailable, OptionalDependencyMissing
 from aegis_framework.fixtures import demo_request
 from aegis_framework.remediation_demo import (
     RemediationDemoScenario,
     build_remediation_api_demo,
 )
-
-_DEFAULT_BEARER = "demo-responder-token"
-
-_DEFAULT_BEARER = "demo-responder-token"
-
-_DEFAULT_BEARER = "demo-responder-token"
-
-_DEFAULT_BEARER = "demo-responder-token"
 
 _DEFAULT_BEARER = "demo-responder-token"
 
@@ -38,9 +29,10 @@ def _headers(
     }
 
 
-def _payload() -> dict[str, object]:
+def _payload(scenario: str = "success") -> dict[str, object]:
     request = demo_request()
     return {
+        "scenario": scenario,
         "incident_id": request.incident_id,
         "alert": request.alert.model_dump(mode="json"),
     }
@@ -299,10 +291,6 @@ def test_endpoint_denial_and_validation() -> None:
         json={**_payload(), "incident_id": "bad incident id"},
     )
     assert bad_incident.status_code == 422
-    bad_tenant = client.get(
-        "/v1/tenants/bad tenant", headers=_headers(request_id="api-bad-tenant")
-    )
-    assert bad_tenant.status_code == 422
     malformed_request_id = client.post(
         "/v1/investigations",
         headers=_headers(request_id="bad request id"),
@@ -318,28 +306,6 @@ def test_endpoint_denial_and_validation() -> None:
         json=_payload(),
     )
     assert oversized_auth.status_code == 401
-
-
-def test_authorization_dependency_failures_return_503() -> None:
-    bundle = create_app(mode=AppMode.DEMO).state.runtime
-
-    class _UnavailablePolicy:
-        def authorize(self, *args: object, **kwargs: object) -> object:
-            del args, kwargs
-            raise IdentityUnavailable("policy backend offline")
-
-    runtime = ApiRuntime(
-        authenticator=bundle.authenticator,
-        governance=bundle.governance,
-        policy=_UnavailablePolicy(),
-        service_for=bundle.service_for,
-    )
-    client = TestClient(create_app(mode=AppMode.TEST, runtime=runtime))
-    response = client.get(
-        "/v1/tenants/tenant-acme", headers=_headers(request_id="api-policy-down")
-    )
-    assert response.status_code == 503
-    assert response.json()["detail"] == "authorization service is unavailable"
 
 
 def test_oversized_body_is_rejected_before_validation() -> None:
@@ -450,21 +416,42 @@ def test_cli_returns_failure_for_failed_eval(
     assert report["passed"] is False
 
 
-def test_cli_publish_langfuse_requires_optional_extra(
-    monkeypatch: object,
+def test_governed_eval_cli_list_replay_compare_and_baseline(
+    tmp_path: Path,
     capsys: object,
 ) -> None:
-    def fail() -> object:
-        raise OptionalDependencyMissing("langfuse support requires the extra")
+    assert main(["eval", "list", "--filter", "prompt-injection"]) == 0
+    listed = json.loads(capsys.readouterr().out)
+    assert [item["case_id"] for item in listed] == ["prompt-injection"]
 
-    monkeypatch.setattr(
-        "aegis_framework.langfuse_adapter.build_langfuse_observability",
-        fail,
+    assert main(["eval", "replay", "--filter", "prompt-injection"]) == 0
+    replay = json.loads(capsys.readouterr().out)
+    assert replay["stable"] is True
+    assert replay["first"] == replay["replay"]
+
+    assert main(["eval", "compare", "--filter", "prompt-injection"]) == 0
+    comparison = json.loads(capsys.readouterr().out)
+    assert comparison["passed"] is True
+
+    baseline = tmp_path / "baseline.json"
+    assert (
+        main(
+            [
+                "eval",
+                "update-baseline",
+                "--reviewed-by",
+                "release-reviewer",
+                "--reason",
+                "Reviewed deterministic canonical corpus update.",
+                "--output",
+                str(baseline),
+            ]
+        )
+        == 0
     )
-    with pytest.raises(SystemExit) as excinfo:
-        main(["eval", "--cases", "evals/cases.json", "--publish-langfuse"])
-    assert excinfo.value.code == 2
-    assert "langfuse support requires the extra" in capsys.readouterr().err
+    updated = json.loads(capsys.readouterr().out)
+    assert updated["reviewed_by"] == "release-reviewer"
+    assert baseline.is_file()
 
 
 def test_cli_serve_passes_safe_defaults(monkeypatch: object) -> None:

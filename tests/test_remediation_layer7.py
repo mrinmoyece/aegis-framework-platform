@@ -14,8 +14,6 @@ from aegis_framework.action_adapters import (
 )
 from aegis_framework.domain import (
     Citation,
-    Evidence,
-    EvidenceKind,
     GrantBinding,
     IdentityContext,
     PrincipalKind,
@@ -50,7 +48,6 @@ from aegis_framework.remediation import (
     InMemoryActionPolicyStore,
     InMemoryEffectClaims,
     InMemoryEffectQuota,
-    InMemoryPostEffectEvidenceStore,
     InMemoryRemediationControlStore,
     InMemoryRemediationLedger,
     KubernetesTarget,
@@ -231,7 +228,7 @@ def _action(
             enabled=compensation,
             action="rollback_revision" if compensation else "observe_only",
             rollback_revision="checkout-v41" if compensation else None,
-            requires_fresh_approval=False,
+            requires_fresh_approval=True,
         ),
     }
     return ActionDefinition(**material, canonical_digest=canonical_digest(material))
@@ -288,23 +285,6 @@ class Harness:
     approver_two: IdentityContext
     worker: IdentityContext
     plan: RemediationPlan
-    evidence_store: InMemoryPostEffectEvidenceStore
-
-    def post_effect_evidence(self) -> Evidence:
-        """Add and return a post-effect evidence item using the current clock time."""
-        item = Evidence(
-            evidence_id=f"post-effect-{self.clock.now().timestamp():.0f}",
-            tenant_id=TENANT,
-            kind=EvidenceKind.TELEMETRY,
-            source="test-harness",
-            locator="test://post-effect",
-            observed_at=self.clock.now(),
-            summary="Post-effect verification evidence.",
-            facts={"available_replicas": 3, "checkout_failure_rate_bps": 50},
-            content_hash="d" * 64,
-        )
-        self.evidence_store.add(item)
-        return item
 
 
 def _harness(
@@ -356,7 +336,6 @@ def _harness(
         compensation_succeeds=compensation_succeeds,
     )
     claims = InMemoryEffectClaims()
-    evidence_store = InMemoryPostEffectEvidenceStore()
     approvals = ApprovalService(
         policy=application_policy,
         action_policies=policy_store,
@@ -373,7 +352,6 @@ def _harness(
         quotas=InMemoryEffectQuota({TENANT: quota_limit}),
         claims=claims,
         clock=clock,
-        evidence=evidence_store,
     )
     plan = _plan(proposer, current)
     return Harness(
@@ -391,7 +369,6 @@ def _harness(
         approver_two=approver_two,
         worker=worker,
         plan=plan,
-        evidence_store=evidence_store,
     )
 
 
@@ -852,7 +829,6 @@ def test_successful_effect_requires_dry_run_and_fresh_verification() -> None:
     )
     assert replayed_receipt == receipt
     harness.clock.advance()
-    harness.post_effect_evidence()
     verification = harness.effects.verify(
         harness.worker,
         plan_id=harness.plan.plan_id,
@@ -860,7 +836,7 @@ def test_successful_effect_requires_dry_run_and_fresh_verification() -> None:
         expected_version=version + 5,
         operation_id="verify",
         effect_receipt=receipt,
-        fresh_evidence=(),
+        fresh_evidence=harness.plan.evidence,
         attempt=1,
     )
     assert verification.postconditions_satisfied is True
@@ -872,7 +848,7 @@ def test_successful_effect_requires_dry_run_and_fresh_verification() -> None:
             expected_version=version + 5,
             operation_id="verify",
             effect_receipt=receipt,
-            fresh_evidence=(),
+            fresh_evidence=harness.plan.evidence,
             attempt=2,
         )
         == verification
@@ -1022,7 +998,6 @@ def test_verification_failure_rolls_back_and_failed_rollback_escalates() -> None
         attempt=1,
     )
     harness.clock.advance()
-    harness.post_effect_evidence()
     with pytest.raises(VerificationFailed):
         harness.effects.verify(
             harness.worker,
@@ -1031,7 +1006,7 @@ def test_verification_failure_rolls_back_and_failed_rollback_escalates() -> None
             expected_version=version + 5,
             operation_id="verify",
             effect_receipt=receipt,
-            fresh_evidence=(),
+            fresh_evidence=harness.plan.evidence,
             attempt=1,
         )
     rollback = harness.effects.rollback(
@@ -1080,7 +1055,6 @@ def test_verification_failure_rolls_back_and_failed_rollback_escalates() -> None
         attempt=1,
     )
     failing.clock.advance()
-    failing.post_effect_evidence()
     with pytest.raises(VerificationFailed):
         failing.effects.verify(
             failing.worker,
@@ -1089,7 +1063,7 @@ def test_verification_failure_rolls_back_and_failed_rollback_escalates() -> None
             expected_version=version + 5,
             operation_id="verify",
             effect_receipt=receipt,
-            fresh_evidence=(),
+            fresh_evidence=failing.plan.evidence,
             attempt=1,
         )
     with pytest.raises(EffectConflict, match="operator escalation"):
@@ -1147,7 +1121,6 @@ def test_failed_effect_and_disabled_compensation_fail_closed() -> None:
         attempt=1,
     )
     no_compensation.clock.advance()
-    no_compensation.post_effect_evidence()
     no_compensation.adapter._verification_facts["checkout_failure_rate_bps"] = 500
     with pytest.raises(VerificationFailed):
         no_compensation.effects.verify(
@@ -1157,7 +1130,7 @@ def test_failed_effect_and_disabled_compensation_fail_closed() -> None:
             expected_version=version + 5,
             operation_id="verify",
             effect_receipt=receipt,
-            fresh_evidence=(),
+            fresh_evidence=no_compensation.plan.evidence,
             attempt=1,
         )
     with pytest.raises(PolicyDenied, match="not_enabled"):
@@ -1223,7 +1196,6 @@ def test_missing_postcondition_and_failed_precondition_fail_closed() -> None:
         attempt=1,
     )
     harness.clock.advance()
-    harness.post_effect_evidence()
     with pytest.raises(VerificationFailed):
         harness.effects.verify(
             harness.worker,
@@ -1232,7 +1204,7 @@ def test_missing_postcondition_and_failed_precondition_fail_closed() -> None:
             expected_version=version + 5,
             operation_id="verify",
             effect_receipt=receipt,
-            fresh_evidence=(),
+            fresh_evidence=harness.plan.evidence,
             attempt=1,
         )
 
@@ -1479,7 +1451,7 @@ def test_verification_rejects_unrecorded_receipt() -> None:
             expected_version=version + 5,
             operation_id="verify",
             effect_receipt=forged,
-            fresh_evidence=(),
+            fresh_evidence=harness.plan.evidence,
             attempt=1,
         )
 
@@ -1696,55 +1668,3 @@ def test_kubernetes_adapter_rejects_malformed_provider_shapes() -> None:
     )
     with pytest.raises(EffectConflict, match="annotations"):
         adapter.observe(intent)
-
-
-def test_kubernetes_adapter_rejects_uncommitted_restart_patch() -> None:
-    harness = _harness()
-    _open_and_approve(harness)
-    projection = harness.ledger.projection(
-        tenant_id=TENANT,
-        plan_id=harness.plan.plan_id,
-    )
-    approval = harness.store.approval(
-        tenant_id=TENANT,
-        approval_id=projection.approval_id,
-    )
-    intent = harness.effects._intent(
-        harness.plan,
-        approval,
-        harness.policy,
-        projection,
-        action_id="restart-checkout",
-        operation_id="execute-k8s-uncommitted",
-        attempt=1,
-        dry_run=False,
-    )
-
-    class NonCommittingApi(FakeKubernetesApi):
-        def patch_namespaced_deployment(
-            self,
-            *,
-            name: str,
-            namespace: str,
-            body: dict[str, object],
-            dry_run: str | None = None,
-            field_manager: str,
-        ) -> object:
-            super().patch_namespaced_deployment(
-                name=name,
-                namespace=namespace,
-                body=body,
-                dry_run=dry_run,
-                field_manager=field_manager,
-            )
-            self.annotations.clear()
-            self.resource_version = "1042"
-            return self.deployment()
-
-    adapter = KubernetesRolloutRestartAdapter(
-        api=NonCommittingApi(),
-        clock=harness.clock,
-        enabled=True,
-    )
-    with pytest.raises(EffectConflict, match=r"not committed|did not advance"):
-        adapter.execute(intent)

@@ -24,7 +24,6 @@ _REQUIRED_ENVIRONMENT = (
     "AEGIS_TEMPORAL_PAYLOAD_ENCRYPTION",
     "AEGIS_TEMPORAL_TASK_QUEUE_PREFIX",
     "AEGIS_TEMPORAL_TLS_SERVER_NAME",
-    "AEGIS_TEMPORAL_WORKER_KIND",
     "AEGIS_TEMPORAL_WORKER_VERSIONING",
     "AEGIS_TELEMETRY_ATTRIBUTES",
     "AEGIS_WORKER_BUILD_ID",
@@ -36,11 +35,6 @@ _REQUIRED_VALUES = {
     "AEGIS_TEMPORAL_PAYLOAD_ENCRYPTION": "required",
     "AEGIS_TEMPORAL_WORKER_VERSIONING": "required",
     "AEGIS_TELEMETRY_ATTRIBUTES": "allowlist-only",
-}
-_TEMPORAL_CERT_PATHS = {
-    "AEGIS_TEMPORAL_SERVER_CA_CERT_PATH": "Temporal CA certificate",
-    "AEGIS_TEMPORAL_CLIENT_CERTIFICATE_PATH": "Temporal client certificate",
-    "AEGIS_TEMPORAL_CLIENT_KEY_PATH": "Temporal client private key",
 }
 
 
@@ -136,18 +130,10 @@ def run_production_worker(
     missing = [
         name for name in _REQUIRED_ENVIRONMENT if not selected_environment.get(name)
     ]
-    api_key = selected_environment.get("AEGIS_TEMPORAL_API_KEY") or None
-    certificate = selected_environment.get("AEGIS_TEMPORAL_CLIENT_CERTIFICATE") or None
-    private_key = selected_environment.get("AEGIS_TEMPORAL_CLIENT_KEY") or None
-    certificate_path = (
-        selected_environment.get("AEGIS_TEMPORAL_CLIENT_CERTIFICATE_PATH") or None
-    )
-    private_key_path = (
-        selected_environment.get("AEGIS_TEMPORAL_CLIENT_KEY_PATH") or None
-    )
-    if not api_key and not (
-        (certificate and private_key) or (certificate_path and private_key_path)
-    ):
+    api_key = selected_environment.get("AEGIS_TEMPORAL_API_KEY")
+    certificate = selected_environment.get("AEGIS_TEMPORAL_CLIENT_CERTIFICATE")
+    private_key = selected_environment.get("AEGIS_TEMPORAL_CLIENT_KEY")
+    if not api_key and not (certificate and private_key):
         missing.append("AEGIS_TEMPORAL_API_KEY or client certificate/key")
     if missing:
         raise RuntimeError("production worker prerequisites are unavailable")
@@ -159,8 +145,7 @@ def run_production_worker(
     ):
         raise RuntimeError("production worker enforcement settings are invalid")
     prefix = selected_environment["AEGIS_TEMPORAL_TASK_QUEUE_PREFIX"]
-    worker_kind = selected_environment["AEGIS_TEMPORAL_WORKER_KIND"]
-    if not task_queue.startswith(f"{prefix}-{worker_kind}-"):
+    if not task_queue.startswith(f"{prefix}-"):
         raise RuntimeError("Temporal task queue is outside the deployment prefix")
     try:
         generation = int(selected_environment["AEGIS_DEPLOYMENT_GENERATION"])
@@ -168,16 +153,6 @@ def run_production_worker(
         raise RuntimeError("deployment generation is invalid") from exc
     if generation < 1:
         raise RuntimeError("deployment generation is invalid")
-    _validate_temporal_transport(
-        api_key=api_key,
-        tls_server_name=selected_environment["AEGIS_TEMPORAL_TLS_SERVER_NAME"],
-        inline_certificate=certificate,
-        inline_private_key=private_key,
-        certificate_path=certificate_path,
-        private_key_path=private_key_path,
-        server_ca_path=selected_environment.get("AEGIS_TEMPORAL_SERVER_CA_CERT_PATH")
-        or None,
-    )
 
     provider = discover or (
         lambda: tuple(entry_points(group=_ENTRY_POINT_GROUP, name="aegis"))
@@ -190,51 +165,8 @@ def run_production_worker(
         raise RuntimeError("production worker bootstrap is not callable")
     bootstrap = cast(WorkerBootstrap, loaded)
     control = WorkerControl(runtime_directory)
-    # Clear any stale state files left by a previous container instance in the
-    # same emptyDir volume before marking this instance as started.
-    for stale in ("started", "ready", "heartbeat", "draining", "drained"):
-        (runtime_directory / stale).unlink(missing_ok=True)
     control.mark_started()
     result = bootstrap(profile=profile, task_queue=task_queue, control=control)
     if control.drain_requested:
         control.mark_drained()
     return result
-
-
-def _validate_temporal_transport(
-    *,
-    api_key: str | None,
-    tls_server_name: str,
-    inline_certificate: str | None,
-    inline_private_key: str | None,
-    certificate_path: str | None,
-    private_key_path: str | None,
-    server_ca_path: str | None,
-) -> None:
-    if not tls_server_name or tls_server_name.startswith(("http://", "https://")):
-        raise RuntimeError("Temporal TLS server name is invalid")
-    if (inline_certificate is None) != (inline_private_key is None):
-        raise RuntimeError("Temporal mTLS credentials must be paired")
-    if (certificate_path is None) != (private_key_path is None):
-        raise RuntimeError("Temporal mTLS certificate paths must be paired")
-    if inline_certificate and certificate_path:
-        raise RuntimeError("Temporal mTLS credentials are ambiguous")
-    if api_key is None and inline_certificate is None and certificate_path is None:
-        raise RuntimeError("Temporal authenticated transport is unavailable")
-    for name, label in _TEMPORAL_CERT_PATHS.items():
-        value = {
-            "AEGIS_TEMPORAL_SERVER_CA_CERT_PATH": server_ca_path,
-            "AEGIS_TEMPORAL_CLIENT_CERTIFICATE_PATH": certificate_path,
-            "AEGIS_TEMPORAL_CLIENT_KEY_PATH": private_key_path,
-        }[name]
-        if value is not None:
-            _validate_secret_file(Path(value), label=label)
-
-
-def _validate_secret_file(path: Path, *, label: str) -> None:
-    if not path.is_absolute():
-        raise RuntimeError(f"{label} path must be absolute")
-    if path.is_symlink() or not path.is_file():
-        raise RuntimeError(f"{label} path must reference a regular file")
-    if path.stat().st_size < 1:
-        raise RuntimeError(f"{label} path must not be empty")

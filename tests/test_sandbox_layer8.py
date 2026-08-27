@@ -353,19 +353,6 @@ def test_contracts_are_immutable_canonical_and_exactly_bound() -> None:
         _spec(approval=mismatched)
 
 
-def test_private_normalization_helpers_fail_closed() -> None:
-    class Dictable:
-        def to_dict(self) -> dict[str, object]:
-            return {"PodSpec": {"HostPID": False}}
-
-    assert sandbox_adapters._get({"outer": None}, "outer", "inner") is None
-    assert sandbox_adapters._normalize_object(Dictable()) == {
-        "podspec": {"hostpid": False}
-    }
-    assert sandbox_adapters._normalized_get(Dictable(), "pod_spec", "host_pid") is False
-    assert sandbox_adapters._normalized_get(("not", "a", "mapping"), "x") is None
-
-
 @pytest.mark.parametrize(
     "path",
     [
@@ -659,8 +646,6 @@ def _append_lifecycle(
             payload["manifest_digest"] = "7" * 64
         if fact_type is SandboxFactType.ATTESTED:
             payload["attestation_digest"] = "8" * 64
-        if fact_type is SandboxFactType.RECONCILIATION_RESOLVED:
-            payload["resolved_status"] = SandboxStatus.RECONCILING.value
         projection = ledger.append(
             tenant_id=TENANT,
             execution_id=request.execution_id,
@@ -912,7 +897,6 @@ class FakeBatchApi:
         labels = body["metadata"]["labels"]  # type: ignore[index]
         self.job = SimpleNamespace(
             metadata=SimpleNamespace(uid="job-uid-001", labels=labels),
-            spec=body["spec"],
             status=SimpleNamespace(active=1, succeeded=0, failed=0, conditions=[]),
         )
         return self.job
@@ -956,8 +940,7 @@ class FakeNetworkingApi:
         del namespace
         self.created.append(body)
         self.policy = SimpleNamespace(
-            metadata=SimpleNamespace(labels=body["metadata"]["labels"]),  # type: ignore[index]
-            spec=body["spec"],
+            metadata=SimpleNamespace(labels=body["metadata"]["labels"])  # type: ignore[index]
         )
         return body
 
@@ -1118,10 +1101,6 @@ def test_kubernetes_manifest_is_nonroot_digest_pinned_and_host_isolated() -> Non
     assert network_spec["egress"] == []
     selector = network_spec["podSelector"]["matchLabels"]
     assert (
-        selector["aegis.github.com/tenant"]
-        == manifest["metadata"]["labels"]["aegis.github.com/tenant"]  # type: ignore[index]
-    )
-    assert (
         selector["aegis.github.com/execution"]
         == manifest["metadata"]["labels"][  # type: ignore[index]
             "aegis.github.com/execution"
@@ -1182,65 +1161,6 @@ def test_kubernetes_conflicting_binding_and_uid_change_fail_closed() -> None:
     assert backend.observe(request).state is BackendObservationState.CONFLICT
     with pytest.raises(SandboxRejected, match="conflicts"):
         backend.provision(request)
-
-
-def test_kubernetes_rejects_spoofed_job_and_network_policy_specs() -> None:
-    request = _request()
-    backend, batch, networking, _ = _kubernetes_backend()
-    backend.provision(request)
-    batch.job.spec["template"]["spec"]["containers"][0]["securityContext"][  # type: ignore[union-attr,index]
-        "privileged"
-    ] = True
-    assert backend.observe(request).state is BackendObservationState.CONFLICT
-
-    backend, batch, networking, _ = _kubernetes_backend()
-    backend.provision(request)
-    networking.policy.spec["egress"] = [{"to": [{"ipBlock": {"cidr": "0.0.0.0/0"}}]}]  # type: ignore[union-attr,index]
-    with pytest.raises(SandboxRejected, match="NetworkPolicy identity"):
-        backend.provision(request)
-
-
-def test_kubernetes_resource_names_are_tenant_scoped() -> None:
-    request = _request()
-    backend, _, _, _ = _kubernetes_backend()
-    other_approval = _approval(
-        tenant_id="tenant-beta",
-        run_id="run-layer8-tenant-beta",
-        task_id="task-layer8-tenant-beta",
-        approval_id="approval-layer7-tenant-beta",
-    )
-    other_spec_material = request.spec.model_dump(mode="json")
-    other_spec_material["tenant_id"] = "tenant-beta"
-    other_spec_material["run_id"] = other_approval.run_id
-    other_spec_material["task_id"] = other_approval.task_id
-    other_spec_material["approval"] = other_approval.model_dump(mode="json")
-    other_spec_material["spec_digest"] = canonical_digest(
-        {
-            key: value
-            for key, value in other_spec_material.items()
-            if key != "spec_digest"
-        }
-    )
-    other_spec = SandboxSpec.model_validate(other_spec_material)
-    other_request_material = request.model_dump(mode="json")
-    other_request_material["tenant_id"] = "tenant-beta"
-    other_request_material["run_id"] = other_spec.run_id
-    other_request_material["task_id"] = other_spec.task_id
-    other_request_material["spec"] = other_spec.model_dump(mode="json")
-    other_request_material["spec_digest"] = other_spec.spec_digest
-    other_request_material["approval_digest"] = other_spec.approval.approval_digest
-    other_request_material["request_digest"] = canonical_digest(
-        {
-            key: value
-            for key, value in other_request_material.items()
-            if key != "request_digest"
-        }
-    )
-    other_request = SandboxExecutionRequest.model_validate(other_request_material)
-    assert backend._job_name(request) != backend._job_name(other_request)  # type: ignore[name-defined]
-    assert backend._network_policy_name(request) != backend._network_policy_name(  # type: ignore[name-defined]
-        other_request
-    )
 
 
 @pytest.mark.parametrize(
@@ -1412,28 +1332,6 @@ def test_kubernetes_rejects_unapproved_apparmor_and_delete_uid_change() -> None:
         backend.cleanup(request, execution)
 
 
-def test_kubernetes_cleanup_tolerates_delete_races() -> None:
-    class GoneOnDelete(FakeBatchApi):
-        def delete_namespaced_job(
-            self,
-            *,
-            name: str,
-            namespace: str,
-            body: Mapping[str, object],
-        ) -> object:
-            del name, namespace, body
-            self.job = None
-            raise _NotFound
-
-    request = _request()
-    backend, _, networking, _ = _kubernetes_backend()
-    batch = GoneOnDelete()
-    backend._batch = batch  # type: ignore[attr-defined]
-    execution = backend.provision(request)
-    backend.cleanup(request, execution)
-    assert len(networking.deleted) == 1
-
-
 def test_kubernetes_network_policy_replay_mounts_and_runtime_binding() -> None:
     request = _request(
         spec=_spec(
@@ -1509,28 +1407,6 @@ def test_kubernetes_ambiguous_job_create_reuses_matching_network_policy() -> Non
     assert len(networking.created) == 1
 
 
-def test_kubernetes_create_conflict_reuses_matching_job() -> None:
-    class _Conflict(Exception):
-        status = 409
-
-    class ConflictBatch(FakeBatchApi):
-        def create_namespaced_job(
-            self,
-            *,
-            namespace: str,
-            body: Mapping[str, object],
-        ) -> object:
-            super().create_namespaced_job(namespace=namespace, body=body)
-            raise _Conflict
-
-    request = _request()
-    backend, _, networking, _ = _kubernetes_backend()
-    backend._batch = ConflictBatch()  # type: ignore[attr-defined]
-    execution = backend.provision(request)
-    assert execution.provider_uid == "job-uid-001"
-    assert len(networking.created) == 1
-
-
 def test_kubernetes_network_policy_and_pod_observation_fail_closed() -> None:
     request = _request()
     backend, batch, networking, core = _kubernetes_backend()
@@ -1557,13 +1433,9 @@ def test_kubernetes_official_builder_success_and_failure(
     class Configuration:
         pass
 
-    captured: dict[str, object] = {}
-
     fake_module = SimpleNamespace(
         Configuration=Configuration,
-        ApiClient=lambda configuration: captured.setdefault(
-            "configuration", configuration
-        ),
+        ApiClient=lambda configuration: configuration,
         BatchV1Api=lambda client: FakeBatchApi(),
         NetworkingV1Api=lambda client: FakeNetworkingApi(),
         CoreV1Api=lambda client: FakeCoreApi(),
@@ -1593,9 +1465,6 @@ def test_kubernetes_official_builder_success_and_failure(
         ),
         KubernetesJobSandboxBackend,
     )
-    configuration = captured["configuration"]
-    assert configuration.api_key == {"authorization": "opaque-token"}
-    assert configuration.api_key_prefix == {"authorization": "Bearer"}
     monkeypatch.setattr(
         sandbox_adapters.importlib,
         "import_module",

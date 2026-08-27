@@ -4,4 +4,4 @@ from aegis_framework.domain import InvestigationResult
 from aegis_framework.service import InvestigationService
 
 __all__ = ["InvestigationResult", "InvestigationService"]
-__version__ = "0.15.0"
+__version__ = "0.14.0"

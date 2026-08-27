@@ -5,7 +5,8 @@
   "comparison_basis": {
     "framework_layer15": {
       "repository": "mrinmoyece/aegis-framework-platform",
-      "base_sha": "60b120c6c6348044e716a2cc79e679b6bd29b758"
+      "base_sha": "60b120c6c6348044e716a2cc79e679b6bd29b758",
+      "sha": "4f4b8924247367f959c910f8261baea3337967d6"
     },
     "custom_layer16": {
       "repository": "mrinmoyece/aegis-agent-platform",

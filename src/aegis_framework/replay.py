@@ -285,29 +285,13 @@ class ReplayDebugger:
             material["truncated"] = True
         if len(_canonical(material).encode()) > maximum_bytes:
             raise ValueError("support report cannot fit within its byte bound")
-        report = SupportReport(
+        return SupportReport(
             integrity=integrity,
             projection=projection,
             causal_chain=chain,
             report_digest=sha256(_canonical(material).encode()).hexdigest(),
             truncated=bool(material["truncated"]),
         )
-        # Verify the fully-serialized report (which includes integrity and
-        # projection) still satisfies the bound; trim the chain further if not.
-        while len(report.model_dump_json().encode()) > maximum_bytes and chain:
-            chain = chain[:-1]
-            material["causal_chain"] = [item.model_dump(mode="json") for item in chain]
-            material["truncated"] = True
-            report = SupportReport(
-                integrity=integrity,
-                projection=projection,
-                causal_chain=chain,
-                report_digest=sha256(_canonical(material).encode()).hexdigest(),
-                truncated=True,
-            )
-        if len(report.model_dump_json().encode()) > maximum_bytes:
-            raise ValueError("support report cannot fit within its byte bound")
-        return report
 
 
 def load_events(value: object) -> tuple[ApplicationEvent, ...]:

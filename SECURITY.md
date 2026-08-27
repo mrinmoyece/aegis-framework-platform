@@ -5,7 +5,11 @@ remediation. Report vulnerabilities privately through GitHub's security advisory
 interface for `mrinmoyece/aegis-framework-platform`; do not include credentials,
 customer evidence, or exploit data in public issues.
 
-Supported code is the latest commit on `master`. Layer 12 has production-shaped
+Supported security fixes cover the current `0.16.x` line on `master`; older
+minor versions are unsupported. Report privately and allow maintainers to
+coordinate remediation before disclosure.
+
+Layer 16 has production-shaped
 OIDC/JWT, forced PostgreSQL RLS, immutable application events, transactional delivery,
 Temporal workflow boundaries, and disabled evidence connector adapters. Production
 Temporal/PostgreSQL HA, live IdP rotation, connector/provider qualification, DNS/egress,
