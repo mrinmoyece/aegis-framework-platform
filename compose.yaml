@@ -24,7 +24,7 @@ services:
       - ./tools/postgres-init.sh:/docker-entrypoint-initdb.d/010-aegis.sh:ro
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.7.2-1@sha256:831330513f55695572286e521f94fcd3c7e285250ed5b848090265a33192f669
+    image: quay.io/keycloak/keycloak:26.7.1@sha256:f1f1f01e472c8a78df40d8f2a49a925274eda4d3d80d5f6edbb5c880ee3c01c6
     profiles: ["identity"]
     command: ["start-dev", "--health-enabled=true"]
     environment:
@@ -130,7 +130,7 @@ services:
       - no-new-privileges:true
 
   prometheus:
-    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
     profiles: ["observability"]
     command:
       - --config.file=/etc/prometheus/prometheus.yaml
@@ -149,7 +149,7 @@ services:
       - no-new-privileges:true
 
   grafana:
-    image: grafana/grafana:13.2.0@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b
+    image: grafana/grafana:12.1.0@sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f
     profiles: ["observability"]
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
