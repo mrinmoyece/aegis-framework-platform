@@ -40,7 +40,7 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.5"
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24.15.0"
           cache: npm
@@ -67,7 +67,7 @@ jobs:
           format: spdx-json
           output-file: build/aegis-framework-platform.spdx.json
           upload-artifact: false
-      - uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+      - uses: anchore/scan-action@df395807f4554463d4455b8047cf58e37b6acaae # v6.5.0
         with:
           image: aegis-framework-platform:ci
           grype-version: v0.117.0
@@ -143,7 +143,7 @@ jobs:
             echo "arm64=${arm64}"
           } >> "${GITHUB_OUTPUT}"
       - name: Scan published amd64 image
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        uses: anchore/scan-action@df395807f4554463d4455b8047cf58e37b6acaae # v6.5.0
         with:
           image: ${{ env.IMAGE }}@${{ steps.platforms.outputs.amd64 }}
           grype-version: v0.117.0
@@ -153,7 +153,7 @@ jobs:
           output-format: json
           output-file: build/aegis-framework-platform-amd64.grype.json
       - name: Scan published arm64 image
-        uses: anchore/scan-action@e1165082ffb1fe366ebaf02d8526e7c4989ea9d2 # v7.4.0
+        uses: anchore/scan-action@df395807f4554463d4455b8047cf58e37b6acaae # v6.5.0
         with:
           image: ${{ env.IMAGE }}@${{ steps.platforms.outputs.arm64 }}
           grype-version: v0.117.0
