@@ -186,7 +186,7 @@ jobs:
       - name: Keyless-sign immutable digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes --registry-referrers-mode oci-1-1 "${IMAGE}@${DIGEST}"
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
       - uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
         with:
           subject-name: ${{ env.IMAGE }}
