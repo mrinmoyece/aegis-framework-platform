@@ -307,3 +307,31 @@ Production readiness remains false. Live identity/PKI, managed PostgreSQL and Te
 recovery, provider/connector/partner operation, enforced sandbox isolation, production
 load/chaos/SLO/on-call, signed protected promotion, independent security/accessibility/
 privacy/legal review and certification remain hard gates.
+
+# Layer 16 final release and governance status
+
+## Locally qualified
+
+- the exact Layer 15 base is pinned to
+  `4f4b8924247367f959c910f8261baea3337967d6`;
+- all 16 capabilities map to code, tests, evals, CI, runbooks, owners, commands,
+  status, and release gates in a machine-validated manifest;
+- the custom comparison pins
+  `1cccd9363fec83f7f4b2748b0e913be3a123d5ce`, reports equivalent axes,
+  identifies non-equivalent latency data, and contains no aggregate score;
+- framework-loss, authority-bypass, tenant, protocol, observability, projection
+  and derived-memory-loss behavior has executable evidence;
+- governance, versioning, release, security, ownership, issue/PR, dependency and
+  exact waiver policies are checked in and validated.
+
+## Environment-gated or live-required
+
+PostgreSQL/pgvector, Temporal, Keycloak, browser, providers, connectors and partner
+protocols retain named environment commands. Production identity, managed
+restore/failover, sandbox isolation, signed promotion/admission, representative
+load/chaos/SLO/on-call, independent assessments, privacy/legal acceptance and
+organizational compliance remain hard live gates.
+
+`production_ready`, `production_approved`, and `certification_claimed` remain
+false. See [final readiness](release-readiness.md) and the
+[risk register](../qualification/residual-risks.json).

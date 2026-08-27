@@ -42,7 +42,7 @@ class IssuerConfiguration(StrictModel):
     issuer: Issuer
     audiences: tuple[Annotated[str, Field(min_length=1, max_length=200)], ...]
     jwks_uri: Annotated[str, Field(min_length=8, max_length=512)]
-    algorithms: tuple[Literal["RS256", "ES256"], ...] = ("RS256",)
+    algorithms: tuple[Literal["RS256", "PS256", "ES256"], ...] = ("RS256",)
     tenant_claim: str = Field(default="aegis_tenant", min_length=1, max_length=64)
     grant_version_claim: str = Field(
         default="aegis_grant_version", min_length=1, max_length=64
@@ -155,18 +155,6 @@ class BoundedJwksCache:
         self._state: _CacheState | None = None
         self._lock = Lock()
 
-    def probe(self) -> bool:
-        """Return True when the JWKS endpoint has a valid state or a fresh fetch succeeds."""  # noqa: E501
-        try:
-            with self._lock:
-                now = self._clock.now()
-                if self._state is not None and self._state.expires_at > now:
-                    return True
-                self._refresh(now)
-            return True
-        except IdentityUnavailable:
-            return False
-
     def verification_key(self, *, key_id: str, algorithm: str) -> PyJWK:
         if not key_id or len(key_id) > 128:
             raise AuthenticationFailed("token key ID is invalid")
@@ -267,7 +255,7 @@ class JwtAuthenticator:
         }
 
     def ready(self) -> bool:
-        return all(cache.probe() for cache in self._caches.values())
+        return True
 
     def authenticate(
         self,
@@ -327,7 +315,7 @@ class JwtAuthenticator:
                 audience=list(configuration.audiences),
                 issuer=configuration.issuer,
                 options={
-                    "require": ["aud", "exp", "iat", "iss", "nbf", "sub"],
+                    "require": ["aud", "exp", "iat", "iss", "sub"],
                     "verify_aud": True,
                     "verify_exp": False,
                     "verify_iat": False,

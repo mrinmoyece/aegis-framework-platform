@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 
 import { operatorApi } from "./api/client";
 import { DataTable } from "./components/DataTable";
@@ -11,7 +11,6 @@ import type {
   ProtocolPeerItem
 } from "./contracts/schemas";
 import { useOperator } from "./operator-context";
-import { redactError } from "./safety";
 
 type Health = OperatorSnapshot["health"][number];
 type Incident = OperatorSnapshot["incidents"][number];
@@ -359,16 +358,12 @@ function ApprovalCard({ approval }: { approval: ApprovalItem }) {
   const [reviewed, setReviewed] = useState(false);
   const confirmationId = useId();
   const rationaleId = useId();
-  // Stable command_id: generated once per component mount so that a timeout or
-  // lost-response retry reuses the same idempotency key and the server can
-  // de-duplicate the approval decision.
-  const commandIdRef = useRef(crypto.randomUUID());
   const mutation = useMutation({
     mutationFn: () =>
       operatorApi.decideApproval(
         approval,
         {
-          command_id: commandIdRef.current,
+          command_id: crypto.randomUUID(),
           disposition: "grant",
           rationale,
           expected_status: "pending",
@@ -408,16 +403,6 @@ function ApprovalCard({ approval }: { approval: ApprovalItem }) {
         <dt>Approval digest</dt>
         <dd>
           <code>{approval.approval_digest}</code>
-        </dd>
-      </dl>
-      <dl className="digests">
-        <dt>Target</dt>
-        <dd>
-          <code>{approval.target}</code>
-        </dd>
-        <dt>Rollback</dt>
-        <dd>
-          <code>{approval.rollback}</code>
         </dd>
       </dl>
       <p>
@@ -460,7 +445,7 @@ function ApprovalCard({ approval }: { approval: ApprovalItem }) {
         {mutation.data === undefined
           ? null
           : `${mutation.data.outcome}: ${mutation.data.message}`}
-        {mutation.error != null ? redactError(mutation.error) : null}
+        {mutation.error instanceof Error ? mutation.error.message : null}
       </div>
     </article>
   );

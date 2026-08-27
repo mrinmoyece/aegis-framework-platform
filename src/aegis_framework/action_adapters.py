@@ -266,7 +266,7 @@ class KubernetesRolloutRestartAdapter:
         state = self._read(intent)
         self._require_identity(intent, state)
         operation = state.annotations.get(self._ANNOTATION)
-        if operation == intent.action.idempotency_key:
+        if operation == intent.operation_id:
             observation = ObservationState.APPLIED
         elif state.resource_version == intent.action.target.resource_version:
             observation = ObservationState.BEFORE
@@ -296,7 +296,7 @@ class KubernetesRolloutRestartAdapter:
         self._validate_enabled(intent)
         state = self._read(intent)
         self._require_identity(intent, state)
-        if state.annotations.get(self._ANNOTATION) == intent.action.idempotency_key:
+        if state.annotations.get(self._ANNOTATION) == intent.operation_id:
             return self._receipt(
                 intent,
                 EffectOutcome.DUPLICATE,
@@ -312,10 +312,6 @@ class KubernetesRolloutRestartAdapter:
         )
         updated = _deployment_state(result)
         self._require_identity(intent, updated)
-        if updated.annotations.get(self._ANNOTATION) != intent.action.idempotency_key:
-            raise EffectConflict("Kubernetes rollout patch was not committed")
-        if updated.resource_version == state.resource_version:
-            raise EffectConflict("Kubernetes rollout resourceVersion did not advance")
         return self._receipt(
             intent,
             EffectOutcome.SUCCEEDED,
@@ -377,7 +373,7 @@ class KubernetesRolloutRestartAdapter:
                 "template": {
                     "metadata": {
                         "annotations": {
-                            self._ANNOTATION: intent.action.idempotency_key,
+                            self._ANNOTATION: intent.operation_id,
                             "aegis.github.com/requested-at": (
                                 intent.requested_at.isoformat()
                             ),

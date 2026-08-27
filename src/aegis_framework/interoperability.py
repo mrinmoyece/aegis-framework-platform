@@ -108,13 +108,6 @@ class TrustTier(StrEnum):
     RESTRICTED = "restricted"
 
 
-_TRUST_TIER_ORDER = {
-    TrustTier.RESTRICTED: 0,
-    TrustTier.PARTNER: 1,
-    TrustTier.INTERNAL: 2,
-}
-
-
 class TrustStatus(StrEnum):
     PENDING_REVIEW = "pending-review"
     ACTIVE = "active"
@@ -673,20 +666,15 @@ class TrustRegistry:
         risk: RiskLevel,
         classification: DataClassification,
         now: datetime,
-        expected_environment: str | None = None,
-        minimum_trust_tier: TrustTier | None = None,
     ) -> TrustEntry:
         with self._lock:
             current = self._current(peer_id)
-            if current is None:
+            if current is None or current.protocol is not protocol:
                 raise PolicyDenied("peer is not registered for this protocol")
-            require_trusted_peer(
-                current,
-                protocol=protocol,
-                now=now,
-                expected_environment=expected_environment,
-                minimum_trust_tier=minimum_trust_tier,
-            )
+            if current.status is not TrustStatus.ACTIVE:
+                raise PolicyDenied("peer trust is not active")
+            if current.expires_at <= now or current.review_after <= now:
+                raise PolicyDenied("peer trust review is expired")
             if capability_id not in current.allowed_capabilities:
                 raise PolicyDenied("peer capability is not allowed")
             if risk not in current.allowed_risks:
@@ -855,20 +843,14 @@ class WorkloadIdentityValidator:
         expected_purpose: str,
         channel_binding_digest: str,
         now: datetime,
-        expected_audience: str | None = None,
-        allowed_issuer_digests: Sequence[str] | None = None,
     ) -> PrincipalContract:
         if not self.ready():
             raise RepositoryUnavailable(
                 "production workload identity requires distributed replay and mTLS"
             )
-        trusted_issuers = tuple(
-            allowed_issuer_digests or self._policy.allowed_issuer_digests
-        )
-        expected_binding_audience = expected_audience or self._policy.audience
-        if assertion.issuer_digest not in trusted_issuers:
+        if assertion.issuer_digest not in self._policy.allowed_issuer_digests:
             raise AuthenticationFailed("workload issuer is not trusted")
-        if assertion.audience != expected_binding_audience:
+        if assertion.audience != self._policy.audience:
             raise AuthenticationFailed("workload audience is invalid")
         if assertion.principal_ref not in self._policy.allowed_principals:
             raise PolicyDenied("workload principal is not allowed")
@@ -892,17 +874,7 @@ class WorkloadIdentityValidator:
         if lifetime > self._policy.maximum_lifetime_seconds:
             raise AuthenticationFailed("workload assertion lifetime is too long")
         if not self._replay_cache.consume(
-            digest_value(
-                {
-                    "audience": assertion.audience,
-                    "channel_binding_digest": channel_binding_digest,
-                    "issuer_digest": assertion.issuer_digest,
-                    "principal_ref": assertion.principal_ref,
-                    "purpose": assertion.purpose,
-                    "tenant_ref": assertion.tenant_ref,
-                    "token_id_digest": assertion.token_id_digest,
-                }
-            ),
+            assertion.token_id_digest,
             expires_at=assertion.expires_at,
         ):
             raise AuthenticationFailed("workload assertion replay was detected")
@@ -1749,30 +1721,6 @@ def validate_untrusted_text(value: str) -> str:
     if len(value) > MAX_PROTOCOL_TEXT_CHARS:
         raise ValueError("protocol text exceeds its bound")
     return value
-
-
-def require_trusted_peer(
-    entry: TrustEntry,
-    *,
-    protocol: ProtocolKind,
-    now: datetime,
-    expected_environment: str | None = None,
-    minimum_trust_tier: TrustTier | None = None,
-) -> TrustEntry:
-    if entry.protocol is not protocol:
-        raise PolicyDenied("peer is not registered for this protocol")
-    if entry.status is not TrustStatus.ACTIVE:
-        raise PolicyDenied("peer trust is not active")
-    if entry.expires_at <= now or entry.review_after <= now:
-        raise PolicyDenied("peer trust review is expired")
-    if expected_environment is not None and entry.environment != expected_environment:
-        raise PolicyDenied("peer trust environment is invalid")
-    if (
-        minimum_trust_tier is not None
-        and _TRUST_TIER_ORDER[entry.trust_tier] < _TRUST_TIER_ORDER[minimum_trust_tier]
-    ):
-        raise PolicyDenied("peer trust tier is insufficient")
-    return entry
 
 
 def canonical_json(value: object) -> bytes:

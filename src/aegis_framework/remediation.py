@@ -14,7 +14,6 @@ from pydantic import AwareDatetime, Field, JsonValue, model_validator
 
 from aegis_framework.domain import (
     Citation,
-    Evidence,
     Identifier,
     IdentityContext,
     RiskLevel,
@@ -367,7 +366,7 @@ class VerificationRecord(StrictModel):
     plan_id: Identifier
     action_id: Identifier
     effect_receipt_digest: Sha256Digest
-    fresh_evidence: tuple[Evidence, ...] = Field(max_length=32)
+    fresh_evidence: tuple[Citation, ...] = Field(min_length=1, max_length=32)
     observation: ActionObservation
     postconditions_satisfied: bool
     verified_at: AwareDatetime
@@ -1122,32 +1121,6 @@ class InMemoryRemediationControlStore:
             return self._verifications.get((tenant_id, verification_id))
 
 
-class InMemoryPostEffectEvidenceStore:
-    """In-memory post-effect evidence store for freshness validation."""
-
-    def __init__(self) -> None:
-        self._items: list[Evidence] = []
-        self._lock = Lock()
-
-    def add(self, item: Evidence) -> None:
-        with self._lock:
-            self._items.append(item)
-
-    def recent_evidence(
-        self,
-        *,
-        tenant_id: str,
-        observed_after: datetime,
-        max_items: int = 32,
-    ) -> Sequence[Evidence]:
-        with self._lock:
-            return [
-                e
-                for e in self._items
-                if e.tenant_id == tenant_id and e.observed_at > observed_after
-            ][:max_items]
-
-
 class ApprovalService:
     """Exact-scope authenticated approval with SoD, quorum, and replay guards."""
 
@@ -1571,18 +1544,6 @@ class ApprovalService:
         return approval
 
 
-class PostEffectEvidencePort(Protocol):
-    """Queries evidence observed after an effect for freshness validation."""
-
-    def recent_evidence(
-        self,
-        *,
-        tenant_id: str,
-        observed_after: datetime,
-        max_items: int = 32,
-    ) -> Sequence[Evidence]: ...
-
-
 class EffectService:
     """Executes only current-policy, exact-digest, quorum-approved action intents."""
 
@@ -1597,7 +1558,6 @@ class EffectService:
         quotas: EffectQuotaPort,
         claims: EffectClaimPort,
         clock: ClockPort,
-        evidence: PostEffectEvidencePort | None = None,
     ) -> None:
         self._policy = policy
         self._action_policies = action_policies
@@ -1607,7 +1567,6 @@ class EffectService:
         self._quotas = quotas
         self._claims = claims
         self._clock = clock
-        self._evidence = evidence
 
     def preflight(
         self,
@@ -1916,7 +1875,7 @@ class EffectService:
         expected_version: int,
         operation_id: str,
         effect_receipt: ActionReceipt,
-        fresh_evidence: Sequence[Evidence],
+        fresh_evidence: Sequence[Citation],
         attempt: int,
     ) -> VerificationRecord:
         plan, approval, policy, projection = self._validated_scope(
@@ -1973,24 +1932,9 @@ class EffectService:
         )
         if record is None:
             observed = self._actions.observe(intent)
-            # Reload tenant-scoped evidence observed after the effect to validate
-            # time and provenance binding; callers may pass pre-effect plan citations.
-            if self._evidence is not None:
-                post_effect = tuple(
-                    self._evidence.recent_evidence(
-                        tenant_id=plan.tenant_id,
-                        observed_after=effect_receipt.recorded_at,
-                    )
-                )
-            else:
-                post_effect = tuple(
-                    e
-                    for e in fresh_evidence
-                    if e.observed_at > effect_receipt.recorded_at
-                )
             satisfied = (
                 observed.observed_at > effect_receipt.recorded_at
-                and bool(post_effect)
+                and bool(fresh_evidence)
                 and all(
                     _condition_matches(item, observed.facts)
                     for item in action.postconditions
@@ -2003,7 +1947,7 @@ class EffectService:
                 "plan_id": plan.plan_id,
                 "action_id": action_id,
                 "effect_receipt_digest": effect_receipt.canonical_digest,
-                "fresh_evidence": post_effect,
+                "fresh_evidence": tuple(fresh_evidence),
                 "observation": observed,
                 "postconditions_satisfied": satisfied,
                 "verified_at": self._clock.now(),
@@ -2056,13 +2000,6 @@ class EffectService:
         action = next(item for item in plan.actions if item.action_id == action_id)
         if not action.compensation.enabled:
             raise PolicyDenied("compensation_not_enabled")
-        if (
-            action.compensation.requires_fresh_approval
-            and approval.requested_at <= projection.updated_at
-        ):
-            raise ApprovalExpired(
-                "compensation requires fresh approval obtained after verification"
-            )
         intent = self._intent(
             plan,
             approval,

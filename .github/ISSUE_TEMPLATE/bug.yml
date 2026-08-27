@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible non-sensitive defect
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, tenant/actor/request identifiers, raw evidence,
+        evidence locators, prompts, completions, or exploit details. Security
+        vulnerabilities must use the repository's private security advisory.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: Describe the bounded behavior without sensitive data.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide deterministic commands or a minimal synthetic fixture.
+    validations:
+      required: true
+  - type: dropdown
+    id: boundary
+    attributes:
+      label: Affected boundary
+      options:
+        - Application authority or tenancy
+        - Workflow or graph mechanics
+        - Model, evidence, memory, or protocol adapter
+        - Operator UI/BFF
+        - Deployment, supply chain, or governance
+        - Documentation
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: This report contains no sensitive data or private exploit details.
+          required: true

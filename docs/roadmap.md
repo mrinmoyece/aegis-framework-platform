@@ -1,6 +1,6 @@
 # Roadmap across the 16 Aegis capabilities
 
-| Layer | Capability | Layer 15 status | Framework-first direction |
+| Capability | Capability name | Layer 16 status | Framework-first direction |
 |---:|---|---|---|
 | 1 | Platform foundation | **Delivered** | Strict Python, contracts, deterministic slice, CI/container/docs |
 | 2 | Tenant identity and authorization | **Delivered** | OIDC/JWT current grants, purpose/risk policy, forced RLS, quota, secret refs, audit |
@@ -12,16 +12,17 @@
 | 8 | Approval-gated remediation actions | **Delivered offline/adapter boundary** | Exact approvals, Temporal waits, fixed action, fencing/idempotency/reconciliation, verification and compensation |
 | 9 | Hardened sandbox execution | **Delivered offline/adapter boundary** | Approval-bound immutable contracts, Temporal lifecycle, forced-RLS ledger, safe artifacts, hardened Kubernetes Job/RuntimeClass adapter; live isolation qualification deferred |
 | 10 | Event-grounded memory and pgvector RAG | **Delivered offline/adapter boundary** | Immutable three-tier ledger, deterministic chunk/embed/compact pipeline, live forced-RLS pgvector hybrid SQL query (store-tested), digest-only retrieval/context ledger facts, explicit `MemoryAcceptance` decision contract, LangGraph-bounded untrusted context; production wiring of the SQL query into the serving path, real embedding providers, and KMS/blob erasure remain deferred |
-| 11 | Deterministic enterprise evaluation gates | **Delivered offline/adapter boundary** | Governed artifacts, 50 real cross-layer cases, 20 named fault cuts, adversarial/recovery/baseline/meta gates, deterministic reports and optional sanitized Langfuse publication |
+| 11 | Deterministic enterprise evaluation gates | **Delivered offline/adapter boundary** | Governed artifacts, 58 real cross-layer cases, 17 qualification fault points, adversarial/recovery/baseline/meta gates, deterministic reports and optional sanitized Langfuse publication |
 | 12 | Observability and replay | **Delivered offline/adapter boundary** | Neutral semantics/OTel, bounded logs/metrics, Prometheus SLOs, Grafana provisioning, authenticated support and ledger replay; live backends/SLO evidence deferred |
 | 13 | Secure operator workspace and BFF | **Delivered offline/demo boundary** | React/TanStack/Zod workspace, fail-closed BFF session boundary, tenant teardown, safe mutation review, polling, accessibility/security/build gates; live IdP/session store/browser qualification deferred |
 | 14 | Secure MCP and A2A interoperability | **Delivered offline/adapter boundary** | Official MCP/A2A SDK mechanics with application trust, identity, policy, ledger, Temporal and operator controls |
 | 15 | Production deployment foundations | **Partial: executable reference boundary** | Kustomize, direct AWS Terraform, Temporal Cloud topology, signed supply chain, migration/HA/capacity/DR/retention/fenced-region contracts and deterministic gates; live operation deferred |
 | 16 | Final enterprise qualification | **Delivered locally; production blocked** | Integrated journey, invariants, adversarial, deterministic chaos, bounded capacity, readiness and operations; live sign-off remains required |
 
-## Next layer boundary
+## Final boundary
 
-Layer 15 delivers final repository/local enterprise qualification over Layer 14.
+Layer 16 closes final repository/local release, comparison, learning, security,
+and governance evidence over the Layer 15 qualification.
 Real cloud apply, live managed failover, production PKI, OIDC/session operation,
 SLO/on-call, representative load/chaos, provider/connector/partner qualification,
 penetration/accessibility/human review, privacy/legal acceptance and compliance

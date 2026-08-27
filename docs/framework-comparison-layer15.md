@@ -1,7 +1,8 @@
 # Framework Layer 15 versus custom Aegis Layer 16
 
-Comparison basis: framework base `60b120c6c6348044e716a2cc79e679b6bd29b758`;
-custom `mrinmoyece/aegis-agent-platform` PR 18 at
+Comparison basis: framework release `4f4b8924247367f959c910f8261baea3337967d6`
+on parent `60b120c6c6348044e716a2cc79e679b6bd29b758`; custom
+`mrinmoyece/aegis-agent-platform` PR 18 at
 `1cccd9363fec83f7f4b2748b0e913be3a123d5ce`. Measurements use physical lines
 including comments/blanks and are not code-efficiency ratios.
 

@@ -5,7 +5,7 @@ import {
   useQueryClient
 } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
-import { Component, useEffect, useRef, useState, type ReactNode } from "react";
+import { Component, useEffect, useState, type ReactNode } from "react";
 
 import { ApiError, operatorApi } from "./api/client";
 import { assertSnapshotContext, SnapshotPoller } from "./api/polling";
@@ -40,9 +40,6 @@ function SessionBoundary() {
   const client = useQueryClient();
   const [loginError, setLoginError] = useState<string | null>(null);
   const [pollingStatus, setPollingStatus] = useState<string | null>(null);
-  // Ref to the active SnapshotPoller so switchTenant can stop it explicitly
-  // before cancelling query-client queries (cancelQueries cannot reach the poller).
-  const pollerRef = useRef<SnapshotPoller | null>(null);
   const sessionQuery = useQuery({
     queryKey: ["operator-session"],
     queryFn: ({ signal }) => operatorApi.session(signal),
@@ -80,12 +77,8 @@ function SessionBoundary() {
       },
       onDegraded: setPollingStatus
     });
-    pollerRef.current = poller;
     poller.start();
-    return () => {
-      poller.stop();
-      pollerRef.current = null;
-    };
+    return () => poller.stop();
   }, [client, session]);
   const serverNow = useServerClock(session?.server_time);
 
@@ -136,10 +129,6 @@ function SessionBoundary() {
         serverNow,
         switchTenant: async (tenantId: string) => {
           if (tenantId === session.tenant_id) return;
-          // Stop the snapshot poller before switching tenants; cancelQueries()
-          // cannot reach the independently managed SnapshotPoller.
-          pollerRef.current?.stop();
-          pollerRef.current = null;
           await client.cancelQueries();
           client.removeQueries({ queryKey: ["operator"] });
           const rotated = await operatorApi.switchTenant(tenantId, session.csrf_token);

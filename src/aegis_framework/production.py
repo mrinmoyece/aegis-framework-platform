@@ -162,11 +162,8 @@ class RegionTopology(StrictModel):
 
     @model_validator(mode="after")
     def validate_regions(self) -> Self:
-        allowed_writer_regions = {self.home_region, *self.standby_regions}
-        if self.writer_region not in allowed_writer_regions:
-            raise ValueError(
-                "topology writer must be the home region or a declared standby"
-            )
+        if self.writer_region != self.home_region:
+            raise ValueError("normal topology writer must be the declared home region")
         if self.home_region in self.standby_regions:
             raise ValueError("home region cannot also be a standby")
         if len(self.standby_regions) != len(set(self.standby_regions)):
@@ -215,25 +212,6 @@ def authorize_failover(
         raise PolicyDenied("failover source is not the current writer")
     if authorization.target_region not in topology.standby_regions:
         raise PolicyDenied("failover target is not an approved standby")
-    # Verify the fence digest ties this authorization to the exact topology
-    # snapshot — preventing cross-topology reuse of an approval reference.
-    expected_fence = sha256(
-        json.dumps(
-            {
-                "home_region": topology.home_region,
-                "writer_region": topology.writer_region,
-                "generation": topology.generation,
-                "source_region": authorization.source_region,
-                "target_region": authorization.target_region,
-                "expected_generation": authorization.expected_generation,
-                "next_generation": authorization.next_generation,
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode()
-    ).hexdigest()
-    if expected_fence != authorization.fence_digest:
-        raise PolicyDenied("failover fence digest does not match topology state")
     return ActiveRegion(
         region=authorization.target_region,
         generation=authorization.next_generation,

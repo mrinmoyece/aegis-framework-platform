@@ -128,90 +128,6 @@ Temporal LangGraph plugin is not used: per-node Temporal Activities would overla
 ownership and increase framework coupling. Interrupts are not used for approval or
 effects; any future non-authoritative pause must resume only through application intent.
 
-## Layer 6 specialist graph
-
-The static graph is `coordinator -> four specialists -> critic -> optional remediation
-planner -> verification agent -> coordinator decision`. The coordinator creates exactly
-four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
-parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
-checkpoint history. Application code provides the fixed role set, deny-by-default
-capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
-dispatch intent, result fencing, terminal decision, and all tenant authority.
-
-Every artifact is a frozen strict neutral envelope with schema version, tenant,
-incident, run and optional task linkage, producer role, ordinal, provenance digests,
-bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
-artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
-resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
-
-Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
-Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
-ownership and increase framework coupling. Interrupts are not used for approval or
-effects; any future non-authoritative pause must resume only through application intent.
-
-## Layer 6 specialist graph
-
-The static graph is `coordinator -> four specialists -> critic -> optional remediation
-planner -> verification agent -> coordinator decision`. The coordinator creates exactly
-four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
-parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
-checkpoint history. Application code provides the fixed role set, deny-by-default
-capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
-dispatch intent, result fencing, terminal decision, and all tenant authority.
-
-Every artifact is a frozen strict neutral envelope with schema version, tenant,
-incident, run and optional task linkage, producer role, ordinal, provenance digests,
-bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
-artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
-resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
-
-Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
-Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
-ownership and increase framework coupling. Interrupts are not used for approval or
-effects; any future non-authoritative pause must resume only through application intent.
-
-## Layer 6 specialist graph
-
-The static graph is `coordinator -> four specialists -> critic -> optional remediation
-planner -> verification agent -> coordinator decision`. The coordinator creates exactly
-four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
-parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
-checkpoint history. Application code provides the fixed role set, deny-by-default
-capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
-dispatch intent, result fencing, terminal decision, and all tenant authority.
-
-Every artifact is a frozen strict neutral envelope with schema version, tenant,
-incident, run and optional task linkage, producer role, ordinal, provenance digests,
-bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
-artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
-resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
-
-Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
-Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
-ownership and increase framework coupling. Interrupts are not used for approval or
-effects; any future non-authoritative pause must resume only through application intent.
-
-## Layer 6 specialist graph
-
-The static graph is `coordinator -> four specialists -> critic -> optional remediation
-planner -> verification agent -> coordinator decision`. The coordinator creates exactly
-four tasks for telemetry, change, runtime, and knowledge roles. LangGraph provides
-parallel super-step scheduling, synchronized fan-in, reducers, conditional routing, and
-checkpoint history. Application code provides the fixed role set, deny-by-default
-capabilities, artifact transitions, citation/confidence gates, deterministic IDs/order,
-dispatch intent, result fencing, terminal decision, and all tenant authority.
-
-Every artifact is a frozen strict neutral envelope with schema version, tenant,
-incident, run and optional task linkage, producer role, ordinal, provenance digests,
-bounded typed payload, and canonical SHA-256 digest. PostgreSQL orchestration facts and
-artifact projections are authoritative and rebuildable. A LangGraph checkpoint may
-resume mechanics only; graph version `6.0.0`, run binding, and input digest must match.
-
-Temporal continues to schedule one bounded `aegis.run_graph` Activity. The experimental
-Temporal LangGraph plugin is not used: per-node Temporal Activities would overlap retry
-ownership and increase framework coupling. Interrupts are not used for approval or
-effects; any future non-authoritative pause must resume only through application intent.
-
 ## Three durable owners
 
 | Owner | Owns | Never authoritative for |
@@ -393,9 +309,7 @@ workflow completion. Authorized routes expose a redacted run view and opaque
 HMAC-protected cursor timeline. Timeline entries contain only cursor, event type,
 timestamp, status, and bounded failure code. Payloads and tenant IDs are not returned.
 
-Checkpoint content can resume graph mechanics. It remains non-authoritative for
-identity, grants, policy, quota, approval, audit, idempotency, secrets, fencing, or
-effects.
+## Replaceability
 
 - `ActivityOperations` and the application outbox isolate the Temporal SDK/server.
 - `OrchestratorPort` isolates LangGraph.

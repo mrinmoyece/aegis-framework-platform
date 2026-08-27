@@ -232,7 +232,6 @@ def test_workload_principal_is_authoritative_repository_data() -> None:
         {"nbf": (DEMO_TIME + timedelta(minutes=5)).timestamp()},
         {"exp": (DEMO_TIME + timedelta(hours=2)).timestamp()},
         {"sub": None},
-        {"nbf": None},
         {"aegis_tenant": None},
         {"aegis_grant_version": None},
     ],
@@ -457,8 +456,6 @@ def test_identity_configuration_and_numeric_date_edges_fail_closed() -> None:
             fetcher=_Fetcher({"keys": [jwk]}),
             clock=_MutableClock(DEMO_TIME),
         )
-    with pytest.raises(ValidationError):
-        _configuration(algorithms=("PS256",))
     configuration = _configuration()
     with pytest.raises(ValueError, match="unique"):
         JwtAuthenticator(

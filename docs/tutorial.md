@@ -452,7 +452,7 @@ curl --fail-with-body -X POST \
   -H 'Authorization: ******' \
   -H 'X-Request-ID: memory-retrieve-001' \
   -H 'Content-Type: application/json' \
-  -d '{"query_id": "q-1", "run_id": "run-1", "incident_id": "inc-1", "text": "incident summary"}' \
+  -d '{"query_id": "q-1", "run_id": "run-1", "text": "incident summary"}' \
   http://127.0.0.1:8000/v1/memories/retrieve
 ```
 

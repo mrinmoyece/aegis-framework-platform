@@ -599,7 +599,7 @@ SLO evidence. See [ADR 016](adr/016-provider-neutral-observability-replay.md).
 | Redux/design system/analytics/SSE | Deferred/rejected | No overlapping state or styling authority; no third-party telemetry; no durable stream contract yet |
 
 The pinned custom Layer 13 uses fewer runtime dependencies and builds a 291,588-byte
-JavaScript bundle versus 440,439 bytes here. This layer has materially less authored
+JavaScript bundle versus 437,307 bytes here. This layer has materially less authored
 UI/BFF LOC because TanStack owns generic mechanics, but session, tenant, authorization,
 approval, XSS, accessibility and audit policy remain custom. See
 `comparison/layer12-metrics.json` and [ADR 017](adr/017-secure-operator-bff.md).

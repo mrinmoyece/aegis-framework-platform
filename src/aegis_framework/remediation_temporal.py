@@ -13,7 +13,7 @@ from temporalio import activity, workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 
-from aegis_framework.domain import Identifier, OpaqueReference, StrictModel, stable_id
+from aegis_framework.domain import Identifier, OpaqueReference, StrictModel
 from aegis_framework.errors import (
     AegisFrameworkError,
     ApprovalDenied,
@@ -192,42 +192,57 @@ class AegisRemediationWorkflow:
                 self._input(value, "request-approval"),
                 {"recorded", "pending", "duplicate"},
             )
-            approval_deadline = workflow.time() + value.approval_timeout_seconds
-            while True:
-                expired = await self._wait_for_approval(value, approval_deadline)
-                if expired is not None:
-                    return expired
-                cancelled = await self._cancel_if_requested(value)
-                if cancelled is not None:
-                    return cancelled
-
-                command = self._approval_commands.pop(0)
-                self._stage = "loading_approval"
-                decision = await self._activity(
-                    "aegis.remediation.load_approval_decision",
-                    self._input(
-                        value,
-                        "load-approval",
-                        command_ref=command,
+            self._stage = "waiting_for_approval"
+            try:
+                await workflow.wait_condition(
+                    lambda: (
+                        bool(self._approval_commands)
+                        or self._cancel_command is not None
                     ),
+                    timeout=timedelta(seconds=value.approval_timeout_seconds),
+                    timeout_summary="exact-scope human approval wait",
                 )
-                if decision.outcome in {"denied", "expired", "revoked"}:
-                    return RemediationWorkflowResult(
-                        run_id=value.run_id,
-                        plan_ref=value.plan_ref,
-                        status=decision.outcome,
-                    )
-                if decision.outcome == "granted":
-                    break
-                if decision.outcome not in {"pending", "duplicate"}:
-                    raise ApplicationError(
-                        "approval Activity returned an invalid outcome",
-                        type="IntegrityFailure",
-                        non_retryable=True,
-                    )
-                cancelled = await self._cancel_if_requested(value)
-                if cancelled is not None:
-                    return cancelled
+            except TimeoutError:
+                self._stage = "expiring"
+                await self._require(
+                    "aegis.remediation.expire",
+                    self._input(value, "expire"),
+                    {"expired", "duplicate"},
+                )
+                return RemediationWorkflowResult(
+                    run_id=value.run_id,
+                    plan_ref=value.plan_ref,
+                    status="expired",
+                )
+            cancelled = await self._cancel_if_requested(value)
+            if cancelled is not None:
+                return cancelled
+
+            command = self._approval_commands.pop(0)
+            self._stage = "loading_approval"
+            decision = await self._activity(
+                "aegis.remediation.load_approval_decision",
+                self._input(
+                    value,
+                    "load-approval",
+                    command_ref=command,
+                ),
+            )
+            if decision.outcome in {"denied", "expired", "revoked"}:
+                return RemediationWorkflowResult(
+                    run_id=value.run_id,
+                    plan_ref=value.plan_ref,
+                    status=decision.outcome,
+                )
+            if decision.outcome not in {"granted", "duplicate"}:
+                raise ApplicationError(
+                    "approval Activity returned an invalid outcome",
+                    type="IntegrityFailure",
+                    non_retryable=True,
+                )
+            cancelled = await self._cancel_if_requested(value)
+            if cancelled is not None:
+                return cancelled
 
             self._stage = "preflight"
             await self._require(
@@ -283,9 +298,9 @@ class AegisRemediationWorkflow:
                     value,
                     failure_code="effect_failed",
                 )
-            # Do NOT check for cancellation here: the effect has already been applied
-            # (succeeded or reconciled). Returning cancelled would leave an applied
-            # production change unverified. Continue to mandatory verification.
+            cancelled = await self._cancel_if_requested(value)
+            if cancelled is not None:
+                return cancelled
 
             self._stage = "verifying"
             verification = await self._activity(
@@ -396,43 +411,6 @@ class AegisRemediationWorkflow:
             status="cancelled",
         )
 
-    async def _wait_for_approval(
-        self,
-        value: RemediationWorkflowInput,
-        deadline: float,
-    ) -> RemediationWorkflowResult | None:
-        self._stage = "waiting_for_approval"
-        remaining = deadline - workflow.time()
-        if remaining <= 0:
-            return await self._expire_approval(value)
-        try:
-            await workflow.wait_condition(
-                lambda: (
-                    bool(self._approval_commands) or self._cancel_command is not None
-                ),
-                timeout=timedelta(seconds=remaining),
-                timeout_summary="exact-scope human approval wait",
-            )
-        except TimeoutError:
-            return await self._expire_approval(value)
-        return None
-
-    async def _expire_approval(
-        self,
-        value: RemediationWorkflowInput,
-    ) -> RemediationWorkflowResult:
-        self._stage = "expiring"
-        await self._require(
-            "aegis.remediation.expire",
-            self._input(value, "expire"),
-            {"expired", "duplicate"},
-        )
-        return RemediationWorkflowResult(
-            run_id=value.run_id,
-            plan_ref=value.plan_ref,
-            status="expired",
-        )
-
     async def _escalate(
         self,
         value: RemediationWorkflowInput,
@@ -492,14 +470,6 @@ class AegisRemediationWorkflow:
         *,
         command_ref: str | None = None,
     ) -> RemediationActivityInput:
-        operation_id = stable_id(
-            "operation",
-            operation,
-            value.run_id,
-            value.plan_ref,
-            command_ref or "",
-            length=48,
-        )
         return RemediationActivityInput(
             tenant_ref=value.tenant_ref,
             actor_ref=value.actor_ref,
@@ -507,7 +477,7 @@ class AegisRemediationWorkflow:
             run_id=value.run_id,
             plan_ref=value.plan_ref,
             action_ref=value.action_ref,
-            operation_id=operation_id,
+            operation_id=f"{operation}:{value.run_id}:{value.plan_ref}",
             command_ref=command_ref,
         )
 

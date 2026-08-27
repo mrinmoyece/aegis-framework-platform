@@ -1601,6 +1601,7 @@ def _run_security_case(case: EvalCase) -> EvalOutcome:
                 "X-Roles": "tenant-admin",
             },
             json={
+                "scenario": "success",
                 "incident_id": request.incident_id,
                 "alert": request.alert.model_dump(mode="json"),
             },

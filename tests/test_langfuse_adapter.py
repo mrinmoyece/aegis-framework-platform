@@ -15,6 +15,7 @@ from aegis_framework.evaluation import (
 from aegis_framework.langfuse_adapter import (
     LangfuseObservability,
     _mask_langfuse_payload,
+    build_langfuse_observability,
 )
 
 
@@ -172,3 +173,23 @@ def test_langfuse_mask_is_defense_in_depth() -> None:
         data={"prompt": "secret", "safe": 1},
         ignored=True,
     ) == {"prompt": "[REDACTED]", "safe": 1}
+
+
+def test_langfuse_builder_blocks_automatic_sensitive_instrumentation(
+    monkeypatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_langfuse(**kwargs: object) -> _FakeClient:
+        captured.update(kwargs)
+        return _FakeClient()
+
+    monkeypatch.setattr("langfuse.Langfuse", fake_langfuse)
+
+    assert isinstance(build_langfuse_observability(), LangfuseObservability)
+    assert captured["mask"] is _mask_langfuse_payload
+    assert captured["blocked_instrumentation_scopes"] == [
+        "anthropic",
+        "langchain",
+        "openai",
+    ]

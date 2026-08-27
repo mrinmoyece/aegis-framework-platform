@@ -49,13 +49,9 @@ data:
       transform/redact:
         error_mode: propagate
         trace_statements:
-          - context: resource
-            statements:
-              - keep_keys(attributes, ["service.name", "service.version", "deployment.environment"])
           - context: span
             statements:
               - keep_keys(attributes, ["aegis.semantic.version", "aegis.component", "aegis.operation", "aegis.outcome", "aegis.retry", "aegis.count_bucket"])
-              - limit(events, 0, [])
       batch:
         timeout: 5s
         send_batch_size: 512

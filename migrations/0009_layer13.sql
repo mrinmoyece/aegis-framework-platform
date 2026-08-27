@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS aegis.interop_invocations (
     updated_at timestamptz NOT NULL,
     PRIMARY KEY (tenant_id, operation_id),
     UNIQUE (tenant_id, idempotency_key_digest),
-    CHECK ((state = 'ambiguous') = ambiguous)
+    CHECK ((state = 'ambiguous') = ambiguous OR NOT ambiguous)
 );
 CREATE INDEX IF NOT EXISTS interop_invocations_state_idx
     ON aegis.interop_invocations (

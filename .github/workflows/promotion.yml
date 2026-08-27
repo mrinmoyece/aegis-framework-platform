@@ -20,6 +20,10 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/aegis-framework-platform
   DIGEST: ${{ inputs.image_digest }}
 
+concurrency:
+  group: promotion-${{ inputs.image_digest }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -42,24 +46,19 @@ jobs:
       - name: Verify GitHub provenance
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh attestation verify "oci://${IMAGE}@${DIGEST}" \
-            --repo "${{ github.repository }}" \
-            --predicate-type "https://slsa.dev/provenance/v1"
+        run: gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "${{ github.repository }}"
       - name: Materialize digest-only candidate
+        env:
+          CHANGE_REFERENCE: ${{ inputs.change_reference }}
         run: |
           mkdir -p build/promotion
-          # Rewrite the relative base reference so it resolves correctly from
-          # the promotion output directory, then pin the image digest.
-          sed \
-            -e "s|../../base|$GITHUB_WORKSPACE/deployment/kubernetes/base|g" \
-            -e "s#digest: sha256:[0-9a-f]\\{64\\}#digest: ${DIGEST}#" \
+          sed "s#digest: sha256:[0-9a-f]\\{64\\}#digest: ${DIGEST}#" \
             deployment/kubernetes/overlays/production/kustomization.yaml \
             > build/promotion/kustomization.yaml
           cp deployment/kubernetes/overlays/production/production-settings.yaml \
             build/promotion/production-settings.yaml
           printf '{"change_reference":"%s","digest":"%s","rollback_digest_required":true}\n' \
-            '${{ inputs.change_reference }}' "${DIGEST}" \
+            "${CHANGE_REFERENCE}" "${DIGEST}" \
             > build/promotion/evidence.json
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -72,6 +71,7 @@ jobs:
     needs: verify
     environment: staging
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - run: echo "staging approval records the immutable digest; the GitOps repository remains the deployment authority"
 
@@ -79,6 +79,6 @@ jobs:
     needs: staging
     environment: production
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - run: echo "production approval records the same digest; rollback requires a previously verified digest"
-

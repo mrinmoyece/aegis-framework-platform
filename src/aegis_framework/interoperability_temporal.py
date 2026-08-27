@@ -26,10 +26,6 @@ _INTEROP_RETRY = RetryPolicy(
         "PayloadRejected",
         "IntegrityFailure",
         "TrustRevoked",
-        # Ambiguous transport outcomes require human reconciliation — retrying would
-        # compound the ambiguity and produce duplicate side effects.
-        "PolicyDenied",
-        "ReconciliationRequired",
     ],
 )
 _ACTIVITY_TIMEOUT = timedelta(minutes=3)
@@ -175,9 +171,6 @@ class _InteropWorkflow:
                 ),
                 self._input(value, "network"),
             )
-            cancelled = await self._cancel_if_requested(value)
-            if cancelled is not None:
-                return cancelled
             if outcome.outcome == "ambiguous":
                 self._stage = "reconciling"
                 outcome = await self._activity(

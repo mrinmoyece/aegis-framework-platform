@@ -191,8 +191,6 @@ class PostgresInteroperabilityStore:
                             = EXCLUDED.policy_digest
                           AND aegis.interop_invocations.fence_token
                             = EXCLUDED.fence_token
-                          AND aegis.interop_invocations.idempotency_key_digest
-                            = EXCLUDED.idempotency_key_digest
                         RETURNING version
                         """,
                         {

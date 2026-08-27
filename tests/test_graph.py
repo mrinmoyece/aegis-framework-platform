@@ -229,7 +229,7 @@ def test_missing_runbook_never_produces_action() -> None:
     assert result.status is InvestigationStatus.ABSTAINED
     assert result.critic.decision is CriticDecision.ACCEPTED
     assert result.proposal is None
-    assert result.critic.reasons == ("corroborated_and_cited",)
+    assert result.critic.reasons == ("corroborated_but_no_valid_action",)
 
 
 def test_invalid_evidence_target_safely_omits_proposal() -> None:
@@ -254,7 +254,7 @@ def test_invalid_evidence_target_safely_omits_proposal() -> None:
     )
     assert result.status is InvestigationStatus.ABSTAINED
     assert result.proposal is None
-    assert result.critic.reasons == ("corroborated_and_cited",)
+    assert result.critic.reasons == ("corroborated_but_no_valid_action",)
 
 
 def test_checkpoint_owner_cannot_be_rebound_across_tenants() -> None:

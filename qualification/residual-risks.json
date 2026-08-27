@@ -1,40 +1,238 @@
 {
-    "schema_version": 1,
-    "risks": [
-        {
-            "id": "R15-001",
-            "risk": "Application HTTP rate limiting is not implemented; ingress and tenant quotas remain required.",
-            "owner": "platform-security",
-            "expires_on": "2026-09-17",
-            "fail_closed": "Do not expose the API without reviewed ingress limits and tenant quota evidence."
-        },
-        {
-            "id": "R15-002",
-            "risk": "PostgreSQL and Temporal adapter modules remain excluded from aggregate unit-test coverage accounting.",
-            "owner": "quality-engineering",
-            "expires_on": "2026-09-17",
-            "fail_closed": "Require their dedicated environment-backed suites before promotion."
-        },
-        {
-            "id": "R15-003",
-            "risk": "Local timing profiles do not measure networked services, noisy neighbors or production scale.",
-            "owner": "sre",
-            "expires_on": "2026-09-17",
-            "fail_closed": "Block production capacity approval until representative environment evidence exists."
-        },
-        {
-            "id": "R15-004",
-            "risk": "Current vulnerability waivers expire on 2026-09-17 and depend on upstream no-fix status.",
-            "owner": "platform-security",
-            "expires_on": "2026-09-17",
-            "fail_closed": "Supply-chain verification rejects expiry, a published fix, unused waivers or mismatched findings."
-        },
-        {
-            "id": "R15-005",
-            "risk": "Independent penetration, accessibility, privacy, legal and compliance effectiveness reviews are absent.",
-            "owner": "risk-and-compliance",
-            "expires_on": "2026-09-17",
-            "fail_closed": "Readiness remains blocked and no certification claim is permitted."
-        }
-    ]
+  "schema_version": 2,
+  "layer": 16,
+  "as_of": "2026-08-18",
+  "production_approved": false,
+  "certification_claimed": false,
+  "risks": [
+    {
+      "id": "RR16-001",
+      "title": "Production identity and session lifecycle are unqualified",
+      "severity": "HIGH",
+      "owner": "identity-platform",
+      "evidence": [
+        "tests/test_identity_and_authorization.py",
+        "tests/test_operator_layer12.py"
+      ],
+      "mitigation": "Keep production readiness false until live OIDC exchange, JWKS rotation, logout, emergency revocation, proxy trust and durable distributed sessions pass.",
+      "trigger": "Before onboarding any real user or tenant.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-11-30",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Production operator login and API readiness remain disabled."
+    },
+    {
+      "id": "RR16-002",
+      "title": "Sandbox isolation is not independently proven in a live cluster",
+      "severity": "CRITICAL",
+      "owner": "sandbox-platform",
+      "evidence": [
+        "tests/test_sandbox_layer8.py",
+        "deployment/kubernetes/base/sandbox-foundation.yaml"
+      ],
+      "mitigation": "Qualify RuntimeClass, admission, node isolation, PID/cgroup, CNI/egress proxy, CSI, workload identity, scanner, quarantine and cleanup controls.",
+      "trigger": "Before enabling any untrusted-code workload.",
+      "opened_on": "2026-08-18",
+      "target_date": "2027-01-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Keep sandbox execution disabled and replicas at zero."
+    },
+    {
+      "id": "RR16-003",
+      "title": "Live providers, connectors and protocol peers are unqualified",
+      "severity": "HIGH",
+      "owner": "integrations",
+      "evidence": [
+        "tests/test_model_gateway.py",
+        "tests/test_evidence_layer5.py",
+        "tests/test_interoperability_layer13.py"
+      ],
+      "mitigation": "Use dedicated non-production accounts to verify retention, residency, quotas, TLS/egress, pagination, billing ambiguity, rotation, revocation, conformance and semantic quality per integration.",
+      "trigger": "Before enabling each provider, connector or external peer.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-12-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Adapters remain disabled unless a current reviewed policy and environment evidence exist."
+    },
+    {
+      "id": "RR16-004",
+      "title": "Managed backup, restore and regional fencing are unmeasured",
+      "severity": "CRITICAL",
+      "owner": "sre",
+      "evidence": [
+        "tools/restore_drill.py",
+        "tools/restore_drill.sh",
+        "docs/backup-restore-dr.md"
+      ],
+      "mitigation": "Run isolated managed PITR, cross-account/key restore, Temporal recovery and regional failover with ledger hashes, generations, projection rebuild and measured RPO/RTO.",
+      "trigger": "Before declaring disaster recovery available.",
+      "opened_on": "2026-08-18",
+      "target_date": "2027-02-28",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Remain unavailable on any count, hash, sequence, key, fence or rebuild mismatch."
+    },
+    {
+      "id": "RR16-005",
+      "title": "Production SLO, capacity, soak and paging evidence is absent",
+      "severity": "HIGH",
+      "owner": "sre",
+      "evidence": [
+        "qualification/performance-profiles.json",
+        "observability/prometheus/rules/aegis-slos.yaml"
+      ],
+      "mitigation": "Run representative topology, load, tenant skew, soak and paging drills; retain baselines and rollback thresholds without extrapolating local smoke.",
+      "trigger": "Before production traffic or an availability objective.",
+      "opened_on": "2026-08-18",
+      "target_date": "2027-01-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "No production SLO or capacity claim may be published."
+    },
+    {
+      "id": "RR16-006",
+      "title": "Protected promotion and repository rules are not live evidence",
+      "severity": "HIGH",
+      "owner": "platform-security",
+      "evidence": [
+        ".github/workflows/supply-chain.yml",
+        ".github/workflows/promotion.yml",
+        "docs/governance.md"
+      ],
+      "mitigation": "Configure the documented ruleset, required reviews/checks, environment approval and signed immutable promotion; verify admission rejection.",
+      "trigger": "Before the first deployable release.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-10-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Do not promote from an unprotected branch or without verified signatures, attestations and scans."
+    },
+    {
+      "id": "RR16-007",
+      "title": "Production memory serving, derived rebuild and erasure are incomplete",
+      "severity": "HIGH",
+      "owner": "ai-platform",
+      "evidence": [
+        "tests/test_memory_layer9.py",
+        "tests/test_postgres.py",
+        "docs/memory-runbook.md"
+      ],
+      "mitigation": "Wire the forced-RLS pgvector candidate query into serving; qualify retained-content rehydration, embeddings, KMS/blob erasure, legal hold and backup deletion.",
+      "trigger": "Before storing or serving customer-derived memory.",
+      "opened_on": "2026-08-18",
+      "target_date": "2027-02-28",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Keep production memory retrieval disabled for customer-derived content."
+    },
+    {
+      "id": "RR16-008",
+      "title": "Application HTTP rate limiting is not implemented",
+      "severity": "HIGH",
+      "owner": "platform-security",
+      "evidence": [
+        "qualification/readiness-scorecard.json",
+        "docs/limitations.md"
+      ],
+      "mitigation": "Deploy reviewed ingress limits and tenant quotas, then test fairness, bypass resistance, retry behavior and denial-of-wallet handling.",
+      "trigger": "Before exposing any API endpoint to an untrusted network.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-10-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Do not expose the API without reviewed ingress limits and tenant quota evidence."
+    },
+    {
+      "id": "RR16-009",
+      "title": "Environment adapters are excluded from aggregate unit coverage",
+      "severity": "MEDIUM",
+      "owner": "quality-engineering",
+      "evidence": [
+        "pyproject.toml",
+        "tests/test_postgres.py",
+        "tests/test_temporal_integration.py"
+      ],
+      "mitigation": "Keep dedicated PostgreSQL, Temporal, protocol and deployment suites required and publish their results with each promotion.",
+      "trigger": "Any adapter or migration change, or before promotion.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-11-30",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Promotion requires all dedicated environment-backed suites."
+    },
+    {
+      "id": "RR16-010",
+      "title": "Independent security, accessibility, privacy, legal and compliance assessments are absent",
+      "severity": "MEDIUM",
+      "owner": "risk-and-compliance",
+      "evidence": [
+        "docs/security-assessment.md",
+        "docs/operator-accessibility.md",
+        "docs/compliance-evidence.md"
+      ],
+      "mitigation": "Commission scoped penetration, manual accessibility, privacy/legal and control-effectiveness reviews; track findings to closure.",
+      "trigger": "Before public, regulated-user or compliance-scoped launch.",
+      "opened_on": "2026-08-18",
+      "target_date": "2027-03-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Readiness remains blocked and no certification claim is permitted."
+    },
+    {
+      "id": "RR16-011",
+      "title": "Two exact no-fix runtime vulnerability waivers are active",
+      "severity": "HIGH",
+      "owner": "platform-security",
+      "evidence": [
+        "security/vulnerability-waivers.json",
+        "tools/vulnerability_check.py"
+      ],
+      "mitigation": "Re-scan every platform on any database/base change; reject expiry, a published fix, an unused waiver or any tuple mismatch.",
+      "trigger": "Scanner database or base digest change, published fix, or 2026-09-17 expiry.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-09-17",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "The supply-chain workflow fails and no image may publish."
+    },
+    {
+      "id": "RR16-012",
+      "title": "Framework export and replacement rehearsal is not live-proven",
+      "severity": "MEDIUM",
+      "owner": "platform-architecture",
+      "evidence": [
+        "tests/test_release_layer16.py",
+        "docs/framework-comparison-final.md",
+        "docs/authority-boundaries.md"
+      ],
+      "mitigation": "Rebuild identical application projections after removing Temporal history, LangGraph checkpoints, Langfuse data and pgvector/read models in a production-like rehearsal.",
+      "trigger": "Before adopting hosted framework state as an operated dependency or changing framework major versions.",
+      "opened_on": "2026-08-18",
+      "target_date": "2027-01-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "No portability or disaster-recovery claim may rely only on local tests."
+    },
+    {
+      "id": "RR16-013",
+      "title": "Protocol invocation and artifact projections lack a pure ledger rebuilder",
+      "severity": "MEDIUM",
+      "owner": "protocols",
+      "evidence": [
+        "src/aegis_framework/interoperability_postgres.py",
+        "migrations/0009_layer13.sql",
+        "tests/test_interoperability_layer13.py"
+      ],
+      "mitigation": "Add a versioned interoperability reducer and populate interop_rebuilds from digest-only facts without trusting MCP/A2A framework state; preserve compatibility for existing facts.",
+      "trigger": "Before treating protocol projections as recoverable or enabling an external peer.",
+      "opened_on": "2026-08-18",
+      "target_date": "2026-12-31",
+      "review_by": "2026-09-17",
+      "status": "open",
+      "fail_closed": "Protocol peers remain environment-gated; no disaster-recovery or projection-rebuild claim is made for these views."
+    }
+  ]
 }

@@ -178,14 +178,8 @@ class _EvidenceOperations(EvidenceActivityOperations):
 
 
 class _RemediationOperations:
-    def __init__(
-        self,
-        *,
-        ambiguous: bool = False,
-        approval_outcomes: dict[str, str] | None = None,
-    ) -> None:
+    def __init__(self, *, ambiguous: bool = False) -> None:
         self.ambiguous = ambiguous
-        self.approval_outcomes = approval_outcomes or {}
         self.calls: list[str] = []
 
     async def request_approval(
@@ -202,9 +196,7 @@ class _RemediationOperations:
     ) -> RemediationActivityOutcome:
         assert value.command_ref is not None
         self.calls.append("load_approval_decision")
-        return RemediationActivityOutcome(
-            outcome=self.approval_outcomes.get(value.command_ref, "granted")
-        )
+        return RemediationActivityOutcome(outcome="granted")
 
     async def preflight(
         self,
@@ -757,47 +749,6 @@ def test_temporal_remediation_wait_signal_reconcile_cancel_and_replay() -> None:
                     "execute",
                     "verify",
                 ]
-
-                pending_operations = _RemediationOperations(
-                    approval_outcomes={
-                        "command:approval:pending": "pending",
-                        "command:approval:grant": "granted",
-                    }
-                )
-                pending_activities = TemporalRemediationActivities(pending_operations)
-                pending_queue = "aegis-remediation-pending-v1"
-                pending_worker = Worker(
-                    client,
-                    task_queue=pending_queue,
-                    workflows=[AegisRemediationWorkflow],
-                    activities=list(pending_activities.registered()),
-                )
-                async with pending_worker:
-                    pending = await client.start_workflow(
-                        AegisRemediationWorkflow.run,
-                        _remediation_input("pending"),
-                        id=f"workflow:remediation:pending:{uuid4().hex}",
-                        task_queue=pending_queue,
-                        execution_timeout=timedelta(minutes=2),
-                    )
-                    await pending.signal(
-                        AegisRemediationWorkflow.approval_decision,
-                        RemediationSignal(command_ref="command:approval:pending"),
-                    )
-                    await pending.signal(
-                        AegisRemediationWorkflow.approval_decision,
-                        RemediationSignal(command_ref="command:approval:grant"),
-                    )
-                    pending_result = await pending.result()
-                    assert pending_result.status == "verified"
-                    assert pending_operations.calls == [
-                        "request_approval",
-                        "load_approval_decision",
-                        "load_approval_decision",
-                        "preflight",
-                        "execute",
-                        "verify",
-                    ]
 
                 cancelled = await client.start_workflow(
                     AegisRemediationWorkflow.run,

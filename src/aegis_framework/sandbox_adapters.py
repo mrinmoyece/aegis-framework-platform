@@ -45,7 +45,6 @@ _SECRET_PATTERNS = (
     re.compile(r"(?i)\b(?:api[_-]?key|password|secret|token)\s*[:=]\s*[^\s,;]{8,}"),
 )
 _CONTAINER_TMP = str(PurePosixPath("/") / "tmp")
-_NORMALIZED_KEY = re.compile(r"[^a-z0-9]+")
 
 
 class KubernetesBatchApi(Protocol):
@@ -166,34 +165,6 @@ def _get(value: object, *names: str) -> object | None:
     return current
 
 
-def _normalize_key(value: str) -> str:
-    return _NORMALIZED_KEY.sub("", value.lower())
-
-
-def _normalize_object(value: object) -> object:
-    if hasattr(value, "to_dict") and callable(value.to_dict):
-        return _normalize_object(value.to_dict())
-    if isinstance(value, Mapping):
-        return {
-            _normalize_key(str(key)): _normalize_object(item)
-            for key, item in value.items()
-        }
-    if hasattr(value, "__dict__") and not isinstance(value, type):
-        return _normalize_object(vars(value))
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
-        return [_normalize_object(item) for item in value]
-    return value
-
-
-def _normalized_get(value: object, *names: str) -> object | None:
-    current: object | None = _normalize_object(value)
-    for name in names:
-        if not isinstance(current, Mapping):
-            return None
-        current = current.get(_normalize_key(name))
-    return current
-
-
 class KubernetesJobSandboxBackend:
     """Official-client Job adapter; cluster isolation still depends on deployment."""
 
@@ -251,8 +222,6 @@ class KubernetesJobSandboxBackend:
         if (
             not isinstance(labels, Mapping)
             or labels.get("app.kubernetes.io/managed-by") != self._MANAGED_BY
-            or labels.get("aegis.github.com/tenant")
-            != self._label_value("tenant", request.tenant_id)
             or labels.get("aegis.github.com/execution")
             != self._label_value("execution", request.execution_id)
             or labels.get("aegis.github.com/request-digest")
@@ -261,7 +230,6 @@ class KubernetesJobSandboxBackend:
             != self._label_value("fence", request.fence_token)
             or not isinstance(uid, str)
             or not uid
-            or not self._job_matches_request(job, request)
         ):
             return BackendObservation(
                 execution_id=request.execution_id,
@@ -316,26 +284,6 @@ class KubernetesJobSandboxBackend:
         except (SandboxRejected, SandboxUnavailable):
             raise
         except Exception as exc:
-            if getattr(exc, "status", None) == 409:
-                observation = self.observe(request)
-                if observation.state is BackendObservationState.CONFLICT:
-                    raise SandboxRejected(
-                        "Kubernetes Job identity binding conflicts"
-                    ) from exc
-                if observation.state is not BackendObservationState.ABSENT:
-                    if observation.provider_uid is None:
-                        raise SandboxAmbiguous(
-                            "existing Kubernetes Job has no stable UID"
-                        ) from exc
-                    self._require_network_policy(request)
-                    return BackendExecution(
-                        execution_id=request.execution_id,
-                        provider_ref=self._job_name(request),
-                        provider_uid=observation.provider_uid,
-                        attempt=request.attempt,
-                        fence_token=request.fence_token,
-                        provisioned_at=observation.observed_at,
-                    )
             raise SandboxAmbiguous(
                 "Kubernetes create outcome is ambiguous; reconcile by identity"
             ) from exc
@@ -451,28 +399,16 @@ class KubernetesJobSandboxBackend:
         preconditions = {"preconditions": {"uid": execution.provider_uid}}
         try:
             if observation.state is not BackendObservationState.ABSENT:
-                try:
-                    self._batch.delete_namespaced_job(
-                        name=execution.provider_ref,
-                        namespace=self._config.namespace,
-                        body={
-                            **preconditions,
-                            "propagationPolicy": "Foreground",
-                            "gracePeriodSeconds": 0,
-                        },
-                    )
-                except Exception as exc:
-                    if getattr(exc, "status", None) != 404:
-                        raise
-            # Only delete the NetworkPolicy after confirming the Job and its
-            # Pods are no longer present. Foreground propagation has initiated
-            # deletion above, but the Kubernetes API returns before Pods are
-            # gone. Re-observe here; if any workload remains the cleanup
-            # outcome will be "ambiguous" and the reconcile path will call
-            # _delete_network_policy once absence is confirmed.
-            post_observation = self.observe(request)
-            if post_observation.state is BackendObservationState.ABSENT:
-                self._delete_network_policy(request)
+                self._batch.delete_namespaced_job(
+                    name=execution.provider_ref,
+                    namespace=self._config.namespace,
+                    body={
+                        **preconditions,
+                        "propagationPolicy": "Foreground",
+                        "gracePeriodSeconds": 0,
+                    },
+                )
+            self._delete_network_policy(request)
         except Exception as exc:
             raise SandboxAmbiguous(
                 "Kubernetes delete outcome is ambiguous; reconcile by UID"
@@ -713,14 +649,10 @@ class KubernetesJobSandboxBackend:
             "spec": {
                 "podSelector": {
                     "matchLabels": {
-                        "aegis.github.com/tenant": self._label_value(
-                            "tenant",
-                            request.tenant_id,
-                        ),
                         "aegis.github.com/execution": self._label_value(
                             "execution",
                             request.execution_id,
-                        ),
+                        )
                     }
                 },
                 "policyTypes": ["Ingress", "Egress"],
@@ -732,10 +664,6 @@ class KubernetesJobSandboxBackend:
     def _labels(self, request: SandboxExecutionRequest) -> dict[str, str]:
         return {
             "app.kubernetes.io/managed-by": self._MANAGED_BY,
-            "aegis.github.com/tenant": self._label_value(
-                "tenant",
-                request.tenant_id,
-            ),
             "aegis.github.com/execution": self._label_value(
                 "execution",
                 request.execution_id,
@@ -750,16 +678,12 @@ class KubernetesJobSandboxBackend:
 
     @staticmethod
     def _job_name(request: SandboxExecutionRequest) -> str:
-        digest = sha256(
-            f"job\x00{request.tenant_id}\x00{request.execution_id}".encode()
-        ).hexdigest()[:32]
+        digest = sha256(f"job\x00{request.execution_id}".encode()).hexdigest()[:32]
         return f"aegis-sandbox-job-{digest}"
 
     @staticmethod
     def _network_policy_name(request: SandboxExecutionRequest) -> str:
-        digest = sha256(
-            f"network\x00{request.tenant_id}\x00{request.execution_id}".encode()
-        ).hexdigest()[:32]
+        digest = sha256(f"network\x00{request.execution_id}".encode()).hexdigest()[:32]
         return f"aegis-sandbox-net-{digest}"
 
     @staticmethod
@@ -789,7 +713,6 @@ class KubernetesJobSandboxBackend:
             policy is None
             or not isinstance(labels, Mapping)
             or any(labels.get(key) != value for key, value in expected.items())
-            or not self._network_policy_matches_request(policy, request)
         ):
             raise SandboxRejected("Kubernetes NetworkPolicy identity binding conflicts")
         return policy
@@ -864,18 +787,6 @@ class KubernetesJobSandboxBackend:
             raise SandboxRejected(
                 "sandbox namespace default-deny NetworkPolicy is incomplete"
             )
-        # Confirm there are no ingress/egress allow rules — any non-empty list
-        # would make the policy a partial-allow rather than a true default-deny.
-        ingress_rules = _get(policy, "spec", "ingress")
-        if ingress_rules is None:
-            ingress_rules = _get(policy, "spec", "ingress_rules")
-        egress_rules = _get(policy, "spec", "egress")
-        if egress_rules is None:
-            egress_rules = _get(policy, "spec", "egress_rules")
-        if ingress_rules or egress_rules:
-            raise SandboxRejected(
-                "sandbox namespace default-deny NetworkPolicy has allow rules"
-            )
         return policy
 
     def _pod_termination(
@@ -920,76 +831,6 @@ class KubernetesJobSandboxBackend:
             return next(item for item in terminations if item[0] == "OOMKilled")
         return terminations[-1] if terminations else (None, None)
 
-    def _job_matches_request(
-        self,
-        job: object,
-        request: SandboxExecutionRequest,
-    ) -> bool:
-        expected = _normalize_object(self.job_manifest(request))
-        actual = _normalize_object(job)
-        return bool(
-            self._matches_paths(
-                actual,
-                expected,
-                (
-                    ("spec", "backoffLimit"),
-                    ("spec", "activeDeadlineSeconds"),
-                    ("spec", "template", "metadata", "annotations"),
-                    ("spec", "template", "metadata", "labels"),
-                    ("spec", "template", "spec", "restartPolicy"),
-                    ("spec", "template", "spec", "runtimeClassName"),
-                    ("spec", "template", "spec", "serviceAccountName"),
-                    ("spec", "template", "spec", "automountServiceAccountToken"),
-                    ("spec", "template", "spec", "enableServiceLinks"),
-                    ("spec", "template", "spec", "hostNetwork"),
-                    ("spec", "template", "spec", "hostPID"),
-                    ("spec", "template", "spec", "hostIPC"),
-                    ("spec", "template", "spec", "securityContext"),
-                    ("spec", "template", "spec", "containers"),
-                    ("spec", "template", "spec", "volumes"),
-                ),
-            )
-            and not self._contains_host_path(job)
-        )
-
-    def _network_policy_matches_request(
-        self,
-        policy: object,
-        request: SandboxExecutionRequest,
-    ) -> bool:
-        expected = _normalize_object(self.network_policy_manifest(request))
-        actual = _normalize_object(policy)
-        return self._matches_paths(
-            actual,
-            expected,
-            (
-                ("spec", "podSelector", "matchLabels"),
-                ("spec", "policyTypes"),
-                ("spec", "ingress"),
-                ("spec", "egress"),
-            ),
-        )
-
-    @staticmethod
-    def _matches_paths(
-        actual: object,
-        expected: object,
-        paths: Sequence[tuple[str, ...]],
-    ) -> bool:
-        return all(
-            _normalized_get(actual, *path) == _normalized_get(expected, *path)
-            for path in paths
-        )
-
-    @staticmethod
-    def _contains_host_path(job: object) -> bool:
-        volumes = _normalized_get(job, "spec", "template", "spec", "volumes")
-        if not isinstance(volumes, Sequence) or isinstance(volumes, (str, bytes)):
-            return False
-        return any(
-            isinstance(volume, Mapping) and "hostpath" in volume for volume in volumes
-        )
-
 
 def build_kubernetes_job_sandbox_backend(
     *,
@@ -1013,8 +854,7 @@ def build_kubernetes_job_sandbox_backend(
         client = importlib.import_module("kubernetes.client")
         configuration = client.Configuration()
         configuration.host = host
-        configuration.api_key = {"authorization": token}
-        configuration.api_key_prefix = {"authorization": "Bearer"}
+        configuration.api_key = {"authorization": f"Bearer {token}"}
         configuration.ssl_ca_cert = ca_cert_path
         configuration.verify_ssl = True
         configuration.proxy = None
@@ -1246,12 +1086,9 @@ def safe_extract_zip(
             raise ArtifactQuarantined("atomic staging destination already exists")
         os.replace(staging, destination)
         return tuple(destination / item.relative_to(staging) for item in extracted)
-    except ArtifactQuarantined:
+    except (ArtifactQuarantined, ValueError, zipfile.BadZipFile):
         shutil.rmtree(staging, ignore_errors=True)
         raise
-    except (ValueError, zipfile.BadZipFile) as exc:
-        shutil.rmtree(staging, ignore_errors=True)
-        raise ArtifactQuarantined("archive is malformed or corrupted") from exc
     except Exception as exc:
         shutil.rmtree(staging, ignore_errors=True)
         raise ArtifactQuarantined("archive extraction failed closed") from exc

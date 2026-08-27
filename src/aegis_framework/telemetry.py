@@ -88,42 +88,6 @@ _SAFE_ATTRIBUTE_KEYS: Final = frozenset(
         "aegis.tokens.output",
         "aegis.queue.age.ms",
         "aegis.semantic.version",
-        # Span-level observation attributes from OtelObservability
-        "aegis.scenario",
-        "aegis.evidence_count",
-        "aegis.finding_count",
-        "aegis.citation_count",
-        "aegis.injection_detected",
-        "aegis.error_code",
-        "aegis.connector_kind",
-        "aegis.page_count",
-        "aegis.record_count",
-        "aegis.quarantined_count",
-        "aegis.rate_limited",
-        "aegis.reconciliation_required",
-        "aegis.stale_result",
-        "aegis.node",
-        "aegis.role",
-        "aegis.artifact_count",
-        "aegis.critic_decision",
-        "aegis.action_kind",
-        "aegis.approval_status",
-        "aegis.effect_outcome",
-        "aegis.verification_status",
-        "aegis.rollback",
-        "aegis.sandbox_outcome",
-        "aegis.artifact_disposition",
-        "aegis.output_file_count",
-        "aegis.output_byte_bucket",
-        "aegis.cleanup_status",
-        "aegis.runtime_profile",
-        "aegis.memory_tier",
-        "aegis.memory_outcome",
-        "aegis.candidate_count",
-        "aegis.chunk_count",
-        "aegis.cache_hit",
-        "aegis.context_token_bucket",
-        "aegis.purged_count",
     }
 )
 _ENUM_VALUES: Final[dict[str, frozenset[str]]] = {
@@ -156,7 +120,6 @@ _ENUM_VALUES: Final[dict[str, frozenset[str]]] = {
             "ambiguous",
             "degraded",
             "unavailable",
-            "complete",
         }
     ),
     "aegis.error.type": frozenset(
@@ -205,20 +168,6 @@ _METRIC_LABEL_VALUES: Final[dict[str, frozenset[str]]] = {
     "reason": _ENUM_VALUES["aegis.error.type"],
     "severity": frozenset({"page", "ticket", "warning"}),
     "signal": frozenset({"traces", "metrics", "logs"}),
-    "control": frozenset(
-        {
-            "approval",
-            "audit",
-            "fence",
-            "idempotency",
-            "integrity",
-            "ledger",
-            "policy",
-            "provenance",
-            "retention",
-            "rls",
-        }
-    ),
     "criticality": frozenset({"correctness", "optional"}),
     "dependency": frozenset(
         {

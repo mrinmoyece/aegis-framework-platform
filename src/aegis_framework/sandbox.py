@@ -885,13 +885,8 @@ _STATUS_BY_FACT = {
     SandboxFactType.CLEANED: SandboxStatus.CLEANED,
     SandboxFactType.QUARANTINED: SandboxStatus.QUARANTINED,
     SandboxFactType.RECONCILIATION_STARTED: SandboxStatus.RECONCILING,
-    # RECONCILIATION_RESOLVED is handled dynamically via payload["resolved_status"].
+    SandboxFactType.RECONCILIATION_RESOLVED: SandboxStatus.RECONCILING,
 }
-
-# Statuses from which no further facts are accepted.
-_TERMINAL_STATUSES: frozenset[SandboxStatus] = frozenset(
-    {SandboxStatus.CLEANED, SandboxStatus.QUARANTINED}
-)
 
 
 def reduce_sandbox(
@@ -941,36 +936,11 @@ def reduce_sandbox(
     ):
         raise IntegrityFailure("sandbox fact chain is invalid")
     update: dict[str, object] = {
+        "status": _STATUS_BY_FACT[fact.fact_type],
         "version": fact.sequence,
         "last_fact_digest": fact.canonical_digest,
         "updated_at": fact.recorded_at,
     }
-    if fact.fact_type is SandboxFactType.RECONCILIATION_RESOLVED:
-        # The resolved status is carried in the payload so replay can reflect
-        # the actual outcome rather than permanently retaining RECONCILING.
-        raw = fact.payload.get("resolved_status")
-        if raw is None:
-            raise IntegrityFailure(
-                "reconciliation_resolved fact missing resolved_status payload"
-            )
-        try:
-            update["status"] = SandboxStatus(str(raw))
-        except ValueError as exc:
-            raise IntegrityFailure(
-                f"reconciliation_resolved fact has unknown resolved_status: {raw!r}"
-            ) from exc
-    else:
-        if current.status in _TERMINAL_STATUSES:
-            raise IntegrityFailure(
-                f"sandbox execution is terminal ({current.status.value}); "
-                "no further facts are accepted"
-            )
-        status = _STATUS_BY_FACT.get(fact.fact_type)
-        if status is None:
-            raise IntegrityFailure(
-                f"sandbox fact type {fact.fact_type!r} is not mapped to a status"
-            )
-        update["status"] = status
     for key in (
         "provider_uid",
         "result_digest",

@@ -139,21 +139,6 @@ class PostgresEvidenceRepository:
         except ValidationError as exc:
             raise IntegrityFailure("evidence cursor projection is malformed") from exc
 
-    def current_cursor_ref(self, *, tenant_id: str, query_id: str) -> str | None:
-        try:
-            with tenant_transaction(self._pool, tenant_id=tenant_id) as connection:
-                row = connection.execute(
-                    """
-                    SELECT cursor_ref
-                    FROM aegis.evidence_cursors
-                    WHERE tenant_id = %s AND query_id = %s
-                    """,
-                    (tenant_id, query_id),
-                ).fetchone()
-        except Error as exc:
-            raise RepositoryUnavailable("evidence cursor_ref query failed") from exc
-        return str(row["cursor_ref"]) if row is not None else None
-
     def rebuild_projections(self, *, tenant_id: str) -> int:
         """Rebuild query status only from verified application events."""
 

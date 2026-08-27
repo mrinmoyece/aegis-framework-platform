@@ -45,7 +45,7 @@ def main() -> int:
             expected_generation=41,
             next_generation=42,
             approval_ref="approval:restore-drill",
-            fence_digest="add7a997f3fde3e8da473a02b8953d3ffa483cf7b30ea3c06dfaf244c59ce692",
+            fence_digest="d" * 64,
             source_writer_fenced=True,
             database_restore_verified=True,
             ledger_hashes_verified=True,

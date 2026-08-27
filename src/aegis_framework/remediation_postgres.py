@@ -369,11 +369,7 @@ class PostgresRemediationStore:
                     fact = RemediationFact.model_validate(
                         existing_command["fact_document"]
                     )
-                    if (
-                        fact.fact_type is not fact_type
-                        or fact.payload != dict(payload)
-                        or fact.plan_id != plan_id
-                    ):
+                    if fact.fact_type is not fact_type or fact.payload != dict(payload):
                         raise IdempotencyConflict(
                             "remediation command replay changed input"
                         )

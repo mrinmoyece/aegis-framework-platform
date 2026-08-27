@@ -220,14 +220,6 @@ class AegisSandboxWorkflow:
                     heartbeat=timedelta(seconds=30),
                 )
                 terminal = await self._handle_execution(value, execution)
-            # Re-check for a cancel signal that arrived during the long-running
-            # wait_for_completion activity.  The workflow thread is blocked on
-            # the activity so signals are buffered; we must drain them before
-            # proceeding to capture/attestation.
-            if terminal.status not in {"cancelled", "failed", "timed_out"}:
-                post_wait_cancel = await self._cancel_if_requested(value)
-                if post_wait_cancel is not None:
-                    terminal = post_wait_cancel
             if terminal.status == "succeeded":
                 self._stage = "capturing_outputs"
                 capture = await self._activity(
@@ -277,12 +269,10 @@ class AegisSandboxWorkflow:
                     heartbeat=timedelta(seconds=30),
                 )
                 if cleanup.outcome == "ambiguous":
-                    reconcile = await self._reconcile_ambiguous(
+                    await self._reconcile_ambiguous(
                         value,
                         failure_code="ambiguous_delete",
                     )
-                    if reconcile.outcome not in {"cleaned", "absent", "duplicate"}:
-                        terminal = self._failed(value, "cleanup_failed")
                 elif cleanup.outcome not in {"cleaned", "absent", "duplicate"}:
                     terminal = self._failed(value, "cleanup_failed")
             except (ActivityError, ApplicationError):

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import uvicorn
 
-from aegis_framework.errors import IntegrityFailure, OptionalDependencyMissing
+from aegis_framework.errors import IntegrityFailure
 from aegis_framework.evals import load_cases, run_eval_suite
 from aegis_framework.fixtures import (
     DemoScenario,
@@ -155,8 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
+    args = build_parser().parse_args(argv)
     if args.command == "demo":
         scenario = DemoScenario(args.scenario)
         bundle = build_demo_bundle(scenario)
@@ -175,18 +174,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_governed_eval(args)
         report = run_eval_suite(load_cases(args.cases))
         if args.publish_langfuse:
-            try:
-                from aegis_framework.langfuse_adapter import (
-                    build_langfuse_observability,
-                )
+            from aegis_framework.langfuse_adapter import build_langfuse_observability
 
-                build_langfuse_observability().publish_evaluation(
-                    total=report.total,
-                    succeeded=report.succeeded,
-                    passed=report.passed,
-                )
-            except OptionalDependencyMissing as exc:
-                parser.exit(2, f"{parser.prog}: error: {exc}\n")
+            build_langfuse_observability().publish_evaluation(
+                total=report.total,
+                succeeded=report.succeeded,
+                passed=report.passed,
+            )
         print(report.model_dump_json(indent=2))
         return 0 if report.passed else 1
     if args.command == "remediation-demo":
@@ -211,13 +205,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             payload = json.loads(args.events.read_text(encoding="utf-8"))
             debugger = ReplayDebugger(load_events(payload))
-            integrity = debugger.verify()
-            if not integrity.valid:
-                raise IntegrityFailure(
-                    f"export integrity check failed: {integrity.failure_code}"
-                )
             if args.view == "verify":
-                replay_result: object = integrity.model_dump(mode="json")
+                replay_result: object = debugger.verify().model_dump(mode="json")
             elif args.view == "state":
                 replay_result = debugger.state_at(
                     aggregate_id=args.run_id,
@@ -287,10 +276,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             control = WorkerControl(_worker_runtime_directory())
             control.request_drain()
-            drained = control.wait_for_drain(timeout_seconds=args.timeout_seconds)
+            control.wait_for_drain(timeout_seconds=args.timeout_seconds)
         except OSError:
             return 1
-        return 0 if drained else 1
+        return 0
 
     uvicorn.run(
         "aegis_framework.api:app",
@@ -349,14 +338,12 @@ def _run_governed_eval(args: argparse.Namespace) -> int:
         )
         return 0
     if args.eval_action == "update-baseline":
-        previous = load_baseline(args.output) if args.output.exists() else None
         reviewed = create_baseline(
             suite=suite,
             dataset=dataset,
             case_ids=(case.case_id for case in cases),
             reviewed_by=args.reviewed_by,
             review_reason=args.reason,
-            previous=previous,
         )
         candidate_runner = EvaluationRunner(
             suite=suite,

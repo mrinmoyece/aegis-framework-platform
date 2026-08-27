@@ -1,5 +1,5 @@
 {
-  "api_version": "0.15.0",
+  "api_version": "0.16.0",
   "models": {
     "AuthorizationStart": [
       "authorization_url",

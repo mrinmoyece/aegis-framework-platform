@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import contextlib
 from collections.abc import Callable, Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 from threading import BoundedSemaphore
@@ -25,10 +24,8 @@ from aegis_framework.interoperability import (
     ToolContract,
     TransportKind,
     TrustEntry,
-    TrustTier,
     canonical_json,
     digest_value,
-    require_trusted_peer,
     validate_untrusted_text,
 )
 
@@ -534,8 +531,6 @@ class McpClientRegistration(StrictModel):
     registration_id: Identifier
     tenant_ref: OpaqueReference
     peer_id: Identifier
-    required_peer_environment: Literal["development", "test", "staging", "production"]
-    minimum_trust_tier: TrustTier
     supported_protocol_versions: tuple[Identifier, ...] = Field(
         min_length=1, max_length=8
     )
@@ -610,7 +605,6 @@ class HardenedMcpClient:
         registration: McpClientRegistration,
         peer: TrustEntry,
         sdk: McpSdkClientPort,
-        now: Callable[[], datetime] | None = None,
     ) -> None:
         if (
             peer.protocol is not ProtocolKind.MCP
@@ -629,50 +623,28 @@ class HardenedMcpClient:
         self._registration = registration
         self._peer = peer
         self._sdk = sdk
-        self._now = now or (lambda: datetime.now(UTC))
         self._initialization: McpInitialization | None = None
         self._concurrency = BoundedSemaphore(registration.maximum_concurrency)
 
     def initialize(self) -> McpInitialization:
-        require_trusted_peer(
-            self._peer,
-            protocol=ProtocolKind.MCP,
-            now=self._now(),
-            expected_environment=self._registration.required_peer_environment,
-            minimum_trust_tier=self._registration.minimum_trust_tier,
-        )
         result = self._sdk.initialize(
             registration=self._registration,
             peer=self._peer,
         )
-        try:
-            if result.negotiated_protocol_version not in (
-                self._registration.supported_protocol_versions
-            ):
-                raise PolicyDenied(
-                    "MCP protocol negotiation selected an unsupported version"
-                )
-            if not set(self._registration.required_capabilities).issubset(
-                result.capabilities
-            ):
-                raise PolicyDenied("MCP server capabilities are insufficient")
-        except PolicyDenied:
-            # Close the SDK session immediately so it is not left open while
-            # the caller handles the policy denial.
-            with contextlib.suppress(BaseException):
-                self._sdk.close(registration=self._registration, initialization=result)
-            raise
+        if result.negotiated_protocol_version not in (
+            self._registration.supported_protocol_versions
+        ):
+            raise PolicyDenied(
+                "MCP protocol negotiation selected an unsupported version"
+            )
+        if not set(self._registration.required_capabilities).issubset(
+            result.capabilities
+        ):
+            raise PolicyDenied("MCP server capabilities are insufficient")
         self._initialization = result
         return result
 
     def discover_tools(self) -> tuple[ToolContract, ...]:
-        require_trusted_peer(
-            self._peer,
-            protocol=ProtocolKind.MCP,
-            now=self._now(),
-            expected_environment=self._registration.required_peer_environment,
-            minimum_trust_tier=self._registration.minimum_trust_tier,
-        )
         initialization = self._require_initialization()
         cursor: str | None = None
         observed_cursors: set[str] = set()
@@ -712,25 +684,8 @@ class HardenedMcpClient:
         timeout_seconds: float,
         cancelled: Callable[[], bool],
     ) -> McpCallResult:
-        require_trusted_peer(
-            self._peer,
-            protocol=ProtocolKind.MCP,
-            now=self._now(),
-            expected_environment=self._registration.required_peer_environment,
-            minimum_trust_tier=self._registration.minimum_trust_tier,
-        )
         if name not in self._registration.allowed_tools:
             raise PolicyDenied("MCP tool is not allowlisted")
-        # Enforce resource allowlist: the middle segment of the tool name
-        # identifies its resource kind (e.g. "aegis.status.read" → "status").
-        # If allowed_resources is non-empty, the tool's resource kind must appear in it.
-        name_parts = name.split(".")
-        if (
-            len(name_parts) >= 3
-            and self._registration.allowed_resources
-            and name_parts[1] not in self._registration.allowed_resources
-        ):
-            raise PolicyDenied("MCP tool resource kind is not allowlisted")
         if cancelled():
             raise PolicyDenied("MCP call was cancelled before dispatch")
         with self._concurrency:

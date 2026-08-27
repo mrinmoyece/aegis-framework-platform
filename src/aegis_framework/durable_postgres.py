@@ -1243,11 +1243,6 @@ class PostgresDurability:
             raise ValueError("run does not exist")
         projection: RunView | None = None
         for event in events:
-            if event.schema_version != 1:
-                raise IntegrityFailure(
-                    f"event {event.event_id!r} has unsupported "
-                    f"schema_version {event.schema_version!r}; expected 1"
-                )
             projection = reduce_run(projection, event)
         if projection is None:
             raise IntegrityFailure("run projection could not be rebuilt")

@@ -1,0 +1,438 @@
+{
+  "axes": {
+    "configuration_loc": {
+      "conclusion": "Both include deployment, CI and governance configuration, but service topology and lock-file formats differ.",
+      "custom": 23730,
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "deployment",
+        ".github/workflows",
+        "qualification"
+      ],
+      "framework": "Machine-recomputed in framework_metrics.configuration_loc."
+    },
+    "deployment_footprint": {
+      "conclusion": "Framework consolidates the app/UI image but isolates more Temporal task queues; custom separates more application services and adds Redis.",
+      "custom": {
+        "compose_services": 9,
+        "kubernetes_yaml_files": 18,
+        "migrations": 11,
+        "required_stateful_services": [
+          "PostgreSQL/pgvector",
+          "Redis"
+        ]
+      },
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "compose.yaml",
+        "deployment/kubernetes",
+        "comparison/layer14-metrics.json"
+      ],
+      "framework": {
+        "compose_services": 7,
+        "kubernetes_yaml_files": 15,
+        "migrations": 10,
+        "required_stateful_services": [
+          "PostgreSQL/pgvector",
+          "Temporal Server"
+        ]
+      }
+    },
+    "deterministic_scenario_latency": {
+      "conclusion": "The executions share a host but not fixtures, interpreter, sample count or profile boundaries. Values are retained as reproducibility evidence and must not be ranked.",
+      "custom": {
+        "api_archive_replay_p50_p95_p99_ms": [
+          139.269,
+          254.417,
+          254.417
+        ],
+        "approval_effect_p50_p95_p99_ms": [
+          8.191,
+          19.551,
+          19.551
+        ],
+        "dag_fanout_fanin_p50_p95_p99_ms": [
+          27.237,
+          28.083,
+          28.083
+        ],
+        "eval_runner_p50_p95_p99_ms": [
+          381.667,
+          398.508,
+          398.508
+        ],
+        "python": "3.13.15",
+        "samples": "3 per local profile after one warmup"
+      },
+      "equivalence": "non-equivalent",
+      "evidence": [
+        "qualification/performance-profiles.json",
+        "comparison/layer16-final.json"
+      ],
+      "framework": {
+        "approval_reconciliation_p50_p95_p99_ms": [
+          1.011,
+          1.057,
+          1.326
+        ],
+        "authenticated_checkout_p50_p95_p99_ms": [
+          51.456,
+          57.709,
+          114.753
+        ],
+        "full_eval_p50_p95_p99_ms": [
+          323.291,
+          438.774,
+          466.141
+        ],
+        "graph_evidence_model_p50_p95_p99_ms": [
+          13.187,
+          14.13,
+          14.252
+        ],
+        "python": "3.14.7",
+        "samples": "20 per local profile, except ledger replay with 50"
+      }
+    },
+    "direct_dependencies": {
+      "conclusion": "Framework Aegis adds orchestration and UI framework dependencies while custom Aegis owns more mechanics directly.",
+      "custom": {
+        "python": 14,
+        "ui": 3
+      },
+      "equivalence": "equivalent",
+      "evidence": [
+        "pyproject.toml",
+        "ui/package.json"
+      ],
+      "framework": {
+        "python": 14,
+        "ui": 6
+      }
+    },
+    "documentation_loc": {
+      "conclusion": "Physical documentation volume is disclosed; navigability and claim accuracy matter more than size.",
+      "custom": 10382,
+      "equivalence": "equivalent",
+      "evidence": [
+        "docs",
+        "README.md"
+      ],
+      "framework": "Machine-recomputed in framework_metrics.documentation_loc."
+    },
+    "evaluation_coverage": {
+      "conclusion": "Custom has a broader case catalog. Framework reuses fewer real cross-layer cases and does not manufacture count parity.",
+      "custom": {
+        "capacity_profiles": 12,
+        "chaos_branches": 17,
+        "eval_cases": 127
+      },
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "evals/cases.json",
+        "qualification/chaos-matrix.json",
+        "comparison/layer15-metrics.json"
+      ],
+      "framework": {
+        "capacity_profiles": 12,
+        "chaos_fault_points": 17,
+        "governed_cases": 58
+      }
+    },
+    "failure_semantics": {
+      "conclusion": "Both are at-least-once across external effects and require idempotency or explicit ambiguity/reconciliation; framework histories never establish enterprise authority.",
+      "custom": "Application events plus PostgreSQL/Redis workers own delivery, lease, retry and reconciliation mechanics directly.",
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "docs/authority-boundaries.md",
+        "tests/test_release_layer16.py",
+        "qualification/chaos-matrix.json"
+      ],
+      "framework": "Temporal owns durable scheduling/retry and LangGraph owns bounded cognitive checkpoints; application events, intent, approval, fencing, receipts and reconciliation remain truth."
+    },
+    "implementation_effort_proxy": {
+      "conclusion": "Changed-file and line counts are a reproducible size proxy only; neither repository records comparable person-hours.",
+      "custom": {
+        "additions": 5549,
+        "commits": 1,
+        "deletions": 139,
+        "files_changed": 71,
+        "sha": "1cccd9363fec83f7f4b2748b0e913be3a123d5ce"
+      },
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "git diff --numstat 4f4b8924247367f959c910f8261baea3337967d6",
+        "GitHub PR 18 metadata retrieved 2026-08-18"
+      ],
+      "framework": {
+        "additions": 4253,
+        "base_sha": "536979cc0b0bff028134db644f27bbb9d8c1791a",
+        "commits": 1,
+        "deletions": 5345,
+        "files_changed": 150
+      }
+    },
+    "learning_curve": {
+      "conclusion": "Framework Aegis accelerates conventional framework literacy but increases breadth; custom Aegis concentrates complexity in code the team fully owns.",
+      "custom": "Requires deeper study of bespoke ledger, worker, lease, retry and reconciliation code with fewer orchestration-framework concepts.",
+      "equivalence": "non-equivalent",
+      "evidence": [
+        "docs/learning-path.md",
+        "docs/framework-verdicts.md"
+      ],
+      "framework": "Requires application authority design plus LangGraph, Temporal, Langfuse/OTel, FastAPI/Pydantic, pgvector, React/TanStack/Zod, protocol SDKs and infrastructure tooling."
+    },
+    "locked_dependencies": {
+      "conclusion": "Python closure is materially larger for framework Aegis. npm package and pnpm entry counts are not structurally identical.",
+      "custom": {
+        "pnpm_entries": 652,
+        "python_packages": 71
+      },
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "uv.lock",
+        "ui/package-lock.json",
+        "comparison/layer15-metrics.json"
+      ],
+      "framework": {
+        "npm_packages": 615,
+        "python_packages": 151
+      }
+    },
+    "operational_burden": {
+      "conclusion": "Temporal removes custom queue/timer/replay mechanics but adds managed service, payload, retention, versioning, cost and failover operations.",
+      "custom": "Operate PostgreSQL, Redis transport/leases/reconcilers, custom worker semantics, Kubernetes, identity, telemetry and signed supply chain.",
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "docs/production-deployment.md",
+        "docs/framework-comparison-layer15.md"
+      ],
+      "framework": "Operate PostgreSQL, Temporal namespace/queues/history/versioning, Kubernetes, identity, telemetry, signed supply chain and framework upgrades."
+    },
+    "portability_and_lock_in": {
+      "conclusion": "Neither design is lock-in free. Accept only if ledger export, projection rebuild and replacement rehearsal preserve identical application truth.",
+      "custom": "Fewer orchestration-framework formats, but custom Redis/worker/event contracts and bespoke operational tooling must be maintained or migrated.",
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "src/aegis_framework/ports.py",
+        "docs/framework-verdicts.md",
+        "tests/test_release_layer16.py"
+      ],
+      "framework": "Provider-neutral ports and application-ledger rebuild reduce coupling, but Temporal histories, LangGraph checkpoint formats and a larger SDK closure add migration work."
+    },
+    "production_loc": {
+      "conclusion": "The custom implementation contains more product-source LOC under the shared physical-line scope; LOC alone does not establish quality or ownership burden.",
+      "custom": 70701,
+      "equivalence": "equivalent",
+      "evidence": [
+        "tools/release_check.py",
+        "comparison/layer16-final.json"
+      ],
+      "framework": "Machine-recomputed in framework_metrics.production_loc."
+    },
+    "security_controls": {
+      "conclusion": "Control families overlap, but no independent penetration, live identity, sandbox, partner, managed recovery or certification evidence exists for either.",
+      "custom": "Equivalent application-owned control families with custom scheduling/worker enforcement and its own release-readiness/risk manifests.",
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "docs/threat-model.md",
+        "qualification/residual-risks.json",
+        "evals/cases.json"
+      ],
+      "framework": "Deny-default identity/policy, forced RLS, budgets, citation gates, exact approvals, fencing, telemetry minimization, sandbox/protocol boundaries and signed supply chain."
+    },
+    "services": {
+      "conclusion": "Framework Aegis replaces custom Redis worker transport with Temporal but carries a managed workflow control-plane dependency.",
+      "custom": [
+        "API",
+        "operator UI",
+        "migration",
+        "PostgreSQL/pgvector",
+        "Redis",
+        "Keycloak",
+        "OpenTelemetry Collector",
+        "Prometheus",
+        "Grafana"
+      ],
+      "equivalence": "partially-equivalent",
+      "evidence": [
+        "compose.yaml",
+        "comparison/layer15-metrics.json"
+      ],
+      "framework": [
+        "application",
+        "PostgreSQL/pgvector",
+        "Temporal",
+        "Keycloak",
+        "OpenTelemetry Collector",
+        "Prometheus",
+        "Grafana"
+      ]
+    },
+    "test_loc": {
+      "conclusion": "Both repositories invest heavily in executable tests; coverage denominators and omitted environment adapters differ.",
+      "custom": 32299,
+      "equivalence": "equivalent",
+      "evidence": [
+        "tools/release_check.py",
+        "tests",
+        "ui/e2e"
+      ],
+      "framework": "Machine-recomputed in framework_metrics.test_loc."
+    }
+  },
+  "comparison_basis": {
+    "custom": {
+      "evidence_retrieved_on": "2026-08-18",
+      "pull_request": 18,
+      "repository": "mrinmoyece/aegis-agent-platform",
+      "sha": "1cccd9363fec83f7f4b2748b0e913be3a123d5ce",
+      "state_observed": "open-unmerged"
+    },
+    "framework": {
+      "base_sha": "536979cc0b0bff028134db644f27bbb9d8c1791a",
+      "comparison_scope": "Layer 16 working tree measured against the exact Layer 15 base",
+      "repository": "mrinmoyece/aegis-framework-platform"
+    }
+  },
+  "custom_metrics": {
+    "compose_services": 9,
+    "configuration_loc": 23730,
+    "documentation_loc": 10382,
+    "production_loc": 70701,
+    "python_direct_dependencies": 14,
+    "python_locked_packages": 71,
+    "source": "Read-only GitHub archive for commit 1cccd9363fec83f7f4b2748b0e913be3a123d5ce measured with the documented Layer 16 script.",
+    "test_loc": 32299,
+    "ui_direct_dependencies": 3,
+    "ui_locked_entries": 652
+  },
+  "framework_metrics": {
+    "configuration_loc": 9701,
+    "documentation_loc": 8896,
+    "production_loc": 47094,
+    "python_direct_dependencies": 14,
+    "python_locked_packages": 151,
+    "test_loc": 21193,
+    "ui_direct_dependencies": 6,
+    "ui_locked_packages": 615
+  },
+  "framework_verdicts": [
+    {
+      "adopt_when": "The bounded cognitive topology removes more scheduling code than its checkpoint/migration burden.",
+      "code_removed": "Generic bounded fan-out/fan-in, reducer, conditional routing and checkpoint scheduling.",
+      "exit_strategy": "Rebuild artifacts/read models from application facts; replace OrchestratorPort and discard checkpoints.",
+      "failure_and_upgrade_risks": "Checkpoint serialization drift, topology replay incompatibility and accidental framework-state authority.",
+      "framework": "LangGraph",
+      "not_replaced": "Roles, capabilities, evidence projection, citations, budgets, policy, approval, audit, effects and deterministic application artifacts.",
+      "operational_cost": "Checkpoint storage, compatibility, pruning, recursion bounds and graph-version migrations.",
+      "reject_when": "The graph needs dynamic authority, opaque replay-only state or cannot be rebuilt from application facts.",
+      "verdict": "Adopt only as a bounded non-authoritative cognitive adapter."
+    },
+    {
+      "adopt_when": "Long waits and cross-process recovery justify a dedicated durable workflow service.",
+      "code_removed": "Queue leases, heartbeats, timers, signals, activity retry, worker recovery and workflow replay mechanics.",
+      "exit_strategy": "Keep opaque workflow references and application outbox/events; drain/reconcile and reissue stable operations to a replacement scheduler.",
+      "failure_and_upgrade_risks": "Nondeterministic workflow changes, history retention/loss, retry duplication, saturation and managed-service coupling.",
+      "framework": "Temporal",
+      "not_replaced": "Transactional outbox, current authorization, budgets, intent, idempotency, approval truth, fencing, receipts, reconciliation and audit.",
+      "operational_cost": "Namespace, task queues, payload codec, identity, retention, versioning, capacity, cost, failover and history export.",
+      "reject_when": "A simple database worker suffices or history/export/privacy/cost constraints are unacceptable.",
+      "verdict": "Adopt for durable orchestration, never as application truth."
+    },
+    {
+      "adopt_when": "Sanitized count/digest UX adds debugging value under reviewed retention.",
+      "code_removed": "Optional trace and evaluation experiment UX.",
+      "exit_strategy": "Keep OTLP semantics and local deterministic reports; delete Langfuse data without losing truth.",
+      "failure_and_upgrade_risks": "Telemetry outage, schema/client drift and accidental payload capture.",
+      "framework": "Langfuse",
+      "not_replaced": "Application audit, replay, authorization, SLO semantics, redaction policy or local release gates.",
+      "operational_cost": "Backend, retention, access control, sampling, exporter monitoring and privacy review.",
+      "reject_when": "Automatic graph capture or hosted data policy conflicts with privacy boundaries.",
+      "verdict": "Optional manual adapter only; automatic tracing stays disabled."
+    },
+    {
+      "adopt_when": "Typed HTTP/OpenAPI delivery fits the service and strict models remain explicit.",
+      "code_removed": "HTTP routing, OpenAPI mechanics, parsing and strict runtime validation boilerplate.",
+      "exit_strategy": "Preserve strict domain contracts and delivery ports; replace the ASGI adapter.",
+      "failure_and_upgrade_risks": "Validation/coercion changes, generated-schema drift and middleware ordering mistakes.",
+      "framework": "FastAPI/Pydantic",
+      "not_replaced": "Identity establishment, authorization, anti-enumeration, idempotency, tenant scoping or domain invariants.",
+      "operational_cost": "ASGI lifecycle, dependency/security updates, schema compatibility and validation-performance review.",
+      "reject_when": "Framework dependency injection obscures authority or coercive schemas weaken boundaries.",
+      "verdict": "Adopt at delivery and contract boundaries, not for enterprise policy."
+    },
+    {
+      "adopt_when": "The SDK is official, exact-pinned, retry-disabled and isolated behind a narrow port.",
+      "code_removed": "Wire protocols, authentication plumbing, object encoding/decoding and provider-specific request mechanics.",
+      "exit_strategy": "Keep provider-neutral ports and deterministic fakes; replace one vendor adapter at a time.",
+      "failure_and_upgrade_risks": "Default retries, changed models, transport behavior, new fields and supply-chain findings.",
+      "framework": "official model/connector/Kubernetes SDKs",
+      "not_replaced": "Tenant policy, SSRF/egress controls, secret references, quotas, retries, provenance, citations, target binding or reconciliation.",
+      "operational_cost": "Large transitive dependency trees, provider release cadence and compatibility testing.",
+      "reject_when": "It widens authority, hides network behavior or cannot meet pinning/privacy requirements.",
+      "verdict": "Prefer official mechanics behind application-owned controls."
+    },
+    {
+      "adopt_when": "PostgreSQL locality and workload scale are acceptable and rebuild is rehearsed.",
+      "code_removed": "Separate vector database service and custom vector storage/index protocol.",
+      "exit_strategy": "Rebuild the derived index from application records/facts plus retained approved content; keep neutral retrieval contracts.",
+      "failure_and_upgrade_risks": "Recall/latency drift, extension compatibility and treating derived similarity as authority.",
+      "framework": "pgvector",
+      "not_replaced": "Memory acceptance, provenance, ACL/classification filters, retention, legal hold, MMR/context policy, citations or erasure.",
+      "operational_cost": "Extension lifecycle, ANN index tuning, vacuum/storage growth, backups and query-plan qualification.",
+      "reject_when": "Scale, isolation or managed extension constraints require a dedicated engine.",
+      "verdict": "Adopt as a disposable derived index, never memory truth."
+    },
+    {
+      "adopt_when": "The operator workflow benefits from typed rich-client state under a same-origin BFF.",
+      "code_removed": "Rendering, routing, query/cache/table mechanics and client runtime parsing.",
+      "exit_strategy": "Retain backend contracts and server-owned decisions; replace the UI without changing authority.",
+      "failure_and_upgrade_risks": "Cache bleed, schema drift, XSS regressions and rapid ecosystem upgrades.",
+      "framework": "React/TanStack/Zod",
+      "not_replaced": "Server authorization, tenant cache teardown policy, approval semantics, CSRF/origin, redaction or audit.",
+      "operational_cost": "Node toolchain, browser matrix, bundle, dependency audits and accessibility testing.",
+      "reject_when": "A static/server-rendered interface meets needs with materially less attack and upgrade surface.",
+      "verdict": "Adopt for derived operator UX; all mutations remain server-authorized."
+    },
+    {
+      "adopt_when": "A reviewed partner needs interoperable read/proposal workflows with exact trust pins.",
+      "code_removed": "Current protocol wire types, negotiation, transport, card and route mechanics.",
+      "exit_strategy": "Keep neutral application task/artifact contracts; disable a peer or replace its adapter.",
+      "failure_and_upgrade_risks": "Schema/card drift, confused deputy, replay, denial of wallet and untrusted content escalation.",
+      "framework": "MCP/A2A",
+      "not_replaced": "Workload identity, peer trust, tenant purpose/RBAC, quotas, SSRF, provenance, citations, approval or effects.",
+      "operational_cost": "Spec/SDK cadence, partner conformance, PKI/token brokerage, egress and revocation operations.",
+      "reject_when": "The peer requires direct effects, self-asserted tenancy or uncontrolled federation.",
+      "verdict": "Adopt only as an untrusted proposal/read adapter."
+    },
+    {
+      "adopt_when": "The organization can operate the control planes and enforce reviewed immutable promotion.",
+      "code_removed": "Kubernetes rollout primitives, Terraform dependency/state mechanics, GitHub build orchestration and Sigstore verification plumbing.",
+      "exit_strategy": "Use OCI digests, Kustomize, SQL, OTLP and provider-neutral application ports; export state and rehearse replacement.",
+      "failure_and_upgrade_risks": "Mutable inputs, state drift, controller/API changes, credential scope and supply-chain compromise.",
+      "framework": "infrastructure tooling",
+      "not_replaced": "Release approval, branch governance, application fencing, restore acceptance, SLO policy or compliance evidence.",
+      "operational_cost": "Clusters, cloud state, controllers, action pinning, registry/signing, drift, upgrades and on-call.",
+      "reject_when": "The deployment footprint exceeds team capability or required live controls cannot be owned.",
+      "verdict": "The checked-in reference is locally qualified; live infrastructure remains a hard gate."
+    }
+  ],
+  "generated_on": "2026-08-18",
+  "layer": 16,
+  "measurement_method": {
+    "dependencies": "Direct runtime dependencies come from project dependencies and UI dependencies. Locked Python packages come from uv.lock or the pinned custom requirements.lock; UI lock entry counts are disclosed separately because npm and pnpm lock structures differ.",
+    "effort_proxy": "One-commit changed-file/addition/deletion counts only. They are not person-hours, complexity, quality or maintainability measures.",
+    "latency": "Both pinned revisions were executed on the same Apple arm64 host on 2026-08-18 with Python 3.14.7 for framework and Python 3.13.15 for custom. Framework uses 20 or 50 samples; custom uses three. Fixtures and profile boundaries differ, so results are regression evidence only and no cross-repository latency ranking is supported.",
+    "loc": "Physical lines including comments and blanks. Production is Python under src plus non-test TypeScript/TSX under the operator UI source. Tests are Python tests plus UI unit/e2e test sources. Configuration includes workflows, deployment, eval, migration, observability, qualification and package/build configuration but excludes dependency lock files. Documentation is every tracked Markdown file."
+  },
+  "missing_data": [
+    "Comparable person-hours and staffing history",
+    "Equivalent production topology latency, throughput, cost and saturation",
+    "Equivalent live provider, connector, partner and model quality",
+    "Independent penetration, accessibility, privacy, legal and compliance assessments",
+    "Production export/replacement rehearsal with identical projection digests"
+  ],
+  "production_ranking_supported": false,
+  "schema_version": 16
+}

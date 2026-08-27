@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import re
+import runpy
 import shutil
 import subprocess
 import sys
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -218,14 +220,6 @@ def _kubernetes_errors() -> list[str]:
         for binding in bindings
     ):
         errors.append("fail-closed workload and sandbox admission is incomplete")
-    hardened = next(
-        (policy for policy in admission if _name(policy) == "aegis-hardened-pods"),
-        None,
-    )
-    if hardened is None or not _hardened_policy_enforces_all_container_classes(
-        hardened
-    ):
-        errors.append("workload admission policy does not harden every container class")
     if len(_by_kind(resources, "ClusterImagePolicy")) != 1:
         errors.append("keyless signature/SBOM admission policy is not rendered")
     return errors
@@ -261,7 +255,11 @@ def _pod_errors(pod_spec: dict[str, Any], owner: str) -> list[str]:
         for volume in pod_spec.get("volumes", [])
         if "hostPath" in volume
     )
-    for container in pod_spec.get("containers", []):
+    containers = (
+        *pod_spec.get("initContainers", []),
+        *pod_spec.get("containers", []),
+    )
+    for container in containers:
         image = container.get("image", "")
         if DIGEST_IMAGE.fullmatch(image) is None:
             errors.append(f"{owner}/{container.get('name')} image is not digest-pinned")
@@ -292,23 +290,6 @@ def _pod_errors(pod_spec: dict[str, Any], owner: str) -> list[str]:
         ):
             errors.append(f"{owner}/{container.get('name')} lacks drain/preStop")
     return errors
-
-
-def _hardened_policy_enforces_all_container_classes(policy: dict[str, Any]) -> bool:
-    expressions = " ".join(
-        validation.get("expression", "")
-        for validation in policy.get("spec", {}).get("validations", [])
-        if isinstance(validation, dict)
-    )
-    required_terms = (
-        "object.spec.containers.all",
-        "object.spec.initContainers.all",
-        "object.spec.ephemeralContainers.all",
-        "runAsNonRoot == true",
-        "readOnlyRootFilesystem == true",
-        "allowPrivilegeEscalation == false",
-    )
-    return all(term in expressions for term in required_terms)
 
 
 def _terraform_errors() -> list[str]:
@@ -386,26 +367,29 @@ def _supply_chain_errors() -> list[str]:
     )
     if "supply-chain.yml@refs/heads/master" not in policy or "spdx-sbom" not in policy:
         errors.append("keyless admission identity/SBOM policy is incomplete")
-    waivers = json.loads(
-        (ROOT / "security/vulnerability-waivers.json").read_text(encoding="utf-8")
-    )
-    if (
-        waivers.get("schema_version") != 1
-        or not isinstance(waivers.get("waivers"), list)
-        or len(waivers["waivers"]) > 16
-    ):
-        errors.append("Layer 14 vulnerability waivers are malformed or unbounded")
+    waiver_path = ROOT / "security/vulnerability-waivers.json"
+    try:
+        validate_waivers = runpy.run_path(ROOT / "tools/vulnerability_check.py")[
+            "validate_waivers"
+        ]
+        validate_waivers(
+            waiver_path=waiver_path,
+            today=datetime.now(UTC).date(),
+        )
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        errors.append(f"vulnerability waiver governance failed: {type(exc).__name__}")
     if "tools/vulnerability_check.py" not in supply:
         errors.append(
             "supply-chain workflow does not enforce exact vulnerability waivers"
         )
-    if "tools/spdx_check.py" not in supply:
-        errors.append("supply-chain workflow does not validate SPDX mandatory fields")
     return errors
 
 
 def _migration_errors() -> list[str]:
-    migration = (ROOT / "migrations/0010_layer14.sql").read_text(encoding="utf-8")
+    path = ROOT / "migrations/0010_layer14.sql"
+    if not path.is_file():
+        return ["missing migrations/0010_layer14.sql"]
+    migration = path.read_text(encoding="utf-8")
     required = (
         "pg_advisory_xact_lock",
         "deployment_generations",

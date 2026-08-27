@@ -123,6 +123,14 @@ memory truth from `InMemoryHybridIndex`, a Postgres chunk row, a Temporal
 or chunk table never affects ledger truth; it can always be rebuilt from
 `embed_completed`/`index_completed` facts and re-chunked/embedded content.
 
+After projection replay, `MemoryLifecycleService.rebuild_derived` accepts only the
+stored record plus retained approved content with the exact tenant, evidence,
+content digest, chunker and embedder versions. It appends a rebuild intent before
+embedding, replaces the derived set only after validating every vector, and appends
+completion. Retries reuse the caller's rebuild ID; a later independent index loss
+requires a new ID. Production still needs qualified blob/KMS and embedding adapters,
+so this local path is not live rebuild evidence.
+
 ## Incident triggers
 
 Escalate as platform/security incidents: a banned field (raw text/query/prompt/

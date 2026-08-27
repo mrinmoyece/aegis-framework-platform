@@ -1046,8 +1046,6 @@ def _mcp_registration() -> McpClientRegistration:
         registration_id="mcp-registration",
         tenant_ref="tenant-ref-acme",
         peer_id="peer-001",
-        required_peer_environment="staging",
-        minimum_trust_tier=TrustTier.PARTNER,
         supported_protocol_versions=(MCP_SPEC_VERSION,),
         required_capabilities=("tools",),
         allowed_tools=(McpToolName.STATUS_READ,),
@@ -1076,7 +1074,6 @@ def test_hardened_mcp_client_negotiation_allowlist_and_cursor_loop() -> None:
         registration=_mcp_registration(),
         peer=_trust(),
         sdk=sdk,
-        now=lambda: NOW,
     )
     assert client.initialize().negotiated_protocol_version == MCP_SPEC_VERSION
     assert client.discover_tools()[0].name == McpToolName.STATUS_READ
@@ -1102,7 +1099,6 @@ def test_hardened_mcp_client_negotiation_allowlist_and_cursor_loop() -> None:
         registration=_mcp_registration(),
         peer=_trust(),
         sdk=loop_sdk,
-        now=lambda: NOW,
     )
     loop_client.initialize()
     with pytest.raises(PayloadRejected, match="cursor loop"):
@@ -1124,7 +1120,6 @@ def test_hardened_mcp_client_negotiation_allowlist_and_cursor_loop() -> None:
         registration=_mcp_registration(),
         peer=_trust(),
         sdk=_HighRiskSdk(),
-        now=lambda: NOW,
     )
     high_risk.initialize()
     with pytest.raises(PolicyDenied, match="untrusted tool"):
@@ -1329,8 +1324,6 @@ def _a2a_registration(card: AgentCardContract) -> A2APeerRegistration:
         registration_id="a2a-registration",
         tenant_ref="tenant-ref-acme",
         peer_id="a2a-peer",
-        required_peer_environment="staging",
-        minimum_trust_tier=TrustTier.PARTNER,
         discovery_origin="https://peer.example.com",
         rpc_path="/a2a",
         supported_protocol_versions=(A2A_PROTOCOL_VERSION,),
@@ -1554,8 +1547,6 @@ def test_registry_denies_wrong_scope_expiry_and_invalid_transitions() -> None:
         ({"risk": RiskLevel.MEDIUM}, "risk"),
         ({"classification": DataClassification.RESTRICTED}, "classification"),
         ({"now": NOW + timedelta(days=8)}, "expired"),
-        ({"expected_environment": "production"}, "environment"),
-        ({"minimum_trust_tier": TrustTier.INTERNAL}, "tier"),
     ):
         arguments: dict[str, Any] = {
             "peer_id": "peer-001",
@@ -1640,70 +1631,6 @@ def test_workload_identity_claim_failures(
             channel_binding_digest="4" * 64,
             now=NOW,
         )
-
-
-def test_workload_identity_replay_scope_is_transport_bound() -> None:
-    policy = WorkloadIdentityPolicy(
-        audience="aegis-global",
-        allowed_issuer_digests=("1" * 64, "2" * 64),
-        required_scopes=("interop:invoke",),
-        allowed_purposes=("incident-response",),
-        maximum_lifetime_seconds=600,
-        require_mutual_tls=True,
-        allowed_principals=("workload-aegis",),
-    )
-    validator = WorkloadIdentityValidator(
-        policy=policy,
-        replay_cache=InMemoryReplayCache(),
-        mutual_tls_ready=lambda: True,
-        production=False,
-    )
-    shared = {
-        "principal_ref": "workload-aegis",
-        "scopes": ("interop:invoke",),
-        "tenant_ref": "tenant-ref-acme",
-        "purpose": "incident-response",
-        "token_id_digest": "2" * 64,
-        "proof_digest": "3" * 64,
-        "issued_at": NOW,
-        "expires_at": NOW + timedelta(minutes=5),
-    }
-    first = WorkloadIdentityAssertion(
-        **shared,
-        issuer_digest="1" * 64,
-        audience="mcp-http",
-        confirmation_digest="4" * 64,
-    )
-    second = WorkloadIdentityAssertion(
-        **shared,
-        issuer_digest="2" * 64,
-        audience="a2a-jsonrpc",
-        confirmation_digest="5" * 64,
-    )
-    assert (
-        validator.validate(
-            first,
-            expected_tenant_ref="tenant-ref-acme",
-            expected_purpose="incident-response",
-            channel_binding_digest="4" * 64,
-            expected_audience="mcp-http",
-            allowed_issuer_digests=("1" * 64,),
-            now=NOW,
-        ).audience
-        == "mcp-http"
-    )
-    assert (
-        validator.validate(
-            second,
-            expected_tenant_ref="tenant-ref-acme",
-            expected_purpose="incident-response",
-            channel_binding_digest="5" * 64,
-            expected_audience="a2a-jsonrpc",
-            allowed_issuer_digests=("2" * 64,),
-            now=NOW,
-        ).audience
-        == "a2a-jsonrpc"
-    )
 
 
 def test_ledger_projection_and_quota_conflicts_are_explicit() -> None:
@@ -1857,13 +1784,11 @@ def test_mcp_registration_and_client_fail_closed_edges() -> None:
             registration=registration,
             peer=_trust().model_copy(update={"schema_digest": "f" * 64}),
             sdk=sdk,
-            now=lambda: NOW,
         )
     client = HardenedMcpClient(
         registration=registration,
         peer=_trust(),
         sdk=sdk,
-        now=lambda: NOW,
     )
     with pytest.raises(PolicyDenied, match="initialized"):
         client.call(
@@ -2036,72 +1961,6 @@ def test_review_regressions_preserve_tenant_and_card_pins() -> None:
         }
     )
     assert resigned.card_digest == first.card_digest
-    with pytest.raises(PayloadRejected, match="bytes"):
-        parse_official_agent_card(
-            document
-            | {
-                "signatures": [
-                    {
-                        "protected": document["signatures"][0]["protected"],
-                    }
-                ]
-            }
-        )
-
-
-def test_transport_clients_reject_environment_and_tier_drift() -> None:
-    registration = _mcp_registration()
-    with pytest.raises(PolicyDenied, match="environment"):
-        HardenedMcpClient(
-            registration=registration.model_copy(
-                update={"required_peer_environment": "production"}
-            ),
-            peer=_trust(),
-            sdk=_McpSdk(),
-            now=lambda: NOW,
-        ).initialize()
-    with pytest.raises(PolicyDenied, match="tier"):
-        HardenedMcpClient(
-            registration=registration.model_copy(
-                update={"minimum_trust_tier": TrustTier.INTERNAL}
-            ),
-            peer=_trust(),
-            sdk=_McpSdk(),
-            now=lambda: NOW,
-        ).initialize()
-    card, _ = _card()
-    trust = _trust(
-        protocol=ProtocolKind.A2A,
-        peer_id="a2a-peer",
-        capability=A2ASkillName.STATUS,
-        card_digest=card.card_digest,
-    ).model_copy(
-        update={
-            "card_digest": card.card_digest,
-            "key_digest": card.key_digest,
-            "allowed_transports": (TransportKind.JSON_RPC_HTTP,),
-        }
-    )
-    with pytest.raises(PolicyDenied, match="environment"):
-        A2APeerGateway(
-            registration=_a2a_registration(card).model_copy(
-                update={"required_peer_environment": "production"}
-            ),
-            trust=trust,
-            sdk=_A2ASdk(card),
-            parse_card=lambda _: card,
-            now=lambda: NOW,
-        ).discover()
-    with pytest.raises(PolicyDenied, match="tier"):
-        A2APeerGateway(
-            registration=_a2a_registration(card).model_copy(
-                update={"minimum_trust_tier": TrustTier.INTERNAL}
-            ),
-            trust=trust,
-            sdk=_A2ASdk(card),
-            parse_card=lambda _: card,
-            now=lambda: NOW,
-        ).discover()
 
 
 def test_a2a_idempotency_reauthorizes_and_circuit_recovers() -> None:

@@ -25,16 +25,13 @@ from aegis_framework.interoperability import (
     ArtifactContract,
     MessageContract,
     PrincipalContract,
-    ProtocolKind,
     StatusContract,
     TaskContract,
     TaskState,
     TransportKind,
     TrustEntry,
-    TrustTier,
     canonical_json,
     digest_value,
-    require_trusted_peer,
 )
 
 
@@ -254,14 +251,6 @@ class BoundedA2AServer:
         task_ref: str,
         command_digest: str,
     ) -> A2ATaskResponse:
-        # Cancellation requires the same authorization as the initiating skill.
-        investigate_skill = self._skills[A2ASkillName.INVESTIGATE]
-        if not self._authorization.authorize(
-            principal=principal,
-            skill=investigate_skill,
-            resource_ref=task_ref,
-        ):
-            raise PolicyDenied("application policy denied the A2A cancellation")
         status = self._application.cancel(
             principal=principal,
             task_ref=task_ref,
@@ -298,8 +287,6 @@ class A2APeerRegistration(StrictModel):
     registration_id: Identifier
     tenant_ref: OpaqueReference
     peer_id: Identifier
-    required_peer_environment: Literal["development", "test", "staging", "production"]
-    minimum_trust_tier: TrustTier
     discovery_origin: Annotated[
         str,
         Field(pattern=r"^https://[a-zA-Z0-9][a-zA-Z0-9.-]*(?::[0-9]+)?$"),
@@ -406,13 +393,6 @@ class A2APeerGateway:
         self._card: AgentCardContract | None = None
 
     def discover(self) -> AgentCardContract:
-        require_trusted_peer(
-            self._trust,
-            protocol=ProtocolKind.A2A,
-            now=self._now(),
-            expected_environment=self._registration.required_peer_environment,
-            minimum_trust_tier=self._registration.minimum_trust_tier,
-        )
         card = self._parse_card(
             self._sdk.discover_card(registration=self._registration)
         )
@@ -422,6 +402,8 @@ class A2APeerGateway:
             raise PolicyDenied("A2A agent card digest pin changed")
         if card.protocol_version not in self._registration.supported_protocol_versions:
             raise PolicyDenied("A2A protocol version is unsupported")
+        if self._trust.expires_at <= self._now():
+            raise PolicyDenied("A2A peer trust is expired")
         if card.key_digest != self._trust.key_digest:
             raise PolicyDenied("A2A agent card key pin is invalid")
         trusted_origins = {
@@ -503,13 +485,6 @@ class A2APeerGateway:
     def _require_card(self) -> AgentCardContract:
         if self._card is None:
             raise PolicyDenied("A2A peer card has not been discovered and verified")
-        require_trusted_peer(
-            self._trust,
-            protocol=ProtocolKind.A2A,
-            now=self._now(),
-            expected_environment=self._registration.required_peer_environment,
-            minimum_trust_tier=self._registration.minimum_trust_tier,
-        )
         return self._card
 
     def _validate_response(

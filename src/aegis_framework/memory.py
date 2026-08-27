@@ -268,7 +268,6 @@ class MemoryAcceptance(StrictModel):
     decision_id: Identifier
     tenant_id: Identifier
     memory_id: Identifier
-    record_digest: Sha256Digest
     disposition: Literal["accept", "reject"]
     reviewer_ref: Identifier
     reviewer_kind: Literal["human", "policy"]
@@ -441,37 +440,6 @@ class SummarizationPort(Protocol):
     def summarize(self, request: SummaryRequest) -> SummaryResult: ...
 
 
-class MemoryScanResult(StrictModel):
-    content_digest: Sha256Digest
-    passed: bool
-    scanner_codes: Annotated[tuple[str, ...], Field(max_length=32)] = ()
-
-
-class MemoryScannerPort(Protocol):
-    def scan(
-        self,
-        *,
-        tenant_id: str,
-        memory_id: str,
-        content: str,
-        content_digest: Sha256Digest,
-    ) -> MemoryScanResult: ...
-
-
-class PassthroughMemoryScanner:
-    """Deterministic scanner that approves all content; substitute in tests."""
-
-    def scan(
-        self,
-        *,
-        tenant_id: str,
-        memory_id: str,
-        content: str,
-        content_digest: Sha256Digest,
-    ) -> MemoryScanResult:
-        return MemoryScanResult(content_digest=content_digest, passed=True)
-
-
 class MemoryFact(StrictModel):
     schema_version: Literal[1] = 1
     tenant_id: Identifier
@@ -493,17 +461,7 @@ class MemoryFact(StrictModel):
         if len(str(ordered).encode()) > _MAX_FACT_BYTES:
             raise ValueError("memory fact payload exceeds the immutable bound")
         sensitive = {"text", "query", "prompt", "completion", "tenant_id", "locator"}
-
-        def _check_keys(obj: object) -> bool:
-            if isinstance(obj, dict):
-                if sensitive.intersection(obj):
-                    return True
-                return any(_check_keys(v) for v in obj.values())
-            if isinstance(obj, list):
-                return any(_check_keys(v) for v in obj)
-            return False
-
-        if _check_keys(ordered):
+        if sensitive.intersection(ordered):
             raise ValueError("memory fact payload contains prohibited sensitive fields")
         return ordered
 
@@ -1121,6 +1079,9 @@ class InMemoryHybridIndex:
             raise IntegrityFailure("index input binding is invalid")
         with self._lock:
             self._items[(item.record.tenant_id, item.chunk.chunk_id)] = item
+            cache_keys = [key for key in self._cache if key[0] == item.record.tenant_id]
+            for cache_key in cache_keys:
+                self._cache.pop(cache_key)
 
     def retrieve(
         self,
@@ -1149,15 +1110,7 @@ class InMemoryHybridIndex:
         with self._lock:
             cached = self._cache.get(cache_key)
             if cached is not None and query.requested_at < cached[0]:
-                # Rebind query_id and recompute result_digest so the returned
-                # object is correct for this specific request.
-                base = cached[1].model_copy(
-                    update={"cache_hit": True, "query_id": query.query_id}
-                )
-                material = base.model_dump(mode="json", exclude={"result_digest"})
-                return base.model_copy(
-                    update={"result_digest": canonical_digest(material)}
-                )
+                return cached[1].model_copy(update={"cache_hit": True})
             if cached is not None:
                 self._cache.pop(cache_key)
             items = tuple(self._items.values())
@@ -1292,22 +1245,6 @@ class InMemoryMemoryControl:
             query,
             _deterministic_vector(query.text, self._dimensions),
         )
-
-
-class AuditedMemoryRetrievalControl:
-    """Wraps MemoryRetrievalService to satisfy MemoryRetrievalPort."""
-
-    def __init__(
-        self,
-        *,
-        service: MemoryRetrievalService,
-        embed: Callable[[str], Sequence[float]],
-    ) -> None:
-        self._service = service
-        self._embed = embed
-
-    def retrieve(self, query: RetrievalQuery) -> RetrievalResult:
-        return self._service.retrieve(query, self._embed(query.text))
 
 
 class MemoryRetrievalService:
@@ -1466,10 +1403,10 @@ class LangGraphMemoryContextBuilder:
         for index in _lost_middle_order(len(result.hits)):
             hit = result.hits[index]
             digest = sha256(canonical_text(hit.text).encode()).hexdigest()
-            framed = _frame_untrusted(hit)
-            tokens = token_estimate(framed)
+            tokens = token_estimate(hit.text)
             if digest in seen or used[hit.tier] + tokens > per_tier[hit.tier]:
                 continue
+            framed = _frame_untrusted(hit)
             if (
                 sum(len(_frame_untrusted(item).encode()) for item in chosen)
                 + len(framed.encode())
@@ -1486,7 +1423,7 @@ class LangGraphMemoryContextBuilder:
                 tier=hit.tier,
                 framed_text=_frame_untrusted(hit),
                 citation=hit.citation,
-                token_count=token_estimate(_frame_untrusted(hit)),
+                token_count=token_estimate(hit.text),
             )
             for hit in chosen
         )
@@ -1560,11 +1497,10 @@ class MemoryCompactor:
         result = self._summarizer.summarize(request)
         allowed = {chunk.chunk_id for chunk in request.source_chunks}
         cited = {citation for claim in result.claims for citation in claim.citations}
-        derived_coverage = len(cited) / len(allowed) if allowed else 0.0
         if (
             result.request_digest != request.request_digest
             or result.fence_token != request.fence_token
-            or derived_coverage < self._minimum_coverage
+            or result.source_coverage < self._minimum_coverage
             or not cited.issubset(allowed)
             or any(
                 not _claim_supported(claim, request.source_chunks)
@@ -1589,14 +1525,12 @@ class MemoryLifecycleService:
         index: InMemoryHybridIndex,
         chunker: DeterministicChunker,
         clock: Callable[[], datetime],
-        scanner: MemoryScannerPort | None = None,
     ) -> None:
         self._ledger = ledger
         self._embedder = embedder
         self._index = index
         self._chunker = chunker
         self._clock = clock
-        self._scanner: MemoryScannerPort = scanner or PassthroughMemoryScanner()
 
     def ingest(
         self,
@@ -1617,7 +1551,6 @@ class MemoryLifecycleService:
             or record.embedding_dimensions != embedding_spec.dimensions
             or acceptance.tenant_id != record.tenant_id
             or acceptance.memory_id != record.memory_id
-            or acceptance.record_digest != record.canonical_digest
         ):
             raise IntegrityFailure("memory candidate bindings are invalid")
         if evidence.disposition not in {
@@ -1665,41 +1598,19 @@ class MemoryLifecycleService:
                 "policy_digest": acceptance.policy_digest,
             },
         )
-        projection = self._append(
-            record,
-            expected=projection.version,
-            fact_type=MemoryFactType.SCAN_REQUESTED,
-            suffix=MemoryFactType.SCAN_REQUESTED.value,
-            actor_ref=actor_ref,
-            payload={"content_digest": record.content_digest},
-        )
-        scan_result = self._scanner.scan(
-            tenant_id=record.tenant_id,
-            memory_id=record.memory_id,
-            content=evidence.canonical_text,
-            content_digest=record.content_digest,
-        )
-        if not scan_result.passed:
-            raise PolicyDenied("memory content failed security scan")
-        projection = self._append(
-            record,
-            expected=projection.version,
-            fact_type=MemoryFactType.SCAN_COMPLETED,
-            suffix=MemoryFactType.SCAN_COMPLETED.value,
-            actor_ref=actor_ref,
-            payload={
-                "content_digest": record.content_digest,
-                "scanner_codes": list(scan_result.scanner_codes),
-            },
-        )
-        projection = self._append(
-            record,
-            expected=projection.version,
-            fact_type=MemoryFactType.CHUNK_REQUESTED,
-            suffix=MemoryFactType.CHUNK_REQUESTED.value,
-            actor_ref=actor_ref,
-            payload={"content_digest": record.content_digest},
-        )
+        for fact_type in (
+            MemoryFactType.SCAN_REQUESTED,
+            MemoryFactType.SCAN_COMPLETED,
+            MemoryFactType.CHUNK_REQUESTED,
+        ):
+            projection = self._append(
+                record,
+                expected=projection.version,
+                fact_type=fact_type,
+                suffix=fact_type.value,
+                actor_ref=actor_ref,
+                payload={"content_digest": record.content_digest},
+            )
         chunks = self._chunker.split(
             tenant_id=record.tenant_id,
             memory_id=record.memory_id,
@@ -1802,6 +1713,162 @@ class MemoryLifecycleService:
             },
         )
 
+    def rebuild_derived(
+        self,
+        *,
+        tenant_id: str,
+        memory_id: str,
+        rebuild_id: str,
+        evidence: NormalizedEvidence,
+        actor_ref: str,
+        embedding_spec: EmbeddingSpec,
+    ) -> MemoryProjection:
+        """Rebuild a disposable index from application facts and retained content."""
+
+        record = self._ledger.record(tenant_id=tenant_id, memory_id=memory_id)
+        if record is None:
+            raise IntegrityFailure("cannot rebuild unknown memory")
+        projection = self._ledger.projection(
+            tenant_id=tenant_id,
+            memory_id=memory_id,
+        )
+        if projection is None:
+            raise IntegrityFailure("memory projection must be rebuilt before its index")
+        if (
+            evidence.tenant_id != record.tenant_id
+            or evidence.evidence_id != record.provenance.evidence_id
+            or evidence.content_hash != record.content_digest
+            or record.chunker_version != self._chunker.version
+            or record.embedder_model != embedding_spec.model
+            or record.embedder_version != embedding_spec.version
+            or record.embedding_dimensions != embedding_spec.dimensions
+            or evidence.disposition
+            not in {EvidenceDisposition.ACCEPTED, EvidenceDisposition.REDACTED}
+            or projection.status is not MemoryStatus.ACTIVE
+            or not projection.indexed
+            or projection.tombstoned
+            or projection.derived_purged
+            or projection.blob_erased
+        ):
+            raise IntegrityFailure("memory rebuild bindings are invalid")
+        chunks = self._chunker.split(
+            tenant_id=record.tenant_id,
+            memory_id=record.memory_id,
+            text=evidence.canonical_text,
+            citation=record.citations[0],
+        )
+        chunk_facts = tuple(
+            fact
+            for fact in self._ledger.facts(
+                tenant_id=tenant_id,
+                memory_id=memory_id,
+            )
+            if fact.fact_type is MemoryFactType.CHUNK_COMPLETED
+        )
+        if (
+            len(chunk_facts) != 1
+            or chunk_facts[0].payload.get("chunk_count") != len(chunks)
+            or chunk_facts[0].payload.get("chunk_set_digest")
+            != canonical_digest(chunks)
+        ):
+            raise IntegrityFailure("memory rebuild chunk set differs from ledger")
+        request_material = {
+            "operation_id": stable_id(
+                "memory-rebuild-embed",
+                tenant_id,
+                memory_id,
+                rebuild_id,
+                length=32,
+            ),
+            "tenant_id": tenant_id,
+            "run_id": record.run_id,
+            "reservation_id": stable_id(
+                "memory-rebuild-reservation",
+                tenant_id,
+                memory_id,
+                rebuild_id,
+                length=32,
+            ),
+            "fence_token": stable_id(
+                "memory-rebuild-fence",
+                tenant_id,
+                memory_id,
+                rebuild_id,
+                length=32,
+            ),
+            "spec": embedding_spec,
+            "chunks": chunks,
+        }
+        request = EmbeddingRequest(
+            **request_material,
+            request_digest=canonical_digest(request_material),
+        )
+        prior_rebuild_facts = tuple(
+            fact
+            for fact in self._ledger.facts(
+                tenant_id=tenant_id,
+                memory_id=memory_id,
+            )
+            if fact.fact_type
+            in {
+                MemoryFactType.REBUILD_REQUESTED,
+                MemoryFactType.REBUILD_COMPLETED,
+            }
+            and fact.payload.get("rebuild_id") == rebuild_id
+        )
+        if any(
+            fact.payload.get("request_digest") != request.request_digest
+            for fact in prior_rebuild_facts
+        ):
+            raise IdempotencyConflict("memory rebuild replay changed")
+        if any(
+            fact.fact_type is MemoryFactType.REBUILD_COMPLETED
+            for fact in prior_rebuild_facts
+        ):
+            return projection
+        projection = self._append(
+            record,
+            expected=projection.version,
+            fact_type=MemoryFactType.REBUILD_REQUESTED,
+            suffix=f"rebuild-requested:{rebuild_id}",
+            actor_ref=actor_ref,
+            payload={
+                "rebuild_id": rebuild_id,
+                "request_digest": request.request_digest,
+                "record_digest": record.canonical_digest,
+                "spec_digest": embedding_spec.digest,
+            },
+        )
+        result = self._embedder.embed(request)
+        vectors = {vector.chunk_id: vector for vector in result.vectors}
+        if len(vectors) != len(chunks):
+            raise IntegrityFailure("memory rebuild embedding set is incomplete")
+        indexed = tuple(
+            IndexedChunk(
+                record=record,
+                chunk=chunk,
+                vector=vectors[chunk.chunk_id],
+                indexed_at=self._clock(),
+            )
+            for chunk in chunks
+        )
+        self._index.purge(tenant_id=tenant_id, memory_id=memory_id)
+        for item in indexed:
+            self._index.index(item)
+        return self._append(
+            record,
+            expected=projection.version,
+            fact_type=MemoryFactType.REBUILD_COMPLETED,
+            suffix=f"rebuild-completed:{rebuild_id}",
+            actor_ref=actor_ref,
+            payload={
+                "rebuild_id": rebuild_id,
+                "indexed_count": len(indexed),
+                "request_digest": request.request_digest,
+                "result_digest": result.result_digest,
+            },
+        )
+
     def tombstone_and_erase(
         self,
         *,
@@ -1817,40 +1884,34 @@ class MemoryLifecycleService:
             raise IntegrityFailure("memory is missing")
         if projection.legal_hold_count or record.retention.held:
             raise PolicyDenied("memory is under legal hold")
-        # Resume from projection state — any step already recorded is skipped so
-        # that a crashed caller can retry safely with the same command_id.
-        if not projection.tombstoned:
-            projection = self._append(
-                record,
-                expected=projection.version,
-                fact_type=MemoryFactType.TOMBSTONED,
-                suffix="tombstone",
-                actor_ref=actor_ref,
-                payload={"reason_code": reason_code},
-            )
-        if not projection.derived_purged:
-            purged = self._index.purge(tenant_id=tenant_id, memory_id=memory_id)
-            projection = self._append(
-                record,
-                expected=projection.version,
-                fact_type=MemoryFactType.DERIVED_PURGED,
-                suffix="purge",
-                actor_ref=actor_ref,
-                payload={"purged_count": purged},
-            )
-        if not projection.blob_erased:
-            erase_blob(record.blob)
-            return self._append(
-                record,
-                expected=projection.version,
-                fact_type=MemoryFactType.CRYPTO_ERASED,
-                suffix="crypto-erase",
-                actor_ref=actor_ref,
-                payload={
-                    "blob_ref_digest": sha256(record.blob.blob_ref.encode()).hexdigest()
-                },
-            )
-        return projection
+        projection = self._append(
+            record,
+            expected=projection.version,
+            fact_type=MemoryFactType.TOMBSTONED,
+            suffix="tombstone",
+            actor_ref=actor_ref,
+            payload={"reason_code": reason_code},
+        )
+        purged = self._index.purge(tenant_id=tenant_id, memory_id=memory_id)
+        projection = self._append(
+            record,
+            expected=projection.version,
+            fact_type=MemoryFactType.DERIVED_PURGED,
+            suffix="purge",
+            actor_ref=actor_ref,
+            payload={"purged_count": purged},
+        )
+        erase_blob(record.blob)
+        return self._append(
+            record,
+            expected=projection.version,
+            fact_type=MemoryFactType.CRYPTO_ERASED,
+            suffix="crypto-erase",
+            actor_ref=actor_ref,
+            payload={
+                "blob_ref_digest": sha256(record.blob.blob_ref.encode()).hexdigest()
+            },
+        )
 
     def supersede(
         self,
@@ -2091,11 +2152,6 @@ def _deterministic_vector(text: str, dimensions: int) -> tuple[float, ...]:
         values[0] = 1.0
     norm = math.sqrt(sum(value * value for value in values))
     return tuple(value / norm for value in values)
-
-
-def deterministic_query_vector(text: str, dimensions: int) -> tuple[float, ...]:
-    """Public wrapper for deterministic embedding in demos and tests."""
-    return _deterministic_vector(text, dimensions)
 
 
 def _terms(text: str) -> tuple[str, ...]:

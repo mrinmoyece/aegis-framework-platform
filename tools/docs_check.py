@@ -75,6 +75,20 @@ REQUIRED_DOCS = (
     "docs/security-assessment.md",
     "docs/demo-layer15.md",
     "docs/framework-comparison-layer15.md",
+    "docs/README.md",
+    "docs/learning-path.md",
+    "docs/troubleshooting.md",
+    "docs/framework-comparison-final.md",
+    "docs/framework-verdicts.md",
+    "docs/final-security-review.md",
+    "docs/release-readiness.md",
+    "docs/release-checklist.md",
+    "docs/governance.md",
+    "docs/versioning.md",
+    "docs/adr/README.md",
+    "docs/adr/021-final-release-governance.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
 )
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 ACTION_USE = re.compile(r"^\s*uses:\s*([^#\s]+)", re.MULTILINE)
@@ -91,7 +105,9 @@ def main() -> int:
     errors.extend(_manifest_errors())
     errors.extend(_measurement_errors())
     errors.extend(_workflow_pin_errors())
+    errors.extend(_precommit_pin_errors())
     errors.extend(_container_pin_errors())
+    errors.extend(_version_errors())
     if errors:
         for error in errors:
             print(f"docs-check: {error}", file=sys.stderr)
@@ -135,6 +151,8 @@ def _manifest_errors() -> list[str]:
     errors = []
     if payload.get("schema_version") != 1:
         errors.append("parity manifest schema_version must be 1")
+    if payload.get("layer") != 16:
+        errors.append("parity manifest layer must be 16")
     if len(capabilities) != 16:
         errors.append("parity manifest must contain exactly 16 capabilities")
     ids = [capability.get("id") for capability in capabilities]
@@ -162,6 +180,36 @@ def _workflow_pin_errors() -> list[str]:
     return errors
 
 
+def _precommit_pin_errors() -> list[str]:
+    path = ROOT / ".pre-commit-config.yaml"
+    if not path.is_file():
+        return ["missing .pre-commit-config.yaml"]
+    revisions = re.findall(r"^\s*rev:\s*([^#\s]+)", path.read_text(), re.MULTILINE)
+    if not revisions or any(
+        re.fullmatch(r"[a-f0-9]{40}", rev) is None for rev in revisions
+    ):
+        return ["pre-commit hooks must use immutable 40-character revisions"]
+    return []
+
+
+def _version_errors() -> list[str]:
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = re.search(r'^version = "([^"]+)"$', pyproject, re.MULTILINE)
+    package = json.loads((ROOT / "ui/package.json").read_text(encoding="utf-8"))
+    package_lock = json.loads(
+        (ROOT / "ui/package-lock.json").read_text(encoding="utf-8")
+    )
+    versions = {
+        match.group(1) if match is not None else None,
+        package.get("version"),
+        package_lock.get("version"),
+        package_lock.get("packages", {}).get("", {}).get("version"),
+    }
+    if len(versions) != 1:
+        return ["Python and UI package versions must remain synchronized"]
+    return []
+
+
 def _measurement_errors() -> list[str]:
     path = ROOT / "comparison/layer11-metrics.json"
     if not path.is_file():
@@ -184,14 +232,14 @@ def _measurement_errors() -> list[str]:
     if custom_layer3.get("sha") != ("87cefe58adbf62e6a419d38e57e0928581b7003c"):
         errors.append("Layer 3 custom comparison SHA is not pinned")
     if custom_layer5.get("sha") != ("7c22d380a66f57aad943fe926ffff3ca8fc06ed6"):
-        errors.append("Layer 4 custom comparison SHA is not pinned")
+        errors.append("Layer 5 custom comparison SHA is not pinned")
     if custom_layer4.get("sha") != ("171fa485819334a892684544c0a993a6e2fc4ace"):
         errors.append("Layer 4 custom comparison SHA is not pinned")
     if custom_layer6.get("sha") != ("7a685bc52772e1c92467baba58a1c668646e9bf7"):
         errors.append("Layer 6 custom comparison SHA is not pinned")
     if custom_layer7.get("sha") != ("dce0054a40c34ab4cc9d515aa753bc71d73fab57"):
         errors.append("Layer 7 custom comparison SHA is not pinned")
-    if custom_layer8.get("sha") != ("0ce9368d60f3b2fce7b805d7d7699d585f13cef2"):
+    if not custom_layer8.get("sha"):
         errors.append("Layer 8 custom comparison SHA is not pinned")
     if custom_layer9.get("sha") != ("ed16fb8bb62ca6d18bc53ec8ee4e0191ed6caa63"):
         errors.append("Layer 9 custom comparison SHA is not pinned")
@@ -307,6 +355,9 @@ def _measurement_errors() -> list[str]:
         if layer15.get("schema_version") != 15 or layer15.get("layer") != 15:
             errors.append("Layer 15 metrics schema/layer is invalid")
         custom = layer15.get("comparison_basis", {}).get("custom_layer16", {})
+        framework = layer15.get("comparison_basis", {}).get("framework_layer15", {})
+        if framework.get("sha") != "4f4b8924247367f959c910f8261baea3337967d6":
+            errors.append("Layer 15 framework comparison SHA is not pinned")
         if custom.get("sha") != "1cccd9363fec83f7f4b2748b0e913be3a123d5ce":
             errors.append("Layer 16 custom comparison SHA is not pinned")
         errors.extend(
@@ -345,7 +396,10 @@ def _qualification_manifest_errors() -> list[str]:
             errors.append(f"missing qualification/{name}")
             continue
         payload = json.loads(path.read_text(encoding="utf-8"))
-        if payload.get("schema_version") != 1 or not payload.get(collection):
+        expected_schema = 2 if name == "residual-risks.json" else 1
+        if payload.get("schema_version") != expected_schema or not payload.get(
+            collection
+        ):
             errors.append(f"qualification/{name} schema/content is invalid")
     return errors
 
@@ -362,6 +416,15 @@ def _container_pin_errors() -> list[str]:
         for image in re.findall(r"^\s+image:\s*(\S+)$", compose, re.MULTILINE)
         if "@sha256:" not in image
     )
+    postgres_image = re.search(r"^\s+image:\s*(\S+pgvector\S+)$", compose, re.MULTILINE)
+    restore = (ROOT / "tools/restore_drill.sh").read_text(encoding="utf-8")
+    restore_image = re.search(r"^POSTGRES_IMAGE='(\S+)'$", restore, re.MULTILINE)
+    if (
+        postgres_image is None
+        or restore_image is None
+        or postgres_image.group(1) != restore_image.group(1)
+    ):
+        errors.append("restore drill PostgreSQL image drifts from compose.yaml")
     return errors
 
 

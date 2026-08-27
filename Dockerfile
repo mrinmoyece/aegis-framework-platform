@@ -29,7 +29,7 @@ RUN ln -sf /usr/bin/python .venv/bin/python \
 
 FROM ${PYTHON_RUNTIME_IMAGE} AS runtime
 LABEL org.opencontainers.image.source="https://github.com/mrinmoyece/aegis-framework-platform" \
-      org.opencontainers.image.description="Aegis framework-first governed Layer 15"
+      org.opencontainers.image.description="Aegis framework-first governed Layer 16"
 ENV PATH="/app/.venv/bin:${PATH}" \
     AEGIS_MIGRATIONS_DIR="/app/migrations" \
     LANGGRAPH_STRICT_MSGPACK=true \

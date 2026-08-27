@@ -11,7 +11,7 @@ spec:
         operations: ["CREATE", "UPDATE"]
         resources: ["pods"]
   validations:
-    - expression: "object.spec.containers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$')) && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$'))) && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$')))"
+    - expression: "object.spec.containers.all(c, c.image.matches('^.+@sha256:[a-f0-9]{64}$'))"
       message: Every container image must use an OCI sha256 digest.
     - expression: "!has(object.spec.hostNetwork) || object.spec.hostNetwork == false"
       message: hostNetwork is forbidden.
@@ -19,8 +19,8 @@ spec:
       message: hostPID is forbidden.
     - expression: "!has(object.spec.hostIPC) || object.spec.hostIPC == false"
       message: hostIPC is forbidden.
-    - expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL')) && (!has(object.spec.initContainers) || object.spec.initContainers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL'))) && (!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL')))"
-      message: Containers, initContainers, and ephemeralContainers must be non-root, read-only, drop-all, and non-privileged.
+    - expression: "object.spec.containers.all(c, has(c.securityContext) && c.securityContext.runAsNonRoot == true && c.securityContext.readOnlyRootFilesystem == true && c.securityContext.allowPrivilegeEscalation == false && (!has(c.securityContext.privileged) || c.securityContext.privileged == false) && has(c.securityContext.capabilities) && c.securityContext.capabilities.drop.exists(x, x == 'ALL'))"
+      message: Containers must be non-root, read-only, drop-all, and non-privileged.
     - expression: "object.spec.volumes.all(v, !has(v.hostPath))"
       message: hostPath volumes are forbidden.
     - expression: "object.spec.containers.all(c, has(c.resources.requests.cpu) && has(c.resources.requests.memory) && has(c.resources.limits.cpu) && has(c.resources.limits.memory))"
@@ -74,3 +74,4 @@ metadata:
 spec:
   policyName: aegis-sandbox-boundary
   validationActions: [Deny, Audit]
+

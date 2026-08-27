@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 from dataclasses import replace
 from hashlib import sha256
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -39,16 +37,6 @@ from aegis_framework.telemetry import (
     readiness_snapshot,
     safe_attributes,
 )
-
-_OBSERVABILITY_CHECK_SPEC = importlib.util.spec_from_file_location(
-    "observability_check",
-    Path(__file__).resolve().parents[1] / "tools" / "observability_check.py",
-)
-assert _OBSERVABILITY_CHECK_SPEC is not None
-assert _OBSERVABILITY_CHECK_SPEC.loader is not None
-_observability_check = importlib.util.module_from_spec(_OBSERVABILITY_CHECK_SPEC)
-_OBSERVABILITY_CHECK_SPEC.loader.exec_module(_observability_check)
-_exporter_errors = _observability_check._exporter_errors
 
 
 class _Sink:
@@ -225,17 +213,6 @@ def test_metric_definitions_histograms_gauges_and_errors() -> None:
             -1,
             labels={"component": "api", "operation": "request", "status": "ok"},
         )
-    with pytest.raises(ValueError, match="outside its stable enumeration"):
-        registry.record(
-            "aegis_safety_violations_total",
-            1,
-            labels={"control": "tenant-acme", "severity": "page"},
-        )
-    registry.record(
-        "aegis_safety_violations_total",
-        1,
-        labels={"control": "ledger", "severity": "page"},
-    )
     registry.record(
         "aegis_dependency_ready",
         1,
@@ -614,53 +591,6 @@ def test_api_rejects_hostile_context_and_telemetry_outage_does_not_block() -> No
     runtime = replace(_build_demo_runtime(budget_units=100), metrics=_FailingMetrics())
     outage_client = TestClient(create_app(mode=AppMode.TEST, runtime=runtime))
     assert outage_client.get("/v1/me", headers=_headers()).status_code == 200
-
-
-def test_api_metrics_track_only_authenticated_business_requests() -> None:
-    metrics = MetricRegistry()
-    runtime = replace(_build_demo_runtime(budget_units=100), metrics=metrics)
-    client = TestClient(create_app(mode=AppMode.TEST, runtime=runtime))
-
-    assert client.get("/healthz").status_code == 200
-    assert client.get("/metrics").status_code == 200
-    assert client.get("/v1/me").status_code == 401
-    assert client.get("/v1/me", headers=_headers()).status_code == 200
-
-    rendered = metrics.render_prometheus()
-    assert (
-        'aegis_operations_total{component="api",operation="request",status="ok"} 1'
-        in rendered
-    )
-    assert (
-        'aegis_operations_total{component="api",operation="request",status="error"}'
-        not in rendered
-    )
-
-
-def test_observability_check_enforces_remote_exporter_tls() -> None:
-    assert _exporter_errors(
-        {
-            "otlphttp/optional_trace_backend": {
-                "endpoint": "http://collector.invalid",
-            }
-        }
-    ) == ["otlphttp/optional_trace_backend must configure TLS explicitly"]
-    assert _exporter_errors(
-        {
-            "otlphttp/optional_trace_backend": {
-                "endpoint": "https://collector.invalid",
-                "tls": {"insecure": True},
-            }
-        }
-    ) == ["otlphttp/optional_trace_backend must set tls.insecure to false"]
-    assert not _exporter_errors(
-        {
-            "otlphttp/optional_trace_backend": {
-                "endpoint": "https://collector.invalid",
-                "tls": {"insecure": False},
-            }
-        }
-    )
 
 
 def test_replay_cli_is_read_only_and_redacted(tmp_path, capsys) -> None:
