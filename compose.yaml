@@ -103,7 +103,7 @@ services:
       - no-new-privileges:true
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.132.0@sha256:e0f565815b2b8e78eb9fdbb80f6190c921ab323aaa8ccceab3255c6d4225f4af
+    image: otel/opentelemetry-collector-contrib:0.159.0@sha256:1f2c54a30e713fac6b3ae77a1ec84010c2007e29ced8ec666214fc2f6739c1cc
     profiles: ["observability"]
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     environment:
