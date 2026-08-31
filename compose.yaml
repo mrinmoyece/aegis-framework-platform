@@ -45,7 +45,7 @@ services:
       - no-new-privileges:true
 
   temporal:
-    image: temporalio/auto-setup:1.29.1@sha256:5b3502a3b685f9eff1b925af90c57c9e3dbeccbef367cc28a2a9712c63379312
+    image: temporalio/auto-setup:1.29.3@sha256:9be7b8d98f60d00f4f2ff74731c071a17848d8182bbc8429e314a24c94ea105b
     profiles: ["temporal"]
     depends_on:
       postgres:
